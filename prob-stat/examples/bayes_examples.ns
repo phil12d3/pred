@@ -1,0 +1,257 @@
+// bayes_examples.ns — worked examples for every bayes function.
+
+prob = import("./prob-stat.ns");
+b = prob.bayes;
+
+printline("=== prob-stat: bayes examples ===");
+printline("");
+
+// ── bayesUpdate ───────────────────────────────────────────────────────────────
+printline("── bayesUpdate ───────────────────────────────────────────");
+printline("");
+
+// Medical test: disease prevalence 0.1%, test accuracy 99%.
+// P(positive) = P(pos|disease)*P(disease) + P(pos|no disease)*P(no disease)
+//             = 0.99*0.001 + 0.01*0.999 = 0.01098
+printline("Medical test (disease prevalence 0.1%, test accuracy 99%):");
+printline("  Prior P(disease)            = 0.001");
+printline("  P(positive | disease)       = 0.99");
+printline("  P(positive)                 = 0.01098");
+post1 = b.bayesUpdate(0.001, 0.99, 0.01098);
+printline("  Posterior P(disease | +ve)  = ", post1);
+printline("  (A positive result is only ~9% likely true when base rate is very low)");
+printline("");
+
+// What if tested again and still positive?
+post2 = b.bayesUpdate(post1, 0.99, 0.01098);
+printline("  After a second positive test:");
+printline("  Posterior = ", post2);
+printline("");
+
+// Spam filter: email contains word 'free'.
+// P(spam)=0.4, P('free'|spam)=0.8, P('free')=0.35
+printline("Spam filter (email contains 'free'):");
+printline("  Prior P(spam)          = 0.4");
+printline("  P(free | spam)         = 0.8");
+printline("  P(free)                = 0.35");
+printline("  P(spam | 'free')       = ", b.bayesUpdate(0.4, 0.8, 0.35));
+printline("");
+
+// Drug test: P(user)=0.05, test sensitivity=0.95, P(positive)=0.10
+printline("Drug test (5% usage rate, 95% sensitivity):");
+printline("  Prior P(user)          = 0.05");
+printline("  P(positive | user)     = 0.95");
+printline("  P(positive)            = 0.10");
+printline("  P(user | positive)     = ", b.bayesUpdate(0.05, 0.95, 0.10));
+printline("");
+
+// ── sequentialUpdate ─────────────────────────────────────────────────────────
+printline("── sequentialUpdate ──────────────────────────────────────");
+printline("");
+
+// Server fault diagnosis: prior = 20%, three independent diagnostic checks.
+printline("Server fault diagnosis (prior = 0.2):");
+printline("  Check 1: high CPU temp   P(hi temp | fault)=0.70  P(hi temp)=0.30");
+printline("  Check 2: high error rate P(hi errors| fault)=0.80 P(hi errors)=0.35");
+printline("  Check 3: high disk latency P(hi latency|fault)=0.60 P(hi latency)=0.25");
+
+steps1 = [{ likelihood: 0.7, evidence: 0.3 }];
+steps2 = [{ likelihood: 0.7, evidence: 0.3 }, { likelihood: 0.8, evidence: 0.35 }];
+steps3 = [
+    { likelihood: 0.7,  evidence: 0.3  },
+    { likelihood: 0.8,  evidence: 0.35 },
+    { likelihood: 0.6,  evidence: 0.25 }
+];
+printline("  After check 1:     ", b.sequentialUpdate(0.2, steps1));
+printline("  After checks 1+2:  ", b.sequentialUpdate(0.2, steps2));
+printline("  After all 3:       ", b.sequentialUpdate(0.2, steps3));
+printline("");
+
+// Weather forecast.
+printline("Weather: P(rain tomorrow) starting from 0.3:");
+wSteps = [
+    { likelihood: 0.85, evidence: 0.4 },
+    { likelihood: 0.90, evidence: 0.5 }
+];
+printline("  Prior                      = 0.3");
+printline("  After low pressure         = ", b.sequentialUpdate(0.3, [wSteps[0]]));
+printline("  After low pressure+clouds  = ", b.sequentialUpdate(0.3, wSteps));
+printline("");
+
+// Credit risk: prior P(default)=0.05.
+printline("Credit risk P(default) starting from 0.05:");
+cSteps = [
+    { likelihood: 0.8, evidence: 0.3 },   // late payment observed
+    { likelihood: 0.7, evidence: 0.25 },  // credit utilisation high
+    { likelihood: 0.6, evidence: 0.2 }    // recent job change
+];
+printline("  Prior                      = 0.05");
+printline("  After late payment         = ", b.sequentialUpdate(0.05, [cSteps[0]]));
+printline("  + high credit utilisation  = ", b.sequentialUpdate(0.05, [cSteps[0], cSteps[1]]));
+printline("  + recent job change        = ", b.sequentialUpdate(0.05, cSteps));
+printline("");
+
+// ── posteriorDistribution ─────────────────────────────────────────────────────
+printline("── posteriorDistribution ─────────────────────────────────");
+printline("");
+
+// Three competing models with equal priors; likelihoods differ.
+printline("Three competing models (equal priors):");
+mh = [
+    { name: "Model A", prior: 1/3, likelihood: 0.9 },
+    { name: "Model B", prior: 1/3, likelihood: 0.4 },
+    { name: "Model C", prior: 1/3, likelihood: 0.1 }
+];
+mr = b.posteriorDistribution(mh);
+i = 0;
+while (i < mr.length) {
+    printline("  ", mr[i].name, " posterior = ", mr[i].posterior);
+    i = i + 1;
+}
+printline("");
+
+// Differential diagnosis: flu / cold / COVID.
+printline("Differential diagnosis (cough + fever symptoms):");
+dh = [
+    { name: "Flu",       prior: 0.60, likelihood: 0.70 },
+    { name: "Cold",      prior: 0.30, likelihood: 0.50 },
+    { name: "COVID-19",  prior: 0.10, likelihood: 0.90 }
+];
+dr = b.posteriorDistribution(dh);
+i = 0;
+while (i < dr.length) {
+    printline("  ", dr[i].name, " = ", dr[i].posterior);
+    i = i + 1;
+}
+printline("");
+
+// Biased coin identification.
+printline("Biased coin identification: one flip = heads.");
+ch = [
+    { name: "Coin p=0.3", prior: 1/3, likelihood: 0.3 },
+    { name: "Coin p=0.5", prior: 1/3, likelihood: 0.5 },
+    { name: "Coin p=0.9", prior: 1/3, likelihood: 0.9 }
+];
+cr = b.posteriorDistribution(ch);
+i = 0;
+while (i < cr.length) {
+    printline("  ", cr[i].name, " = ", cr[i].posterior);
+    i = i + 1;
+}
+printline("");
+
+// Root cause analysis for a server outage.
+printline("Server outage root cause:");
+rh = [
+    { name: "Database failure",   prior: 0.25, likelihood: 0.80 },
+    { name: "Network issue",      prior: 0.40, likelihood: 0.30 },
+    { name: "Application crash",  prior: 0.25, likelihood: 0.60 },
+    { name: "DDoS attack",        prior: 0.10, likelihood: 0.95 }
+];
+rr = b.posteriorDistribution(rh);
+i = 0;
+while (i < rr.length) {
+    printline("  ", rr[i].name, " = ", rr[i].posterior);
+    i = i + 1;
+}
+printline("");
+
+// ── train + predict: naive Bayes classifier ───────────────────────────────────
+printline("── Naive Bayes classifier ────────────────────────────────");
+printline("");
+
+// Sentiment classifier.
+printline("Sentiment classifier (positive / negative reviews):");
+ss = [
+    { label: "positive", features: ["great", "love", "excellent", "amazing"] },
+    { label: "positive", features: ["fantastic", "wonderful", "best", "love"] },
+    { label: "positive", features: ["happy", "great", "recommended", "excellent"] },
+    { label: "positive", features: ["perfect", "brilliant", "enjoy", "amazing"] },
+    { label: "negative", features: ["terrible", "awful", "hate", "worst"] },
+    { label: "negative", features: ["broken", "waste", "disappointed", "bad"] },
+    { label: "negative", features: ["horrible", "poor", "useless", "hate"] },
+    { label: "negative", features: ["defective", "returned", "broken", "awful"] }
+];
+sm = b.train(ss);
+printline("Trained on ", sm.totalSamples, " samples.");
+
+testInputs = [
+    ["great", "love"],
+    ["terrible", "broken"],
+    ["amazing", "wonderful"],
+    ["hate", "worst"],
+    ["great", "awful"]
+];
+ti = 0;
+while (ti < testInputs.count()) {
+    res = b.predict(sm, testInputs[ti]);
+    printline("  Input: ", stringify(testInputs[ti]), "  => ", res[0].label, "  (p=", res[0].probability, ")");
+    ti = ti + 1;
+}
+printline("");
+
+// Topic classifier: sports / tech / food.
+printline("Topic classifier (sports / tech / food):");
+ts = [
+    { label: "sports", features: ["goal", "team", "match", "player", "win"] },
+    { label: "sports", features: ["score", "league", "championship", "player"] },
+    { label: "sports", features: ["match", "coach", "stadium", "goal", "win"] },
+    { label: "tech",   features: ["software", "bug", "deploy", "server", "code"] },
+    { label: "tech",   features: ["algorithm", "database", "api", "code", "bug"] },
+    { label: "tech",   features: ["deploy", "cloud", "container", "server"] },
+    { label: "food",   features: ["recipe", "cook", "ingredient", "bake", "eat"] },
+    { label: "food",   features: ["restaurant", "dish", "flavour", "cook", "meal"] },
+    { label: "food",   features: ["ingredient", "sauce", "bake", "recipe", "eat"] }
+];
+tm = b.train(ts);
+printline("Trained on ", tm.totalSamples, " samples.");
+
+topicTests = [
+    ["goal", "team", "player"],
+    ["code", "bug", "deploy"],
+    ["recipe", "bake", "ingredient"],
+    ["match", "code"],
+    ["cook", "score"]
+];
+ti = 0;
+while (ti < topicTests.count()) {
+    res = b.predict(tm, topicTests[ti]);
+    printline("  Input: ", stringify(topicTests[ti]));
+    ri = 0;
+    while (ri < res.length) {
+        printline("    ", res[ri].label, " = ", res[ri].probability);
+        ri = ri + 1;
+    }
+    ti = ti + 1;
+}
+printline("");
+
+// Language detector: English / French / Spanish based on common words.
+printline("Language detector (English / French / Spanish):");
+ls = [
+    { label: "english", features: ["the", "and", "is", "in", "to"] },
+    { label: "english", features: ["of", "a", "that", "it", "with"] },
+    { label: "english", features: ["was", "he", "for", "on", "are"] },
+    { label: "french",  features: ["le", "de", "et", "la", "les"] },
+    { label: "french",  features: ["un", "une", "du", "des", "en"] },
+    { label: "french",  features: ["est", "que", "il", "au", "ce"] },
+    { label: "spanish", features: ["el", "de", "la", "que", "en"] },
+    { label: "spanish", features: ["un", "una", "los", "las", "es"] },
+    { label: "spanish", features: ["se", "del", "por", "con", "su"] }
+];
+lm = b.train(ls);
+langTests = [
+    ["the", "and", "is"],
+    ["le", "de", "la"],
+    ["el", "la", "que"],
+    ["de", "la", "en"]
+];
+li = 0;
+while (li < langTests.count()) {
+    res = b.predict(lm, langTests[li]);
+    printline("  Input: ", stringify(langTests[li]), "  => ", res[0].label, "  (p=", res[0].probability, ")");
+    li = li + 1;
+}
+printline("");
+
+printline("Done.");

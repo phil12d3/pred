@@ -1,0 +1,174 @@
+// core_tests.ns — tests for prob-stat core module.
+// Each test function is fully self-contained (no module-level captures).
+
+[test]
+testSafeDivNormal = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.safeDiv(10, 2), 5, "safeDiv 10/2 = 5");
+};
+
+[test]
+testSafeDivByZero = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.safeDiv(5, 0), 0, "safeDiv x/0 = 0");
+};
+
+[test]
+testClamp01Below = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.clamp01(-0.5), 0, "clamp01 negative => 0");
+};
+
+[test]
+testClamp01Above = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.clamp01(1.5), 1, "clamp01 >1 => 1");
+};
+
+[test]
+testClamp01Mid = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.clamp01(0.4), 0.4, "clamp01 mid passes through");
+};
+
+[test]
+testFactorial0 = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.factorial(0), 1, "0! = 1");
+};
+
+[test]
+testFactorial5 = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.factorial(5), 120, "5! = 120");
+};
+
+[test]
+testFactorial10 = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.factorial(10), 3628800, "10! = 3628800");
+};
+
+[test]
+testCombC52 = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.combinations(5, 2), 10, "C(5,2) = 10");
+};
+
+[test]
+testCombC00 = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.combinations(0, 0), 1, "C(0,0) = 1");
+};
+
+[test]
+testCombC63 = func(t) {
+    core = import("./prob-stat.ns").core;
+    t.equal(core.combinations(6, 3), 20, "C(6,3) = 20");
+};
+
+[test]
+testFrequencyTable = func(t) {
+    core = import("./prob-stat.ns").core;
+    outcomes = ["a", "b", "a", "c", "a"];
+    ft = core.frequencyTable(outcomes);
+    t.equal(ft.total, 5, "frequencyTable total = 5");
+    t.equal(ft.counts["a"], 3, "frequencyTable a=3");
+    t.equal(ft.counts["b"], 1, "frequencyTable b=1");
+};
+
+[test]
+testProbability = func(t) {
+    core = import("./prob-stat.ns").core;
+    outcomes = ["heads", "tails", "heads", "heads"];
+    p = core.probability(outcomes, "heads");
+    diff = p - 0.75; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "P(heads) approx 0.75");
+};
+
+[test]
+testJoint = func(t) {
+    core = import("./prob-stat.ns").core;
+    v = core.joint(0.5, 0.5);
+    diff = v - 0.25; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.0001, "joint 0.5*0.5 = 0.25");
+};
+
+[test]
+testUnion = func(t) {
+    core = import("./prob-stat.ns").core;
+    v = core.union(0.3, 0.4);
+    diff = v - 0.58; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.0001, "union(0.3,0.4) approx 0.58");
+};
+
+[test]
+testComplement = func(t) {
+    core = import("./prob-stat.ns").core;
+    v = core.complement(0.3);
+    diff = v - 0.7; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.0001, "complement(0.3) = 0.7");
+};
+
+[test]
+testConditional = func(t) {
+    core = import("./prob-stat.ns").core;
+    v = core.conditional(0.2, 0.5);
+    diff = v - 0.4; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.0001, "conditional(0.2,0.5) = 0.4");
+};
+
+[test]
+testExpectedValue = func(t) {
+    core = import("./prob-stat.ns").core;
+    values = [1, 2, 3, 4, 5, 6];
+    probs  = [1/6, 1/6, 1/6, 1/6, 1/6, 1/6];
+    ev = core.expectedValue(values, probs);
+    diff = ev - 3.5; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "E[fair die] approx 3.5");
+};
+
+[test]
+testVarianceAndStddev = func(t) {
+    core = import("./prob-stat.ns").core;
+    values = [1, 2, 3];
+    probs  = [1/3, 1/3, 1/3];
+    mean   = core.expectedValue(values, probs);
+    v      = core.variance(values, probs, mean);
+    dv = v - 0.6667; if (dv < 0) dv = 0 - dv;
+    t.truthy(dv <= 0.001, "variance approx 0.6667");
+    sd = core.stddev(v);
+    ds = sd - 0.8165; if (ds < 0) ds = 0 - ds;
+    t.truthy(ds <= 0.001, "stddev approx 0.8165");
+};
+
+[test]
+testEntropyUniform = func(t) {
+    core = import("./prob-stat.ns").core;
+    probs = [0.5, 0.5];
+    h = core.entropy(probs);
+    diff = h - 1.0; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "H(0.5,0.5) approx 1 bit");
+};
+
+[test]
+testEntropyMax = func(t) {
+    core = import("./prob-stat.ns").core;
+    probs = [0.25, 0.25, 0.25, 0.25];
+    h = core.entropy(probs);
+    diff = h - 2.0; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "H(uniform 4) approx 2 bits");
+};
+
+[test]
+testNormalize = func(t) {
+    core = import("./prob-stat.ns").core;
+    weights = [1, 2, 1];
+    probs = core.normalize(weights);
+    d0 = probs[0] - 0.25; if (d0 < 0) d0 = 0 - d0;
+    d1 = probs[1] - 0.5;  if (d1 < 0) d1 = 0 - d1;
+    d2 = probs[2] - 0.25; if (d2 < 0) d2 = 0 - d2;
+    t.truthy(d0 <= 0.001, "normalize[0] = 0.25");
+    t.truthy(d1 <= 0.001, "normalize[1] = 0.5");
+    t.truthy(d2 <= 0.001, "normalize[2] = 0.25");
+};

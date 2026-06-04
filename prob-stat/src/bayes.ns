@@ -1,0 +1,190 @@
+// bayes.ns — Bayes' theorem, posterior updates, and naive Bayes classifier.
+
+core = import("./src/core.ns");
+
+// ── Basic Bayes ───────────────────────────────────────────────────────────────
+
+// Posterior P(H|E) = P(E|H) * P(H) / P(E).
+// Returns 0 when evidence is zero.
+bayesUpdate = func(prior, likelihood, evidence) {
+    if (evidence == 0) return 0;
+    return this.core.clamp01(this.core.safeDiv(likelihood * prior, evidence));
+};
+
+// Update a discrete hypothesis table given new evidence.
+// hypotheses = [{name, prior, likelihood}, ...]
+// Returns [{name, posterior}, ...] normalised to sum to 1.
+posteriorDistribution = func(hypotheses) {
+    // Compute unnormalised posteriors.
+    unnorm = [];
+    i = 0;
+    while (i < hypotheses.length) {
+        h = hypotheses[i];
+        score = h.prior * h.likelihood;
+        unnorm = unnorm + [{ name: h.name, score: score }];
+        i = i + 1;
+    }
+    // Sum scores.
+    total = 0;
+    j = 0;
+    while (j < unnorm.length) {
+        total = total + unnorm[j].score;
+        j = j + 1;
+    }
+    // Normalise.
+    result = [];
+    k = 0;
+    while (k < unnorm.length) {
+        p = this.core.safeDiv(unnorm[k].score, total);
+        result = result + [{ name: unnorm[k].name, posterior: p }];
+        k = k + 1;
+    }
+    return result;
+};
+
+// ── Naive Bayes classifier ────────────────────────────────────────────────────
+
+// Train a naive Bayes model from labelled samples.
+// samples = [{label, features: [string, ...]}, ...]
+// Returns a model object used by predict().
+train = func(samples) {
+    classCounts = {};
+    featureCounts = {};   // featureCounts[label][feature] = count
+    totalSamples = samples.length;
+
+    i = 0;
+    while (i < samples.length) {
+        s = samples[i];
+        label = s.label;
+
+        // Increment class count.
+        if (classCounts[label] == null) classCounts[label] = 0;
+        classCounts[label] = classCounts[label] + 1;
+
+        // Increment feature counts.
+        if (featureCounts[label] == null) featureCounts[label] = {};
+        j = 0;
+        while (j < s.features.length) {
+            f = s.features[j];
+            if (featureCounts[label][f] == null) featureCounts[label][f] = 0;
+            featureCounts[label][f] = featureCounts[label][f] + 1;
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return {
+        classCounts:   classCounts,
+        featureCounts: featureCounts,
+        totalSamples:  totalSamples
+    };
+};
+
+// Predict class probabilities for a list of features given a trained model.
+// Returns [{label, probability}, ...] sorted by descending probability.
+predict = func(model, features) {
+    // Collect label names from classCounts properties.
+    labels = [];
+    foreach(lbl in model.classCounts.props) {
+        labels = labels + [lbl];
+    }
+    scores = [];
+
+    i = 0;
+    while (i < labels.length) {
+        label = labels[i];
+        // Log-space to avoid underflow: log P(C) + sum log P(f|C)
+        logP = this.core.ln(
+            this.core.safeDiv(model.classCounts[label], model.totalSamples)
+        );
+
+        featureCountsForLabel = model.featureCounts[label];
+        labelTotal = model.classCounts[label];
+
+        j = 0;
+        while (j < features.length) {
+            f = features[j];
+            // Laplace smoothing: add 1 to numerator, 2 to denominator.
+            count = 0;
+            if (featureCountsForLabel[f] != null) {
+                count = featureCountsForLabel[f];
+            }
+            logP = logP + this.core.ln(
+                this.core.safeDiv(count + 1, labelTotal + 2)
+            );
+            j = j + 1;
+        }
+        scores = scores + [{ label: label, logScore: logP }];
+        i = i + 1;
+    }
+
+    // Convert log-scores to normalised probabilities via softmax.
+    // Find max to stabilise exp.
+    maxScore = scores[0].logScore;
+    k = 1;
+    while (k < scores.length) {
+        if (scores[k].logScore > maxScore) maxScore = scores[k].logScore;
+        k = k + 1;
+    }
+    expScores = [];
+    expTotal = 0;
+    m = 0;
+    while (m < scores.length) {
+        e = this.core.ln(1);  // placeholder — will use exp helper
+        // Import exp from distributions? Keep self-contained: inline exp here.
+        eVal = 1;
+        xv = scores[m].logScore - maxScore;
+        term = 1;
+        ti = 1;
+        while (ti <= 60) {
+            term = term * this.core.safeDiv(xv, ti);
+            eVal = eVal + term;
+            if (term < 0.0000000001 && term > -0.0000000001) break;
+            ti = ti + 1;
+        }
+        expScores = expScores + [{ label: scores[m].label, e: eVal }];
+        expTotal = expTotal + eVal;
+        m = m + 1;
+    }
+
+    result = [];
+    n = 0;
+    while (n < expScores.length) {
+        result = result + [{
+            label:       expScores[n].label,
+            probability: this.core.clamp01(
+                this.core.safeDiv(expScores[n].e, expTotal)
+            )
+        }];
+        n = n + 1;
+    }
+
+    // Simple descending sort by probability (insertion sort).
+    sorted = result;
+    p = 1;
+    while (p < sorted.length) {
+        current = sorted[p];
+        q = p - 1;
+        while (q >= 0 && sorted[q].probability < current.probability) {
+            sorted[q + 1] = sorted[q];
+            q = q - 1;
+        }
+        sorted[q + 1] = current;
+        p = p + 1;
+    }
+    return sorted;
+};
+
+// ── Incremental Bayesian update ────────────────────────────────────────────────
+
+// Apply multiple rounds of evidence to a prior in sequence.
+// steps = [{likelihood, evidence}, ...]
+// Returns the final posterior probability.
+sequentialUpdate = func(initialPrior, steps) {
+    posterior = initialPrior;
+    i = 0;
+    while (i < steps.length) {
+        posterior = this.bayesUpdate(posterior, steps[i].likelihood, steps[i].evidence);
+        i = i + 1;
+    }
+    return posterior;
+};

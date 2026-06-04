@@ -1,0 +1,178 @@
+// distributions_tests.ns — tests for prob-stat distributions module.
+// Each test function is fully self-contained.
+
+[test]
+testBinomialPMF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.binomialPMF(10, 3, 0.5);
+    diff = p - 0.1172; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Binomial PMF(10,3,0.5) approx 0.1172");
+};
+
+[test]
+testBinomialPMFPeakAtMean = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p5 = dist.binomialPMF(10, 5, 0.5);
+    p4 = dist.binomialPMF(10, 4, 0.5);
+    p6 = dist.binomialPMF(10, 6, 0.5);
+    t.truthy(p5 >= p4, "binomial mode PMF(5) >= PMF(4)");
+    t.truthy(p5 >= p6, "binomial mode PMF(5) >= PMF(6)");
+};
+
+[test]
+testBinomialCDFAllSuccess = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.binomialCDF(5, 5, 0.7);
+    diff = p - 1.0; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Binomial CDF(5,5,0.7) = 1");
+};
+
+[test]
+testBinomialCDFHalf = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.binomialCDF(10, 5, 0.5);
+    diff = p - 0.6230; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Binomial CDF(10,5,0.5) approx 0.623");
+};
+
+[test]
+testBinomialStats = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    s = dist.binomialStats(20, 0.4);
+    dm = s.mean - 8.0;     if (dm < 0) dm = 0 - dm;
+    dv = s.variance - 4.8; if (dv < 0) dv = 0 - dv;
+    t.truthy(dm <= 0.001, "Binomial mean(20,0.4) = 8");
+    t.truthy(dv <= 0.001, "Binomial var(20,0.4) = 4.8");
+};
+
+[test]
+testPoissonPMF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.poissonPMF(3, 2);
+    diff = p - 0.2240; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Poisson PMF(lambda=3,k=2) approx 0.224");
+};
+
+[test]
+testPoissonCDF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.poissonCDF(1, 0);
+    diff = p - 0.3679; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Poisson CDF(lambda=1,k=0) approx 0.3679");
+};
+
+[test]
+testPoissonStats = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    s = dist.poissonStats(5);
+    dm = s.mean - 5.0;     if (dm < 0) dm = 0 - dm;
+    dv = s.variance - 5.0; if (dv < 0) dv = 0 - dv;
+    t.truthy(dm <= 0.001, "Poisson mean = lambda = 5");
+    t.truthy(dv <= 0.001, "Poisson variance = lambda = 5");
+};
+
+[test]
+testStandardNormalCDFAtZero = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.standardNormalCDF(0);
+    diff = p - 0.5; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Phi(0) = 0.5");
+};
+
+[test]
+testStandardNormalCDFAt1 = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.standardNormalCDF(1);
+    diff = p - 0.8413; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Phi(1) approx 0.8413");
+};
+
+[test]
+testStandardNormalCDFNeg = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.standardNormalCDF(-1);
+    diff = p - 0.1587; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Phi(-1) approx 0.1587");
+};
+
+[test]
+testNormalPDF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.normalPDF(0, 0, 1);
+    diff = p - 0.3989; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "N(0,1) PDF at 0 approx 0.3989");
+};
+
+[test]
+testNormalBetween = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.normalBetween(-1, 1, 0, 1);
+    diff = p - 0.6827; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "P(-1<X<1) approx 0.6827");
+};
+
+[test]
+testUniformPDF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.uniformPDF(2, 0, 4);
+    diff = p - 0.25; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Uniform PDF(2; 0,4) = 0.25");
+};
+
+[test]
+testUniformPDFOutside = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    t.equal(dist.uniformPDF(5, 0, 4), 0, "Uniform PDF outside range = 0");
+};
+
+[test]
+testUniformCDF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.uniformCDF(3, 0, 10);
+    diff = p - 0.3; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Uniform CDF(3; 0,10) = 0.3");
+};
+
+[test]
+testUniformStats = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    s = dist.uniformStats(0, 12);
+    dm = s.mean - 6.0;      if (dm < 0) dm = 0 - dm;
+    dv = s.variance - 12.0; if (dv < 0) dv = 0 - dv;
+    t.truthy(dm <= 0.001, "Uniform mean(0,12) = 6");
+    t.truthy(dv <= 0.001, "Uniform var(0,12) = 12");
+};
+
+[test]
+testGeometricPMF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.geometricPMF(1, 0.5);
+    diff = p - 0.5; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Geometric PMF(k=1,p=0.5) = 0.5");
+};
+
+[test]
+testGeometricPMFk3 = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.geometricPMF(3, 0.5);
+    diff = p - 0.125; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Geometric PMF(k=3,p=0.5) = 0.125");
+};
+
+[test]
+testGeometricCDF = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    p = dist.geometricCDF(2, 0.5);
+    diff = p - 0.75; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "Geometric CDF(k=2,p=0.5) = 0.75");
+};
+
+[test]
+testGeometricStats = func(t) {
+    dist = import("./prob-stat.ns").distributions;
+    s = dist.geometricStats(0.25);
+    dm = s.mean - 4.0;      if (dm < 0) dm = 0 - dm;
+    dv = s.variance - 12.0; if (dv < 0) dv = 0 - dv;
+    t.truthy(dm <= 0.001, "Geometric mean(p=0.25) = 4");
+    t.truthy(dv <= 0.001, "Geometric var(p=0.25) = 12");
+};

@@ -1,0 +1,158 @@
+// core_examples.ns — worked examples for every core probability function.
+
+prob = import("./prob-stat.ns");
+c = prob.core;
+
+printline("=== prob-stat: core examples ===");
+printline("");
+
+// frequencyTable + probability
+printline("── frequencyTable + probability ──────────────────────────");
+printline("");
+
+rolls = [1,2,3,4,5,6,6,6,5,4,3,2,1,6,5,6,4,3,2,6];
+ft = c.frequencyTable(rolls);
+printline("20 die rolls (weighted towards 6):");
+printline("  total = ", ft.total);
+printline("  P(1) = ", c.probability(rolls, 1));
+printline("  P(2) = ", c.probability(rolls, 2));
+printline("  P(3) = ", c.probability(rolls, 3));
+printline("  P(4) = ", c.probability(rolls, 4));
+printline("  P(5) = ", c.probability(rolls, 5));
+printline("  P(6) = ", c.probability(rolls, 6));
+printline("");
+
+lights = ["red","green","red","amber","red","green","green","red","amber","green"];
+printline("Traffic light observations (10 samples):");
+printline("  P(red)   = ", c.probability(lights, "red"));
+printline("  P(green) = ", c.probability(lights, "green"));
+printline("  P(amber) = ", c.probability(lights, "amber"));
+printline("");
+
+// joint / union / complement / conditional
+printline("── joint / union / complement / conditional ──────────────");
+printline("");
+
+pHeart      = 13/52;
+pFace       = 12/52;
+pFaceAndHrt = 3/52;
+printline("Card drawing from a 52-card deck:");
+printline("  P(heart)                          = ", pHeart);
+printline("  P(face card)                      = ", pFace);
+printline("  P(not heart)                      = ", c.complement(pHeart));
+printline("  P(2 hearts in a row, replacement) = ", c.joint(pHeart, pHeart));
+printline("  P(heart OR face card)             = ", c.union(pHeart, pFace));
+printline("  P(face card | heart)              = ", c.conditional(pFaceAndHrt, pHeart));
+printline("");
+
+pSmoke  = 0.02;
+pMotion = 0.03;
+printline("Security system (independent sensors):");
+printline("  P(smoke alarm)     = ", pSmoke);
+printline("  P(motion sensor)   = ", pMotion);
+printline("  P(both fire)       = ", c.joint(pSmoke, pMotion));
+printline("  P(either fires)    = ", c.union(pSmoke, pMotion));
+printline("  P(no smoke alarm)  = ", c.complement(pSmoke));
+printline("");
+
+printline("System diagnostics (P(error|warning) = P(error AND warning)/P(warning)):");
+printline("  P(error AND warning) = 0.04,  P(warning) = 0.10");
+printline("  P(error | warning)   = ", c.conditional(0.04, 0.10));
+printline("");
+
+// expectedValue / variance / stddev
+printline("── expectedValue / variance / stddev ─────────────────────");
+printline("");
+
+payouts = [0, 1000, 5000, 20000, 100000];
+iprobs  = [0.80, 0.10, 0.06, 0.03, 0.01];
+iev  = c.expectedValue(payouts, iprobs);
+iv   = c.variance(payouts, iprobs, iev);
+isd  = c.stddev(iv);
+printline("Insurance payout distribution:");
+printline("  $0 P=0.80  $1000 P=0.10  $5000 P=0.06  $20000 P=0.03  $100000 P=0.01");
+printline("  E[payout]      = $", iev);
+printline("  Variance       = ", iv);
+printline("  Std deviation  = $", isd);
+printline("  Break-even premium = $", iev);
+printline("");
+
+lvals = [499, 9, -1];
+lprbs = [0.01, 0.10, 0.89];
+lev   = c.expectedValue(lvals, lprbs);
+printline("Lottery ticket (cost $1):  +$499 P=0.01  +$9 P=0.10  -$1 P=0.89");
+printline("  Expected net value = $", lev, "  (negative = unfavorable)");
+printline("");
+
+times = [5, 8, 10, 15, 20];
+tprbs = [0.1, 0.3, 0.4, 0.15, 0.05];
+tev  = c.expectedValue(times, tprbs);
+tsd  = c.stddev(c.variance(times, tprbs, tev));
+printline("Project completion time (days):  5 P=0.10  8 P=0.30  10 P=0.40  15 P=0.15  20 P=0.05");
+printline("  Expected duration = ", tev, " days");
+printline("  Std deviation     = ", tsd, " days");
+printline("");
+
+// entropy
+printline("── entropy ───────────────────────────────────────────────");
+printline("");
+
+printline("Entropy measures uncertainty (in bits):");
+printline("  Certain outcome [1.0]             = ", c.entropy([1.0]));
+printline("  Fair coin [0.5, 0.5]              = ", c.entropy([0.5, 0.5]));
+printline("  Biased coin [0.9, 0.1]            = ", c.entropy([0.9, 0.1]));
+printline("  Very biased coin [0.99, 0.01]     = ", c.entropy([0.99, 0.01]));
+printline("  Fair 4-sided die                  = ", c.entropy([0.25, 0.25, 0.25, 0.25]));
+printline("  Fair 6-sided die                  = ", c.entropy([1/6, 1/6, 1/6, 1/6, 1/6, 1/6]));
+printline("  Skewed [0.5,0.1,0.1,0.1,0.1]     = ", c.entropy([0.5, 0.1, 0.1, 0.1, 0.1]));
+printline("");
+
+wordsA = [0.4, 0.3, 0.2, 0.1];
+wordsB = [0.27, 0.26, 0.25, 0.22];
+printline("Language model next-word (4 candidates):");
+printline("  Confident distribution entropy = ", c.entropy(wordsA), " bits");
+printline("  Uncertain distribution entropy = ", c.entropy(wordsB), " bits");
+printline("");
+
+// normalize
+printline("── normalize ─────────────────────────────────────────────");
+printline("");
+
+rawVotes = [4500, 2100, 900, 500];
+ns1 = c.normalize(rawVotes);
+printline("Election results (raw votes -> proportions):");
+printline("  Party A: 4500 -> ", ns1[0]);
+printline("  Party B: 2100 -> ", ns1[1]);
+printline("  Party C:  900 -> ", ns1[2]);
+printline("  Party D:  500 -> ", ns1[3]);
+printline("");
+
+scores = [8.2, 3.1, 1.5];
+sp = c.normalize(scores);
+printline("Model raw scores -> probability shares:");
+printline("  8.2 -> ", sp[0]);
+printline("  3.1 -> ", sp[1]);
+printline("  1.5 -> ", sp[2]);
+printline("");
+
+// factorial + combinations
+printline("── factorial + combinations ──────────────────────────────");
+printline("");
+
+printline("Factorials:");
+n = 0;
+while (n <= 10) {
+    printline("  ", n, "! = ", c.factorial(n));
+    n = n + 1;
+}
+printline("");
+
+printline("Combinations C(n, k):");
+printline("  C(5,2)  = ", c.combinations(5, 2),  "  (ways to pick 2 from 5)");
+printline("  C(10,3) = ", c.combinations(10, 3), "  (ways to pick 3 from 10)");
+printline("  C(10,7) = ", c.combinations(10, 7), "  (same as C(10,3))");
+printline("  C(52,5) = ", c.combinations(52, 5), "  (5-card poker hands)");
+printline("  C(49,6) = ", c.combinations(49, 6), "  (typical lottery odds)");
+printline("");
+
+printline("Done.");

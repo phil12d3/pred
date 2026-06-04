@@ -1,0 +1,191 @@
+// basic_probability.ns — example walkthrough of the prob-stat module.
+
+prob = import("./prob-stat.ns");
+
+core = prob.core;
+dist = prob.distributions;
+bayes = prob.bayes;
+
+printline("=== prob-stat: basic probability example ===");
+printline("");
+
+// ── 1. Empirical probability ──────────────────────────────────────────────────
+
+outcomes = ["heads", "tails", "heads", "heads", "tails", "heads", "tails", "heads"];
+pHeads = core.probability(outcomes, "heads");
+pTails = core.probability(outcomes, "tails");
+
+printline("Coin flips:", stringify(outcomes));
+printline("  P(heads) = ", pHeads);
+printline("  P(tails) = ", pTails);
+printline("  P(not heads) = ", core.complement(pHeads));
+printline("  P(heads AND tails) independent = ", core.joint(pHeads, pTails));
+printline("  P(heads OR tails) = ", core.union(pHeads, pTails));
+printline("");
+
+// ── 2. Expected value, variance, and entropy ─────────────────────────────────
+
+values = [1, 2, 3, 4, 5, 6];
+fairProbs = [1/6, 1/6, 1/6, 1/6, 1/6, 1/6];
+
+ev = core.expectedValue(values, fairProbs);
+mean = ev;
+v    = core.variance(values, fairProbs, mean);
+sd   = core.stddev(v);
+h    = core.entropy(fairProbs);
+
+printline("Fair die:");
+printline("  Expected value = ", ev);
+printline("  Variance       = ", v);
+printline("  Std deviation  = ", sd);
+printline("  Entropy        = ", h, " bits");
+printline("");
+
+// ── 3. Core table helpers ────────────────────────────────────────────────────
+
+rolls = [1, 2, 2, 3, 3, 3, 4, 6, 6, 6];
+table = core.frequencyTable(rolls);
+printline("Frequency table example:");
+printline("  rolls = ", stringify(rolls));
+printline("  total = ", table.total);
+printline("  count(3) = ", table.counts["3"]);
+printline("  count(6) = ", table.counts["6"]);
+printline("  probability(6) = ", core.probability(rolls, 6));
+printline("  expectedValue([1,2,3], [0.2,0.3,0.5]) = ", core.expectedValue([1, 2, 3], [0.2, 0.3, 0.5]));
+printline("  normalize([2, 3, 5]) = ", stringify(core.normalize([2, 3, 5])));
+printline("");
+
+// ── 4. Binomial distribution ─────────────────────────────────────────────────
+
+n = 10;
+p = 0.3;
+
+printline("Binomial(n=10, p=0.3) — number of successes in 10 trials:");
+k = 0;
+while (k <= 10) {
+    pmfVal = dist.binomialPMF(n, k, p);
+    printline("  P(X=", k, ") = ", pmfVal);
+    k = k + 1;
+}
+bStats = dist.binomialStats(n, p);
+printline("  mean=", bStats.mean, "  stddev=", bStats.stddev);
+printline("  P(X <= 3) = ", dist.binomialCDF(n, 3, p));
+printline("");
+
+// ── 5. Poisson distribution ──────────────────────────────────────────────────
+
+lambda = 2.5;
+printline("Poisson(λ=2.5) — rare events per interval:");
+k = 0;
+while (k <= 8) {
+    pmfVal = dist.poissonPMF(lambda, k);
+    printline("  P(X=", k, ") = ", pmfVal);
+    k = k + 1;
+}
+printline("  P(X <= 2) = ", dist.poissonCDF(lambda, 2));
+printline("  mean = ", dist.poissonStats(lambda).mean, "  stddev = ", dist.poissonStats(lambda).stddev);
+printline("");
+
+// ── 6. Normal distribution ───────────────────────────────────────────────────
+
+mean = 170;
+sd   = 10;
+printline("Height model: N(mean=170, sd=10)");
+printline("  PDF at mean = ", dist.normalPDF(170, mean, sd));
+printline("  P(height < 160) = ", dist.normalCDF(160, mean, sd));
+printline("  P(160 <= height <= 180) = ", dist.normalBetween(160, 180, mean, sd));
+printline("  P(height > 190) = ", 1 - dist.normalCDF(190, mean, sd));
+printline("  Phi(0) = ", dist.standardNormalCDF(0));
+printline("");
+
+// ── 7. Uniform and geometric distributions ──────────────────────────────────
+
+printline("Uniform(0, 20) wait time:");
+printline("  PDF at 10 = ", dist.uniformPDF(10, 0, 20));
+printline("  CDF at 5  = ", dist.uniformCDF(5, 0, 20));
+printline("  Mean      = ", dist.uniformStats(0, 20).mean);
+printline("");
+
+printline("Geometric(p=0.4) retry attempts:");
+printline("  P(first success on 1) = ", dist.geometricPMF(1, 0.4));
+printline("  P(first success on 2) = ", dist.geometricPMF(2, 0.4));
+printline("  P(within 3 tries)     = ", dist.geometricCDF(3, 0.4));
+printline("  Expected tries        = ", dist.geometricStats(0.4).mean);
+printline("");
+
+// ── 8. Bayes' theorem ────────────────────────────────────────────────────────
+
+// Disease testing example.
+// P(disease) = 0.001, P(positive|disease) = 0.99, P(positive) = 0.01089
+prior      = 0.001;
+likelihood = 0.99;
+evidence   = 0.01089;
+
+posterior = bayes.bayesUpdate(prior, likelihood, evidence);
+printline("Disease test example:");
+printline("  Prior P(disease)        = ", prior);
+printline("  P(positive | disease)   = ", likelihood);
+printline("  P(positive)             = ", evidence);
+printline("  Posterior P(disease | positive) = ", posterior);
+printline("");
+
+// ── 9. Naive Bayes spam classifier ───────────────────────────────────────────
+
+samples = [
+    { label: "spam", features: ["buy", "cheap", "now", "offer"] },
+    { label: "spam", features: ["click", "here", "win", "prize"] },
+    { label: "spam", features: ["cheap", "deal", "limited", "offer"] },
+    { label: "spam", features: ["free", "money", "now", "win"] },
+    { label: "ham",  features: ["hello", "how", "are", "you"] },
+    { label: "ham",  features: ["meeting", "at", "three", "today"] },
+    { label: "ham",  features: ["see", "you", "tomorrow", "friend"] },
+    { label: "ham",  features: ["project", "update", "team", "review"] }
+];
+
+model = bayes.train(samples);
+printline("Naive Bayes spam classifier (trained on ", model.totalSamples, " samples):");
+
+tests = [
+    { label: "spam-like", features: ["cheap", "win"] },
+    { label: "ham-like",  features: ["hello", "meeting"] },
+    { label: "ambiguous", features: ["you", "now"] }
+];
+
+i = 0;
+while (i < tests.length) {
+    test = tests[i];
+    result = bayes.predict(model, test.features);
+    top = result[0];
+    printline("  Input: ", stringify(test.features), "  →  ", top.label,
+              " (p=", top.probability, ")");
+    i = i + 1;
+}
+printline("");
+
+// Topic classifier.
+topicSamples = [
+    { label: "sports", features: ["goal", "team", "match", "player", "win"] },
+    { label: "sports", features: ["score", "league", "championship", "player"] },
+    { label: "tech",   features: ["software", "bug", "deploy", "server", "code"] },
+    { label: "tech",   features: ["algorithm", "database", "api", "code", "bug"] },
+    { label: "food",   features: ["recipe", "cook", "ingredient", "bake", "eat"] },
+    { label: "food",   features: ["restaurant", "dish", "flavour", "cook", "meal"] }
+];
+topicModel = bayes.train(topicSamples);
+printline("Topic classifier examples:");
+topicTests = [
+    ["goal", "team", "player"],
+    ["code", "bug", "deploy"],
+    ["recipe", "bake", "ingredient"],
+    ["match", "code"]
+];
+i = 0;
+while (i < topicTests.count()) {
+    result = bayes.predict(topicModel, topicTests[i]);
+    printline("  Input: ", stringify(topicTests[i]));
+    printline("    top = ", result[0].label, " (p=", result[0].probability, ")");
+    i = i + 1;
+}
+printline("");
+
+printline("Done.");

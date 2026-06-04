@@ -1,0 +1,194 @@
+// distributions_examples.ns — worked examples for every distribution function.
+
+prob = import("./prob-stat.ns");
+d = prob.distributions;
+
+printline("=== prob-stat: distributions examples ===");
+printline("");
+
+// ── Binomial ──────────────────────────────────────────────────────────────────
+printline("── Binomial distribution ─────────────────────────────────");
+printline("");
+
+// Surgeon: 80% success rate, 10 operations.
+n = 10;
+p = 0.8;
+printline("Surgeon success rate p=0.8, n=10 operations.");
+printline("P(exactly k successes):");
+k = 6;
+while (k <= 10) {
+    printline("  P(X=", k, ") = ", d.binomialPMF(n, k, p));
+    k = k + 1;
+}
+bs = d.binomialStats(n, p);
+printline("  P(X <= 7)  = ", d.binomialCDF(n, 7, p), "  (7 or fewer successes)");
+printline("  P(X >= 8)  = ", 1 - d.binomialCDF(n, 7, p), "  (8+ successes)");
+printline("  Mean       = ", bs.mean);
+printline("  Variance   = ", bs.variance);
+printline("  Std dev    = ", bs.stddev);
+printline("");
+
+// Fair coin: 10 flips.
+printline("Fair coin (p=0.5), 10 flips:");
+printline("  P(exactly 5 heads)   = ", d.binomialPMF(10, 5, 0.5));
+printline("  P(5 or fewer heads)  = ", d.binomialCDF(10, 5, 0.5));
+printline("  P(more than 5 heads) = ", 1 - d.binomialCDF(10, 5, 0.5));
+printline("  P(all 10 heads)      = ", d.binomialPMF(10, 10, 0.5));
+printline("");
+
+// Quality control: 5% defect rate, batch of 20.
+printline("Quality control: p=0.05 defect rate, batch of 20 units.");
+printline("  P(0 defects)      = ", d.binomialPMF(20, 0, 0.05));
+printline("  P(1 defect)       = ", d.binomialPMF(20, 1, 0.05));
+printline("  P(2 defects)      = ", d.binomialPMF(20, 2, 0.05));
+printline("  P(3+ defects)     = ", 1 - d.binomialCDF(20, 2, 0.05));
+qbs = d.binomialStats(20, 0.05);
+printline("  Expected defects  = ", qbs.mean);
+printline("");
+
+// ── Poisson ───────────────────────────────────────────────────────────────────
+printline("── Poisson distribution ──────────────────────────────────");
+printline("");
+
+// Call centre: 4 calls per minute.
+lambda = 4;
+printline("Call centre: lambda=4 calls/minute.");
+printline("P(exactly k calls in one minute):");
+k = 0;
+while (k <= 9) {
+    printline("  P(X=", k, ") = ", d.poissonPMF(lambda, k));
+    k = k + 1;
+}
+printline("  P(X <= 3) = ", d.poissonCDF(lambda, 3), "  (under-capacity)");
+printline("  P(X > 6)  = ", 1 - d.poissonCDF(lambda, 6), "  (overloaded)");
+ps = d.poissonStats(lambda);
+printline("  Mean = ", ps.mean, "  Std dev = ", ps.stddev);
+printline("");
+
+// Rare events: server errors at 0.5 per hour.
+printline("Server errors: lambda=0.5 per hour.");
+printline("  P(0 errors)   = ", d.poissonPMF(0.5, 0));
+printline("  P(1 error)    = ", d.poissonPMF(0.5, 1));
+printline("  P(2 errors)   = ", d.poissonPMF(0.5, 2));
+printline("  P(3+ errors)  = ", 1 - d.poissonCDF(0.5, 2));
+printline("");
+
+// Supermarket: 2.5 arrivals per minute.
+printline("Supermarket arrivals: lambda=2.5 per minute.");
+printline("  P(0 arrivals)     = ", d.poissonPMF(2.5, 0));
+printline("  P(exactly 2)      = ", d.poissonPMF(2.5, 2));
+printline("  P(5 or more)      = ", 1 - d.poissonCDF(2.5, 4));
+printline("  Mean = ", d.poissonStats(2.5).mean);
+printline("");
+
+// ── Normal ────────────────────────────────────────────────────────────────────
+printline("── Normal distribution ───────────────────────────────────");
+printline("");
+
+// Heights: N(178, 7).
+mean = 178;
+sd   = 7;
+printline("Adult male heights: N(mean=178cm, sd=7cm).");
+printline("  PDF at 178cm                   = ", d.normalPDF(178, mean, sd));
+printline("  P(height < 165cm)              = ", d.normalCDF(165, mean, sd));
+printline("  P(height < 178cm)              = ", d.normalCDF(178, mean, sd));
+printline("  P(height > 192cm)              = ", 1 - d.normalCDF(192, mean, sd));
+printline("  P(171 to 185cm, 1 sigma)       = ", d.normalBetween(mean - sd, mean + sd, mean, sd));
+printline("  P(164 to 192cm, 2 sigma)       = ", d.normalBetween(mean - 2*sd, mean + 2*sd, mean, sd));
+printline("  P(157 to 199cm, 3 sigma)       = ", d.normalBetween(mean - 3*sd, mean + 3*sd, mean, sd));
+printline("");
+
+// Standard normal Z-table.
+printline("Standard normal CDF Phi(z):");
+printline("  Phi(-3) = ", d.standardNormalCDF(-3));
+printline("  Phi(-2) = ", d.standardNormalCDF(-2));
+printline("  Phi(-1) = ", d.standardNormalCDF(-1));
+printline("  Phi(0)  = ", d.standardNormalCDF(0));
+printline("  Phi(1)  = ", d.standardNormalCDF(1));
+printline("  Phi(2)  = ", d.standardNormalCDF(2));
+printline("  Phi(3)  = ", d.standardNormalCDF(3));
+printline("");
+
+// Exam scores: N(70, 10).
+emean = 70;
+esd   = 10;
+printline("Exam scores: N(mean=70, sd=10).");
+printline("  PDF at score 70            = ", d.normalPDF(70, emean, esd));
+printline("  P(score >= 90, top grade)  = ", 1 - d.normalCDF(90, emean, esd));
+printline("  P(score < 50, failing)     = ", d.normalCDF(50, emean, esd));
+printline("  P(60-80, B range)          = ", d.normalBetween(60, 80, emean, esd));
+printline("  P(50-90, middle 4 sigma)   = ", d.normalBetween(50, 90, emean, esd));
+printline("");
+
+// Manufacturing tolerances: N(10mm, 0.1mm).
+printline("Manufactured part target 10mm, sd=0.1mm.");
+printline("  P(within 10 +/- 0.2mm tolerance) = ", d.normalBetween(9.8, 10.2, 10, 0.1));
+printline("  P(outside tolerance, scrapped)    = ", 1 - d.normalBetween(9.8, 10.2, 10, 0.1));
+printline("");
+
+// ── Uniform ───────────────────────────────────────────────────────────────────
+printline("── Uniform distribution ──────────────────────────────────");
+printline("");
+
+// Bus wait: Uniform(0, 20 minutes).
+printline("Bus wait time: Uniform(0, 20 minutes).");
+printline("  PDF at any point in [0,20]    = ", d.uniformPDF(10, 0, 20), " (constant)");
+printline("  PDF outside [0,20]            = ", d.uniformPDF(25, 0, 20), " (zero)");
+printline("  P(wait <= 5 min)              = ", d.uniformCDF(5,  0, 20));
+printline("  P(wait <= 10 min)             = ", d.uniformCDF(10, 0, 20));
+printline("  P(5 < wait <= 15 min)         = ", d.uniformCDF(15, 0, 20) - d.uniformCDF(5, 0, 20));
+ubs = d.uniformStats(0, 20);
+printline("  Mean wait                     = ", ubs.mean, " minutes");
+printline("  Std dev                       = ", ubs.stddev, " minutes");
+printline("");
+
+// Network jitter: Uniform(2, 8 ms).
+printline("Network jitter: Uniform(2ms, 8ms).");
+printline("  P(jitter < 4ms)   = ", d.uniformCDF(4, 2, 8));
+printline("  P(jitter > 6ms)   = ", 1 - d.uniformCDF(6, 2, 8));
+printline("  Mean jitter       = ", d.uniformStats(2, 8).mean, " ms");
+printline("");
+
+// ── Geometric ─────────────────────────────────────────────────────────────────
+printline("── Geometric distribution ────────────────────────────────");
+printline("");
+
+// Free-throw shooter p=0.7.
+p = 0.7;
+printline("Free-throw shooter p=0.7: attempts until first basket.");
+k = 1;
+while (k <= 6) {
+    printline("  P(first basket on attempt ", k, ") = ", d.geometricPMF(k, p));
+    k = k + 1;
+}
+printline("  P(basket within 2 attempts) = ", d.geometricCDF(2, p));
+printline("  P(needs more than 3)        = ", 1 - d.geometricCDF(3, p));
+gbs = d.geometricStats(p);
+printline("  Mean attempts = ", gbs.mean);
+printline("  Std dev       = ", gbs.stddev);
+printline("");
+
+// Startup: 10% monthly deal probability.
+p = 0.1;
+printline("Sales deal: 10% monthly probability.");
+k = 1;
+while (k <= 6) {
+    printline("  P(first deal in month ", k, ") = ", d.geometricPMF(k, p));
+    k = k + 1;
+}
+printline("  P(deal within 3 months) = ", d.geometricCDF(3, p));
+gss = d.geometricStats(p);
+printline("  Expected months to first deal = ", gss.mean);
+printline("");
+
+// Retry logic: 40% chance a network request succeeds each attempt.
+p = 0.4;
+printline("Network retry: 40% success per attempt.");
+printline("  P(succeeds on 1st try) = ", d.geometricPMF(1, p));
+printline("  P(succeeds on 2nd try) = ", d.geometricPMF(2, p));
+printline("  P(succeeds on 3rd try) = ", d.geometricPMF(3, p));
+printline("  P(succeeds within 3)   = ", d.geometricCDF(3, p));
+printline("  Mean attempts needed   = ", d.geometricStats(p).mean);
+printline("");
+
+printline("Done.");

@@ -1,0 +1,155 @@
+// bayes_tests.ns — tests for prob-stat bayes module.
+// Each test function is fully self-contained.
+
+[test]
+testBayesUpdateBasic = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    posterior = bayes.bayesUpdate(0.01, 0.9, 0.108);
+    diff = posterior - 0.0833; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "bayesUpdate approx 0.0833");
+};
+
+[test]
+testBayesUpdateFullCertainty = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    posterior = bayes.bayesUpdate(0.5, 0.8, 0.8);
+    diff = posterior - 0.5; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "bayesUpdate prior unchanged when L=E");
+};
+
+[test]
+testBayesUpdateZeroEvidence = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    posterior = bayes.bayesUpdate(0.5, 0.9, 0);
+    t.equal(posterior, 0, "bayesUpdate with zero evidence = 0");
+};
+
+[test]
+testPosteriorDistribution = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    hypotheses = [
+        { name: "H1", prior: 0.5, likelihood: 0.8 },
+        { name: "H2", prior: 0.5, likelihood: 0.2 }
+    ];
+    result = bayes.posteriorDistribution(hypotheses);
+    h1 = null;
+    h2 = null;
+    i = 0;
+    while (i < result.length) {
+        if (result[i].name == "H1") h1 = result[i];
+        if (result[i].name == "H2") h2 = result[i];
+        i = i + 1;
+    }
+    t.truthy(h1 != null, "posteriorDistribution contains H1");
+    d1 = h1.posterior - 0.8; if (d1 < 0) d1 = 0 - d1;
+    d2 = h2.posterior - 0.2; if (d2 < 0) d2 = 0 - d2;
+    t.truthy(d1 <= 0.001, "H1 posterior approx 0.8");
+    t.truthy(d2 <= 0.001, "H2 posterior approx 0.2");
+};
+
+[test]
+testPosteriorDistributionSumsToOne = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    hypotheses = [
+        { name: "A", prior: 0.3, likelihood: 0.6 },
+        { name: "B", prior: 0.4, likelihood: 0.3 },
+        { name: "C", prior: 0.3, likelihood: 0.1 }
+    ];
+    result = bayes.posteriorDistribution(hypotheses);
+    total = 0;
+    i = 0;
+    while (i < result.length) {
+        total = total + result[i].posterior;
+        i = i + 1;
+    }
+    diff = total - 1.0; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "posterior distribution sums to 1");
+};
+
+[test]
+testSequentialUpdateSingleStep = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    steps = [{ likelihood: 0.9, evidence: 0.108 }];
+    p = bayes.sequentialUpdate(0.01, steps);
+    diff = p - 0.0833; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "sequential single step approx 0.0833");
+};
+
+[test]
+testSequentialUpdateMultiStep = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    steps = [
+        { likelihood: 0.6, evidence: 0.6 },
+        { likelihood: 0.7, evidence: 0.7 }
+    ];
+    p = bayes.sequentialUpdate(0.5, steps);
+    diff = p - 0.5; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "sequential identity steps preserve prior");
+};
+
+[test]
+testNaiveBayesTrain = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    samples = [
+        { label: "spam", features: ["buy", "cheap", "now"] },
+        { label: "spam", features: ["cheap", "offer", "now"] },
+        { label: "ham",  features: ["hello", "world"] },
+        { label: "ham",  features: ["meeting", "tomorrow"] }
+    ];
+    model = bayes.train(samples);
+    t.equal(model.classCounts["spam"], 2, "train: spam count = 2");
+    t.equal(model.classCounts["ham"],  2, "train: ham count = 2");
+    t.equal(model.totalSamples, 4,        "train: total = 4");
+};
+
+[test]
+testNaiveBayesPredictSpam = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    samples = [
+        { label: "spam", features: ["buy", "cheap", "now"] },
+        { label: "spam", features: ["cheap", "offer", "now"] },
+        { label: "spam", features: ["limited", "offer", "buy"] },
+        { label: "ham",  features: ["hello", "friend"] },
+        { label: "ham",  features: ["meeting", "tomorrow"] },
+        { label: "ham",  features: ["see", "you", "soon"] }
+    ];
+    model = bayes.train(samples);
+    result = bayes.predict(model, ["cheap", "buy"]);
+    t.equal(result[0].label, "spam", "predict: spam wins for cheap+buy");
+};
+
+[test]
+testNaiveBayesPredictHam = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    samples = [
+        { label: "spam", features: ["buy", "cheap", "now"] },
+        { label: "spam", features: ["cheap", "offer", "now"] },
+        { label: "spam", features: ["limited", "offer", "buy"] },
+        { label: "ham",  features: ["hello", "friend"] },
+        { label: "ham",  features: ["meeting", "tomorrow"] },
+        { label: "ham",  features: ["see", "you", "soon"] }
+    ];
+    model = bayes.train(samples);
+    result = bayes.predict(model, ["hello", "meeting"]);
+    t.equal(result[0].label, "ham", "predict: ham wins for hello+meeting");
+};
+
+[test]
+testNaiveBayesProbabilitiesSumToOne = func(t) {
+    bayes = import("./prob-stat.ns").bayes;
+    samples = [
+        { label: "cat",  features: ["meow", "purr"] },
+        { label: "dog",  features: ["woof", "bark"] },
+        { label: "bird", features: ["tweet", "chirp"] }
+    ];
+    model = bayes.train(samples);
+    result = bayes.predict(model, ["meow"]);
+    total = 0;
+    i = 0;
+    while (i < result.length) {
+        total = total + result[i].probability;
+        i = i + 1;
+    }
+    diff = total - 1.0; if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.001, "naiveBayes probabilities sum to 1");
+};

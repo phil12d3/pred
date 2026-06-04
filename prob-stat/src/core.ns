@@ -1,0 +1,185 @@
+// core.ns — fundamental probability operations
+// All functions are pure and corpus-independent.
+
+// Safe division (returns 0 when denominator is 0).
+safeDiv = func(n, d) {
+    return d == 0 ? 0 : n / d;
+};
+
+// Clamp a value to [0, 1].
+clamp01 = func(v) {
+    if (v < 0) return 0;
+    if (v > 1) return 1;
+    return v;
+};
+
+// Natural logarithm (Taylor series, sufficient for typical probability work).
+// Returns a large negative number for values <= 0.
+ln = func(x) {
+    if (x <= 0) return -999999;
+    // Use identity: ln(x) = ln(m * 2^e) = ln(m) + e*ln(2)
+    // Reduce x to [0.5, 1) then use series.
+    e = 0;
+    v = x;
+    while (v >= 1) { v = v / 2; e = e + 1; }
+    while (v < 0.5) { v = v * 2; e = e - 1; }
+    // v in [0.5, 1). Let u = v - 1, series for ln(1+u), u in [-0.5, 0).
+    u = v - 1;
+    result = 0;
+    term = u;
+    i = 1;
+    while (i <= 30) {
+        result = result + this.safeDiv(term, i);
+        term = term * u * -1;
+        i = i + 1;
+    }
+    ln2 = 0.6931471805599453;
+    return result + (e * ln2);
+};
+
+// Factorial (integer, non-negative).  Returns 1 for n <= 1.
+factorial = func(n) {
+    if (n <= 1) return 1;
+    r = 1;
+    i = 2;
+    while (i <= n) {
+        r = r * i;
+        i = i + 1;
+    }
+    return r;
+};
+
+// Binomial coefficient C(n, k).
+combinations = func(n, k) {
+    if (k < 0 || k > n) return 0;
+    if (k == 0 || k == n) return 1;
+    if (k > n - k) k = n - k;
+    r = 1;
+    i = 0;
+    while (i < k) {
+        r = r * (n - i);
+        r = this.safeDiv(r, i + 1);
+        i = i + 1;
+    }
+    return r;
+};
+
+// ── Frequency-based probability ───────────────────────────────────────────────
+
+// Build a frequency table from an array of outcomes.
+// Returns { counts: {outcome: count}, total: number }
+frequencyTable = func(outcomes) {
+    counts = {};
+    total = 0;
+    i = 0;
+    while (i < outcomes.count()) {
+        v = stringify(outcomes[i]);
+        if (!defined(counts[v])) counts[v] = 0;
+        counts[v] = counts[v] + 1;
+        total = total + 1;
+        i = i + 1;
+    }
+    return { counts: counts, total: total };
+};
+
+// Empirical probability of a specific outcome in an observed list.
+// P(outcome) = count(outcome) / total
+probability = func(outcomes, outcome) {
+    tbl = this.frequencyTable(outcomes);
+    key = stringify(outcome);
+    count = defined(tbl.counts[key]) ? tbl.counts[key] : 0;
+    return this.safeDiv(count, tbl.total);
+};
+
+// Joint probability of two independent events.
+// P(A and B) = P(A) * P(B)
+joint = func(pA, pB) {
+    return this.clamp01(pA * pB);
+};
+
+// Union probability (inclusion-exclusion).
+// P(A or B) = P(A) + P(B) - P(A and B)
+union = func(pA, pB) {
+    return this.clamp01(pA + pB - (pA * pB));
+};
+
+// Complement.
+// P(not A) = 1 - P(A)
+complement = func(pA) {
+    return this.clamp01(1 - pA);
+};
+
+// Conditional probability.
+// P(A | B) = P(A and B) / P(B)
+conditional = func(pAandB, pB) {
+    return this.safeDiv(pAandB, pB);
+};
+
+// Expected value of a discrete distribution.
+// values and probs are parallel arrays.
+expectedValue = func(values, probs) {
+    ev = 0;
+    i = 0;
+    while (i < values.count()) {
+        p = i < probs.count() ? probs[i] : 0;
+        ev = ev + (values[i] * p);
+        i = i + 1;
+    }
+    return ev;
+};
+
+// Variance of a discrete distribution (given mean).
+variance = func(values, probs, mean) {
+    v = 0;
+    i = 0;
+    while (i < values.count()) {
+        p = i < probs.count() ? probs[i] : 0;
+        diff = values[i] - mean;
+        v = v + (diff * diff * p);
+        i = i + 1;
+    }
+    return v;
+};
+
+// Standard deviation (sqrt via Newton's method).
+stddev = func(varianceValue) {
+    if (varianceValue <= 0) return 0;
+    x = varianceValue;
+    i = 0;
+    while (i < 50) {
+        x = (x + this.safeDiv(varianceValue, x)) / 2;
+        i = i + 1;
+    }
+    return x;
+};
+
+// Entropy of a discrete probability distribution (in bits).
+// H = -sum(p * log2(p)) for all non-zero p.
+entropy = func(probs) {
+    ln2 = 0.6931471805599453;
+    h = 0;
+    i = 0;
+    while (i < probs.count()) {
+        p = probs[i];
+        if (p > 0) h = h - (p * this.safeDiv(this.ln(p), ln2));
+        i = i + 1;
+    }
+    return h;
+};
+
+// Normalize a list of raw weights into probabilities summing to 1.
+normalize = func(weights) {
+    total = 0;
+    i = 0;
+    while (i < weights.count()) {
+        total = total + weights[i];
+        i = i + 1;
+    }
+    out = [];
+    i = 0;
+    while (i < weights.count()) {
+        out.add(this.safeDiv(weights[i], total));
+        i = i + 1;
+    }
+    return out;
+};

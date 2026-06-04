@@ -1,0 +1,160 @@
+// distributions.ns — common discrete and continuous probability distributions.
+
+core = import("./src/core.ns");
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+safeDiv = func(n, d) { return this.core.safeDiv(n, d); };
+ln      = func(x)    { return this.core.ln(x); };
+exp     = func(x) {
+    // e^x via Taylor series, good for moderate x.
+    if (x > 700) return 999999999;
+    if (x < -700) return 0;
+    result = 1;
+    term = 1;
+    i = 1;
+    while (i <= 60) {
+        term = term * this.safeDiv(x, i);
+        result = result + term;
+        if (term < 0.0000000001 && term > -0.0000000001) break;
+        i = i + 1;
+    }
+    return result;
+};
+
+sqrt = func(v) { return this.core.stddev(v); };
+
+// ── Binomial distribution ─────────────────────────────────────────────────────
+
+// P(X = k) for X ~ Binomial(n, p)
+binomialPMF = func(n, k, p) {
+    if (k < 0 || k > n) return 0;
+    c = this.core.combinations(n, k);
+    return c * this.exp(k * this.ln(p)) * this.exp((n - k) * this.ln(1 - p));
+};
+
+// P(X <= k) cumulative
+binomialCDF = func(n, k, p) {
+    total = 0;
+    i = 0;
+    while (i <= k) {
+        total = total + this.binomialPMF(n, i, p);
+        i = i + 1;
+    }
+    return this.core.clamp01(total);
+};
+
+// Mean and variance of Binomial(n, p)
+binomialStats = func(n, p) {
+    mean = n * p;
+    variance = n * p * (1 - p);
+    return { mean: mean, variance: variance, stddev: this.sqrt(variance) };
+};
+
+// ── Poisson distribution ─────────────────────────────────────────────────────
+
+// P(X = k) for X ~ Poisson(lambda)
+poissonPMF = func(lambda, k) {
+    if (k < 0) return 0;
+    return this.exp(0 - lambda) * this.exp(k * this.ln(lambda)) *
+           this.safeDiv(1, this.core.factorial(k));
+};
+
+// P(X <= k) cumulative
+poissonCDF = func(lambda, k) {
+    total = 0;
+    i = 0;
+    while (i <= k) {
+        total = total + this.poissonPMF(lambda, i);
+        i = i + 1;
+    }
+    return this.core.clamp01(total);
+};
+
+// Mean and variance of Poisson(lambda): both equal lambda.
+poissonStats = func(lambda) {
+    return { mean: lambda, variance: lambda, stddev: this.sqrt(lambda) };
+};
+
+// ── Normal (Gaussian) distribution ───────────────────────────────────────────
+
+// PDF of N(mean, stddev) at x.
+normalPDF = func(x, mean, sd) {
+    if (sd <= 0) return 0;
+    pi = 3.141592653589793;
+    z = this.safeDiv(x - mean, sd);
+    return this.safeDiv(1, sd * this.sqrt(2 * pi)) * this.exp(-0.5 * z * z);
+};
+
+// CDF approximation of N(0,1) at z using Horner form (max error ~1.5e-7).
+standardNormalCDF = func(z) {
+    t = this.safeDiv(1, 1 + 0.2316419 * (z < 0 ? 0 - z : z));
+    poly = t * (0.319381530 +
+           t * (-0.356563782 +
+           t * (1.781477937 +
+           t * (-1.821255978 +
+           t * 1.330274429))));
+    pdf = this.safeDiv(1, this.sqrt(2 * 3.141592653589793)) *
+          this.exp(-0.5 * z * z);
+    p = 1 - pdf * poly;
+    if (z < 0) p = 1 - p;
+    return this.core.clamp01(p);
+};
+
+// CDF of N(mean, stddev) at x.
+normalCDF = func(x, mean, sd) {
+    if (sd <= 0) return x >= mean ? 1 : 0;
+    z = this.safeDiv(x - mean, sd);
+    return this.standardNormalCDF(z);
+};
+
+// Probability of value in [lo, hi] under N(mean, sd).
+normalBetween = func(lo, hi, mean, sd) {
+    return this.core.clamp01(this.normalCDF(hi, mean, sd) -
+                             this.normalCDF(lo, mean, sd));
+};
+
+// ── Uniform distribution ─────────────────────────────────────────────────────
+
+// PDF of Uniform(a, b) at x.
+uniformPDF = func(x, a, b) {
+    if (b <= a) return 0;
+    if (x < a || x > b) return 0;
+    return this.safeDiv(1, b - a);
+};
+
+// CDF of Uniform(a, b) at x.
+uniformCDF = func(x, a, b) {
+    if (b <= a) return 0;
+    if (x <= a) return 0;
+    if (x >= b) return 1;
+    return this.core.clamp01(this.safeDiv(x - a, b - a));
+};
+
+// Mean and variance of Uniform(a, b).
+uniformStats = func(a, b) {
+    mean = this.safeDiv(a + b, 2);
+    variance = this.safeDiv((b - a) * (b - a), 12);
+    return { mean: mean, variance: variance, stddev: this.sqrt(variance) };
+};
+
+// ── Geometric distribution ────────────────────────────────────────────────────
+
+// P(X = k) — first success on trial k.  k >= 1.
+geometricPMF = func(k, p) {
+    if (k < 1) return 0;
+    return this.exp((k - 1) * this.ln(1 - p)) * p;
+};
+
+// P(X <= k) cumulative.
+geometricCDF = func(k, p) {
+    if (k < 1) return 0;
+    return this.core.clamp01(1 - this.exp(k * this.ln(1 - p)));
+};
+
+// Mean and variance of Geometric(p).
+geometricStats = func(p) {
+    mean = this.safeDiv(1, p);
+    variance = this.safeDiv(1 - p, p * p);
+    return { mean: mean, variance: variance, stddev: this.sqrt(variance) };
+};

@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>prob-stat Documentation</title>
+  <style>
+    :root {
+      --bg: #f8f5ef;
+      --panel: #fffdf9;
+      --ink: #17212b;
+      --muted: #5b6875;
+      --line: #d8d2c7;
+      --accent: #0f766e;
+      --accent2: #b45309;
+      --accent3: #7c3aed;
+      --radius: 14px;
+      --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top left, #fff8df 0, rgba(255, 248, 223, 0.0) 32%),
+        radial-gradient(circle at 90% 10%, #e6fbf8 0, rgba(230, 251, 248, 0.0) 30%),
+        linear-gradient(180deg, #fdfbf7 0%, #f4f0e8 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.64;
+    }
+
+    body { padding: 28px 16px 48px; }
+
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      margin-bottom: 18px;
+      background:
+        linear-gradient(180deg, rgba(15,118,110,0.08), rgba(180,83,9,0.03)),
+        var(--panel);
+    }
+
+    .section { padding: 20px; margin-bottom: 14px; }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      letter-spacing: 0.01em;
+    }
+
+    h1 { font-size: 2.35rem; margin-bottom: 10px; }
+    h2 {
+      font-size: 1.5rem;
+      margin: 26px 0 12px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+
+    .muted { color: var(--muted); }
+
+    .toc {
+      columns: 2;
+      gap: 24px;
+    }
+
+    .code, .diagram, .note, .prop {
+      border-radius: 10px;
+      margin: 10px 0 14px;
+    }
+
+    .code {
+      background: #f8fafc;
+      border-left: 4px solid var(--accent);
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+
+    .diagram {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .diagram svg {
+      width: 100%;
+      min-width: 760px;
+      height: auto;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+    }
+
+    .diagram text {
+      fill: #102a43;
+      font-size: 12px;
+    }
+
+    .prop {
+      border: 1px solid var(--line);
+      background: #fffdf6;
+      padding: 10px;
+    }
+
+    .prop .name {
+      display: block;
+      color: var(--accent);
+      font-family: "Courier New", Courier, monospace;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+
+    .note {
+      background: #fff7ed;
+      border-left: 4px solid var(--accent2);
+      padding: 10px 12px;
+    }
+
+    .formula {
+      background: #f4f7fb;
+      border: 1px solid #d9e2ec;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 10px 0 14px;
+      font-family: "Courier New", Courier, monospace;
+      white-space: pre-wrap;
+      color: #16324f;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      margin-right: 6px;
+    }
+
+    @media (max-width: 920px) {
+      .toc { columns: 1; }
+      h1 { font-size: 1.95rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>prob-stat Documentation</h1>
+      <p class="muted">Complete reference for the probability utilities module: core probability arithmetic, common distributions, and Bayesian inference.</p>
+      <p class="muted">Each function entry explains what it does, the mathematical rule it implements, the expected input shape, and a small usage example.</p>
+      <p class="muted"><span class="tag">Import</span> Use <code>prob = import("./prob-stat.ns")</code> from the prob-stat module root.</p>
+    </section>
+
+    <section class="section">
+      <h2>Table of Contents</h2>
+      <div class="toc">
+        <ul>
+          <li>1. What prob-stat is for</li>
+          <li>2. Module layout and imports</li>
+          <li>3. Core probability functions</li>
+          <li>4. Distribution functions</li>
+          <li>5. Bayes functions</li>
+          <li>6. Visual diagrams</li>
+          <li>7. Practical usage patterns</li>
+          <li>8. Caveats and notes</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>1. What prob-stat Is For</h2>
+      <p>prob-stat is a small, explicit statistics toolkit for the ns runtime. It is intended for direct probability calculations, not for large-scale numerical work or machine-learning pipelines. The module is organized around three ideas:</p>
+      <ul>
+        <li>Core probability identities and summary statistics</li>
+        <li>Common distributions used in examples and simulations</li>
+        <li>Bayesian updating and a lightweight naive Bayes classifier</li>
+      </ul>
+      <p>The implementation favors simple formulas that can be inspected line by line. That makes it good for teaching, quick analysis, and reproducible examples.</p>
+    </section>
+
+    <section class="section">
+      <h2>2. Module Layout and Imports</h2>
+      <p>The module is exposed through an umbrella file:</p>
+      <div class="code"><code>prob = import("./prob-stat.ns");
+
+core = prob.core;
+dist = prob.distributions;
+bayes = prob.bayes;</code></div>
+      <p>Namespace roles:</p>
+      <div class="prop"><span class="name">core</span>Fundamental probability arithmetic and descriptive statistics.</div>
+      <div class="prop"><span class="name">distributions</span>Binomial, Poisson, Normal, Uniform, and Geometric distribution helpers.</div>
+      <div class="prop"><span class="name">bayes</span>Bayes updates, posterior distributions, and a naive Bayes classifier.</div>
+      <div class="note"><strong>Runtime note:</strong> In ns, example files are usually run from the module root, so import paths are relative to that working directory.</div>
+    </section>
+
+    <section class="section">
+      <h2>3. Core Probability Functions</h2>
+
+      <h3>safeDiv(n, d)</h3>
+      <p><strong>What it does:</strong> Divides safely and returns 0 when the denominator is 0.</p>
+      <p><strong>Use it for:</strong> Any probability ratio, rate, or normalization step where you want to avoid a runtime error from a zero denominator. This is especially useful when turning counts into probabilities.</p>
+      <div class="formula">safeDiv(n, d) = { 0, if d = 0
+               { n / d, otherwise</div>
+      <div class="code"><code>core.safeDiv(10, 2)   // 5
+core.safeDiv(5, 0)    // 0</code></div>
+      <div class="code"><code>// Probability example:
+    count = 3;
+    total = 12;
+    core.safeDiv(count, total);   // 0.25</code></div>
+
+      <h3>clamp01(v)</h3>
+      <p><strong>What it does:</strong> Forces a value into the probability range [0, 1].</p>
+      <p><strong>Use it for:</strong> Cleaning up numeric noise after an approximate calculation so a probability never escapes the valid range.</p>
+      <div class="formula">clamp01(v) = min(1, max(0, v))</div>
+      <div class="code"><code>core.clamp01(-0.2)   // 0
+core.clamp01(0.4)    // 0.4
+core.clamp01(1.8)    // 1</code></div>
+
+      <h3>ln(x)</h3>
+      <p><strong>What it does:</strong> Computes a natural logarithm approximation for positive values.</p>
+      <p><strong>Math:</strong> It reduces x toward [0.5, 1) and then uses a Taylor-series style expansion for ln(1 + u). This is used in entropy and some distribution formulas.</p>
+      <p><strong>Use it for:</strong> scoring models in log-space, computing entropy, or implementing formulas like e^-λ and p^k without a dedicated math library.</p>
+      <div class="formula">ln(x) = ln(m * 2^e) = ln(m) + e * ln(2)
+with m in [0.5, 1) and a series approximation for ln(1 + u)</div>
+      <div class="code"><code>// log-space comparison helper:
+    scoreA = core.ln(0.85) + core.ln(0.72);
+    scoreB = core.ln(0.50) + core.ln(0.95);</code></div>
+
+      <h3>factorial(n)</h3>
+      <p><strong>What it does:</strong> Computes n! for non-negative integers.</p>
+      <p><strong>Use it for:</strong> counting arrangements, permutations, and combinations. It is a building block for binomial and Poisson formulas.</p>
+      <div class="formula">n! = 1 × 2 × 3 × ... × n, with 0! = 1</div>
+      <div class="code"><code>core.factorial(5)   // 120
+core.factorial(0)   // 1</code></div>
+      <div class="code"><code>// 6 choices on a die, 10 independent trials:
+    core.factorial(6);
+    core.factorial(10);</code></div>
+
+      <h3>combinations(n, k)</h3>
+      <p><strong>What it does:</strong> Computes the binomial coefficient “n choose k”.</p>
+      <p><strong>Use it for:</strong> binomial probabilities, feature subset counting, lottery and hand-selection counts, and any place you need the number of unordered selections.</p>
+      <div class="formula">C(n, k) = n! / (k! (n-k)!)</div>
+      <p>The implementation uses a multiplicative form to avoid large intermediate factorials:</p>
+      <div class="formula">C(n, k) = Π[i=0..k-1] (n - i) / (i + 1)</div>
+      <div class="code"><code>core.combinations(5, 2)   // 10
+core.combinations(52, 5)  // 2598960</code></div>
+      <div class="code"><code>// Example: number of ways to choose 3 alert checks out of 8
+    core.combinations(8, 3);</code></div>
+
+      <h3>frequencyTable(outcomes)</h3>
+      <p><strong>What it does:</strong> Counts how many times each outcome appears in a list.</p>
+      <p><strong>Use it for:</strong> turning raw observations into count data for probability estimates, histograms, and categorical summaries.</p>
+      <div class="formula">count(x) = number of occurrences of x in outcomes
+total = length(outcomes)</div>
+      <div class="code"><code>core.frequencyTable(["heads", "tails", "heads"])
+// { counts: {heads: 2, tails: 1}, total: 3 }</code></div>
+      <div class="code"><code>// Works with numbers too:
+    core.frequencyTable([1, 1, 2, 4, 4, 4]);</code></div>
+
+      <h3>probability(outcomes, outcome)</h3>
+      <p><strong>What it does:</strong> Returns the empirical probability of a chosen outcome.</p>
+      <p><strong>Use it for:</strong> estimating event frequency from observed data before switching to a theoretical model.</p>
+      <div class="formula">P(x) = count(x) / N</div>
+      <div class="code"><code>core.probability(["a", "b", "a"], "a")   // 2/3</code></div>
+      <div class="code"><code>// Use this as the starting point for observed rates:
+    core.probability(["pass", "pass", "fail", "pass"], "pass");</code></div>
+
+      <h3>joint(pA, pB)</h3>
+      <p><strong>What it does:</strong> Combines two independent probabilities.</p>
+      <p><strong>Use it for:</strong> simple independent event chains, such as "draws with replacement" or "two unrelated checks both passing".</p>
+      <div class="formula">P(A ∩ B) = P(A) × P(B)</div>
+      <div class="code"><code>core.joint(0.5, 0.5)   // 0.25</code></div>
+      <div class="code"><code>// Two independent system checks:
+    core.joint(0.98, 0.97);</code></div>
+
+      <h3>union(pA, pB)</h3>
+      <p><strong>What it does:</strong> Computes the probability that either event happens, using the independence approximation.</p>
+      <p><strong>Use it for:</strong> estimating coverage or at-least-one success scenarios when you can treat the events as independent.</p>
+      <div class="formula">P(A ∪ B) = P(A) + P(B) - P(A)P(B)</div>
+      <div class="code"><code>core.union(0.3, 0.4)   // 0.58</code></div>
+      <div class="code"><code>// At least one of two backup links stays up:
+    core.union(0.95, 0.92);</code></div>
+
+      <h3>complement(pA)</h3>
+      <p><strong>What it does:</strong> Returns the probability that the event does not occur.</p>
+      <p><strong>Use it for:</strong> "none", "not", or "fail" events, such as 1 - success probability or 1 - tail probability.</p>
+      <div class="formula">P(not A) = 1 - P(A)</div>
+      <div class="code"><code>// P(no error) from an error rate:
+    core.complement(0.02);</code></div>
+
+      <h3>conditional(pAandB, pB)</h3>
+      <p><strong>What it does:</strong> Computes conditional probability.</p>
+      <p><strong>Use it for:</strong> answer questions like "what is the probability of A given that B has already occurred?"</p>
+      <div class="formula">P(A | B) = P(A ∩ B) / P(B)</div>
+      <div class="code"><code>core.conditional(0.2, 0.5)   // 0.4</code></div>
+      <div class="code"><code>// Positive predictive style example:
+    core.conditional(0.04, 0.10);</code></div>
+
+      <h3>expectedValue(values, probs)</h3>
+      <p><strong>What it does:</strong> Computes the mean of a discrete random variable.</p>
+      <p><strong>Use it for:</strong> pricing, average outcome estimation, expected return, and long-run planning decisions.</p>
+      <div class="formula">E[X] = Σ x_i p_i</div>
+      <div class="code"><code>core.expectedValue([1,2,3], [0.2,0.3,0.5])   // 2.3</code></div>
+      <div class="code"><code>// Expected payout:
+    core.expectedValue([0, 100, 500], [0.7, 0.2, 0.1]);</code></div>
+
+      <h3>variance(values, probs, mean)</h3>
+      <p><strong>What it does:</strong> Computes the variance of a discrete random variable.</p>
+      <p><strong>Use it for:</strong> measuring spread around the mean. Two distributions can have the same mean but different volatility.</p>
+      <div class="formula">Var(X) = Σ (x_i - μ)^2 p_i</div>
+      <div class="code"><code>// Compare two payout structures with equal mean but different risk:
+    core.variance([0, 1000], [0.5, 0.5], 500);</code></div>
+
+      <h3>stddev(varianceValue)</h3>
+      <p><strong>What it does:</strong> Converts variance into standard deviation.</p>
+      <p><strong>Use it for:</strong> putting spread back into the original units of the variable.</p>
+      <div class="formula">σ = sqrt(Var(X))</div>
+      <div class="code"><code>v = core.variance([1,2,3], [1/3,1/3,1/3], 2)
+core.stddev(v)</code></div>
+
+      <h3>entropy(probs)</h3>
+      <p><strong>What it does:</strong> Computes Shannon entropy in bits.</p>
+      <p><strong>Use it for:</strong> measuring uncertainty, comparing peaked vs flat distributions, and summarizing how predictable a categorical system is.</p>
+      <div class="formula">H(P) = -Σ p_i log2(p_i)</div>
+      <p>Higher entropy means more uncertainty; lower entropy means a more concentrated distribution.</p>
+      <div class="code"><code>core.entropy([1.0]);
+    core.entropy([0.5, 0.5]);
+    core.entropy([0.9, 0.1]);</code></div>
+
+      <h3>normalize(weights)</h3>
+      <p><strong>What it does:</strong> Turns non-negative weights into probabilities that sum to 1.</p>
+      <p><strong>Use it for:</strong> converting scores, counts, or model weights into a usable distribution.</p>
+      <div class="formula">p_i = w_i / Σ w_i</div>
+      <div class="code"><code>core.normalize([2, 3, 5])   // [0.2, 0.3, 0.5]</code></div>
+    </section>
+
+    <section class="section">
+      <h2>4. Distribution Functions</h2>
+
+      <h3>Binomial: binomialPMF(n, k, p)</h3>
+      <p><strong>What it does:</strong> Probability of exactly k successes in n independent trials with success probability p.</p>
+      <p><strong>Use it for:</strong> defect counts, success counts, yes/no tests, click-through counts, and any fixed-trial Bernoulli process.</p>
+      <div class="formula">P(X = k) = C(n, k) p^k (1 - p)^(n-k)</div>
+      <div class="code"><code>dist.binomialPMF(10, 3, 0.5)   // 0.1171875</code></div>
+      <div class="code"><code>// Example: 8 passes out of 10 when p=0.8
+dist.binomialPMF(10, 8, 0.8);</code></div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 240" role="img" aria-label="Binomial distribution example chart">
+          <defs>
+            <marker id="binArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#0f766e"></path>
+            </marker>
+          </defs>
+          <rect x="25" y="20" width="870" height="190" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="60" y="45" text-anchor="start">Binomial PMF example: n = 10, p = 0.5</text>
+          <line x1="60" y1="170" x2="860" y2="170" stroke="#94a3b8" stroke-width="2"></line>
+          <line x1="60" y1="170" x2="60" y2="60" stroke="#94a3b8" stroke-width="2"></line>
+          <rect x="90" y="148" width="40" height="22" fill="#0f766e"></rect>
+          <rect x="150" y="128" width="40" height="42" fill="#0f766e"></rect>
+          <rect x="210" y="104" width="40" height="66" fill="#0f766e"></rect>
+          <rect x="270" y="76" width="40" height="94" fill="#0f766e"></rect>
+          <rect x="330" y="52" width="40" height="118" fill="#0f766e"></rect>
+          <rect x="390" y="40" width="40" height="130" fill="#0f766e"></rect>
+          <rect x="450" y="52" width="40" height="118" fill="#0f766e"></rect>
+          <rect x="510" y="76" width="40" height="94" fill="#0f766e"></rect>
+          <rect x="570" y="104" width="40" height="66" fill="#0f766e"></rect>
+          <rect x="630" y="128" width="40" height="42" fill="#0f766e"></rect>
+          <rect x="690" y="148" width="40" height="22" fill="#0f766e"></rect>
+          <text x="110" y="188" text-anchor="middle">0</text>
+          <text x="170" y="188" text-anchor="middle">1</text>
+          <text x="230" y="188" text-anchor="middle">2</text>
+          <text x="290" y="188" text-anchor="middle">3</text>
+          <text x="350" y="188" text-anchor="middle">4</text>
+          <text x="410" y="188" text-anchor="middle">5</text>
+          <text x="470" y="188" text-anchor="middle">6</text>
+          <text x="530" y="188" text-anchor="middle">7</text>
+          <text x="590" y="188" text-anchor="middle">8</text>
+          <text x="650" y="188" text-anchor="middle">9</text>
+          <text x="710" y="188" text-anchor="middle">10</text>
+          <text x="782" y="78" text-anchor="middle" fill="#334155">Peak near k = np</text>
+          <path d="M790 85 C760 90, 735 115, 690 140" stroke="#b45309" stroke-width="2.5" fill="none" marker-end="url(#binArrow)"></path>
+        </svg>
+      </div>
+
+      <h3>Binomial: binomialCDF(n, k, p)</h3>
+      <p><strong>What it does:</strong> Probability of at most k successes.</p>
+      <p><strong>Use it for:</strong> threshold questions such as “what is the chance we get 7 or fewer defects?” or “what is the probability of being at or below a target count?”</p>
+      <div class="formula">P(X ≤ k) = Σ[i=0..k] C(n, i) p^i (1 - p)^(n-i)</div>
+
+      <h3>Binomial: binomialStats(n, p)</h3>
+      <p><strong>What it does:</strong> Returns the mean, variance, and standard deviation.</p>
+      <p><strong>Use it for:</strong> quick planning calculations. The mean gives the expected count; the standard deviation shows how much that count typically wiggles.</p>
+      <div class="formula">E[X] = np
+Var(X) = np(1-p)
+σ = sqrt(np(1-p))</div>
+
+      <h3>Poisson: poissonPMF(lambda, k)</h3>
+      <p><strong>What it does:</strong> Probability of k events in a fixed interval when events occur independently at average rate λ.</p>
+      <p><strong>Use it for:</strong> call arrivals, failures per hour, rare incidents per mile, or other count data that accumulates over time or space.</p>
+      <div class="formula">P(X = k) = e^-λ λ^k / k!</div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 240" role="img" aria-label="Poisson distribution example chart">
+          <rect x="25" y="20" width="870" height="190" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="60" y="45" text-anchor="start">Poisson PMF example: λ = 4</text>
+          <line x1="60" y1="170" x2="860" y2="170" stroke="#94a3b8" stroke-width="2"></line>
+          <line x1="60" y1="170" x2="60" y2="60" stroke="#94a3b8" stroke-width="2"></line>
+          <rect x="90" y="145" width="40" height="25" fill="#b45309"></rect>
+          <rect x="150" y="120" width="40" height="50" fill="#b45309"></rect>
+          <rect x="210" y="90" width="40" height="80" fill="#b45309"></rect>
+          <rect x="270" y="60" width="40" height="110" fill="#b45309"></rect>
+          <rect x="330" y="50" width="40" height="120" fill="#b45309"></rect>
+          <rect x="390" y="65" width="40" height="105" fill="#b45309"></rect>
+          <rect x="450" y="90" width="40" height="80" fill="#b45309"></rect>
+          <rect x="510" y="115" width="40" height="55" fill="#b45309"></rect>
+          <rect x="570" y="134" width="40" height="36" fill="#b45309"></rect>
+          <rect x="630" y="147" width="40" height="23" fill="#b45309"></rect>
+          <text x="110" y="188" text-anchor="middle">0</text>
+          <text x="170" y="188" text-anchor="middle">1</text>
+          <text x="230" y="188" text-anchor="middle">2</text>
+          <text x="290" y="188" text-anchor="middle">3</text>
+          <text x="350" y="188" text-anchor="middle">4</text>
+          <text x="410" y="188" text-anchor="middle">5</text>
+          <text x="470" y="188" text-anchor="middle">6</text>
+          <text x="530" y="188" text-anchor="middle">7</text>
+          <text x="590" y="188" text-anchor="middle">8</text>
+          <text x="650" y="188" text-anchor="middle">9</text>
+          <text x="770" y="78" text-anchor="middle" fill="#334155">Mass peaks near λ</text>
+        </svg>
+      </div>
+
+      <h3>Poisson: poissonCDF(lambda, k)</h3>
+      <p><strong>What it does:</strong> Probability of at most k events.</p>
+      <p><strong>Use it for:</strong> service-level checks like “probability of fewer than 3 incidents” or “probability of at most 2 arrivals in a minute.”</p>
+      <div class="formula">P(X ≤ k) = Σ[i=0..k] e^-λ λ^i / i!</div>
+
+      <h3>Poisson: poissonStats(lambda)</h3>
+      <p><strong>What it does:</strong> Returns mean, variance, and standard deviation for the Poisson distribution.</p>
+      <p><strong>Use it for:</strong> quick approximation of average event count and its natural spread.</p>
+      <div class="formula">E[X] = λ
+Var(X) = λ
+σ = sqrt(λ)</div>
+
+      <h3>Normal: normalPDF(x, mean, sd)</h3>
+      <p><strong>What it does:</strong> Probability density of a normal distribution at x.</p>
+      <p><strong>Use it for:</strong> evaluating the height of the curve at a point. This is useful for plotting and comparing density shapes, but not for direct probability of a single point.</p>
+      <div class="formula">f(x) = (1 / (sd * sqrt(2π))) * e^(-(x-mean)^2 / (2 sd^2))</div>
+
+      <h3>Normal: standardNormalCDF(z)</h3>
+      <p><strong>What it does:</strong> Approximates the standard normal cumulative distribution function.</p>
+      <p><strong>Use it for:</strong> converting z-scores into percentiles, critical value checks, and confidence-style calculations.</p>
+      <div class="formula">Φ(z) = P(Z ≤ z), where Z ~ N(0, 1)</div>
+
+      <h3>Normal: normalCDF(x, mean, sd)</h3>
+      <p><strong>What it does:</strong> CDF of a general normal distribution by converting x to a z-score.</p>
+      <p><strong>Use it for:</strong> probability of falling below a threshold, such as below-spec parts, test scores, or measurement limits.</p>
+      <div class="formula">z = (x - mean) / sd
+P(X ≤ x) = Φ(z)</div>
+
+      <h3>Normal: normalBetween(lo, hi, mean, sd)</h3>
+      <p><strong>What it does:</strong> Probability that X falls within a numeric interval.</p>
+      <p><strong>Use it for:</strong> tolerance windows, pass bands, and “inside the acceptable range” questions.</p>
+      <div class="formula">P(lo ≤ X ≤ hi) = Φ((hi-mean)/sd) - Φ((lo-mean)/sd)</div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 240" role="img" aria-label="Normal distribution bell curve example">
+          <rect x="25" y="20" width="870" height="190" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="60" y="45" text-anchor="start">Normal curve example: mean = 170, sd = 10</text>
+          <line x1="60" y1="170" x2="860" y2="170" stroke="#94a3b8" stroke-width="2"></line>
+          <path d="M80 170 C160 170, 220 145, 270 120 C320 95, 370 60, 460 60 C550 60, 600 95, 650 120 C700 145, 760 170, 840 170" stroke="#7c3aed" stroke-width="3" fill="none"></path>
+          <path d="M320 170 L320 100" stroke="#0f766e" stroke-width="2"></path>
+          <path d="M460 170 L460 60" stroke="#b45309" stroke-width="2"></path>
+          <path d="M600 170 L600 100" stroke="#0f766e" stroke-width="2"></path>
+          <text x="320" y="190" text-anchor="middle">mean - 1 sd</text>
+          <text x="460" y="190" text-anchor="middle">mean</text>
+          <text x="600" y="190" text-anchor="middle">mean + 1 sd</text>
+          <text x="790" y="88" text-anchor="middle" fill="#334155">Area under curve = probability</text>
+        </svg>
+      </div>
+
+      <h3>Uniform: uniformPDF(x, a, b)</h3>
+      <p><strong>What it does:</strong> Constant density on [a, b].</p>
+      <p><strong>Use it for:</strong> any equally likely continuous range, such as a waiting time between a minimum and maximum bound.</p>
+      <div class="formula">f(x) = 1 / (b - a) for a ≤ x ≤ b, otherwise 0</div>
+
+      <h3>Uniform: uniformCDF(x, a, b)</h3>
+      <p><strong>What it does:</strong> Linear cumulative probability across the interval.</p>
+      <p><strong>Use it for:</strong> answers like “what fraction of the range lies below this cutoff?”</p>
+      <div class="formula">F(x) = 0, x ≤ a
+F(x) = (x - a) / (b - a), a < x < b
+F(x) = 1, x ≥ b</div>
+
+      <h3>Uniform: uniformStats(a, b)</h3>
+      <p><strong>What it does:</strong> Returns the mean and variance.</p>
+      <p><strong>Use it for:</strong> summarizing the center and spread of a bounded flat distribution.</p>
+      <div class="formula">E[X] = (a + b) / 2
+Var(X) = (b - a)^2 / 12</div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 240" role="img" aria-label="Uniform distribution flat chart">
+          <rect x="25" y="20" width="870" height="190" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="60" y="45" text-anchor="start">Uniform distribution example: wait time from 0 to 20 minutes</text>
+          <line x1="60" y1="170" x2="860" y2="170" stroke="#94a3b8" stroke-width="2"></line>
+          <rect x="120" y="95" width="620" height="75" fill="#0f766e" opacity="0.2" stroke="#0f766e" stroke-width="2"></rect>
+          <text x="430" y="88" text-anchor="middle" fill="#334155">constant density</text>
+          <text x="120" y="188" text-anchor="middle">a</text>
+          <text x="740" y="188" text-anchor="middle">b</text>
+          <path d="M120 170 L120 95" stroke="#0f766e" stroke-width="2"></path>
+          <path d="M740 170 L740 95" stroke="#0f766e" stroke-width="2"></path>
+        </svg>
+      </div>
+
+      <h3>Geometric: geometricPMF(k, p)</h3>
+      <p><strong>What it does:</strong> Probability that the first success happens on trial k.</p>
+      <p><strong>Use it for:</strong> retry processes, first-passage events, and “how many attempts until success?” questions.</p>
+      <div class="formula">P(X = k) = (1 - p)^(k-1) p, for k ≥ 1</div>
+
+      <h3>Geometric: geometricCDF(k, p)</h3>
+      <p><strong>What it does:</strong> Probability that the first success happens by trial k.</p>
+      <p><strong>Use it for:</strong> latency or retry thresholds, like “what is the chance we succeed within 3 tries?”</p>
+      <div class="formula">P(X ≤ k) = 1 - (1 - p)^k</div>
+
+      <h3>Geometric: geometricStats(p)</h3>
+      <p><strong>What it does:</strong> Returns mean, variance, and standard deviation.</p>
+      <p><strong>Use it for:</strong> estimating the long-run expected number of tries needed when each attempt has the same success chance.</p>
+      <div class="formula">E[X] = 1 / p
+Var(X) = (1 - p) / p^2
+σ = sqrt((1 - p) / p^2)</div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 240" role="img" aria-label="Geometric distribution decay chart">
+          <rect x="25" y="20" width="870" height="190" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="60" y="45" text-anchor="start">Geometric distribution example: p = 0.4</text>
+          <line x1="60" y1="170" x2="860" y2="170" stroke="#94a3b8" stroke-width="2"></line>
+          <line x1="60" y1="170" x2="60" y2="60" stroke="#94a3b8" stroke-width="2"></line>
+          <rect x="100" y="90" width="35" height="80" fill="#b45309"></rect>
+          <rect x="160" y="118" width="35" height="52" fill="#b45309"></rect>
+          <rect x="220" y="134" width="35" height="36" fill="#b45309"></rect>
+          <rect x="280" y="144" width="35" height="26" fill="#b45309"></rect>
+          <rect x="340" y="150" width="35" height="20" fill="#b45309"></rect>
+          <rect x="400" y="154" width="35" height="16" fill="#b45309"></rect>
+          <path d="M110 90 C170 110, 240 132, 430 155" stroke="#0f766e" stroke-width="2.5" fill="none"></path>
+          <text x="610" y="82" text-anchor="middle" fill="#334155">Probabilities decay by (1 - p) each step</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>5. Bayes Functions</h2>
+
+      <h3>bayesUpdate(prior, likelihood, evidence)</h3>
+      <p><strong>What it does:</strong> Applies Bayes’ theorem for a single hypothesis.</p>
+      <p><strong>Use it for:</strong> medical-test interpretation, spam filtering, diagnostic evidence, and any one-hypothesis posterior update.</p>
+      <div class="formula">P(H | E) = P(E | H) P(H) / P(E)</div>
+      <p>If evidence is zero, the function returns 0 to avoid division by zero.</p>
+      <div class="code"><code>// Example: base-rate aware medical test
+bayes.bayesUpdate(0.001, 0.99, 0.01098);</code></div>
+
+      <h3>posteriorDistribution(hypotheses)</h3>
+      <p><strong>What it does:</strong> Normalizes a list of hypotheses after weighting each by prior × likelihood.</p>
+      <p><strong>Use it for:</strong> comparing several competing explanations for the same observation, such as models, diseases, or categories.</p>
+      <div class="formula">posterior_i = (prior_i × likelihood_i) / Σ(prior_j × likelihood_j)</div>
+      <div class="code"><code>bayes.posteriorDistribution([
+  { name: "A", prior: 0.5, likelihood: 0.8 },
+  { name: "B", prior: 0.5, likelihood: 0.2 }
+]);</code></div>
+
+      <div class="diagram">
+        <svg viewBox="0 0 920 250" role="img" aria-label="Posterior distribution bar chart">
+          <rect x="25" y="20" width="870" height="195" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="60" y="45" text-anchor="start">Posterior example: A = 0.8, B = 0.2, C = 0.1 (normalized)</text>
+          <line x1="60" y1="180" x2="860" y2="180" stroke="#94a3b8" stroke-width="2"></line>
+          <rect x="160" y="100" width="90" height="80" fill="#0f766e"></rect>
+          <rect x="350" y="140" width="90" height="40" fill="#b45309"></rect>
+          <rect x="540" y="150" width="90" height="30" fill="#7c3aed"></rect>
+          <text x="205" y="198" text-anchor="middle">A</text>
+          <text x="395" y="198" text-anchor="middle">B</text>
+          <text x="585" y="198" text-anchor="middle">C</text>
+          <text x="740" y="78" text-anchor="middle" fill="#334155">posterior = weighted evidence / total</text>
+        </svg>
+      </div>
+
+      <h3>train(samples)</h3>
+      <p><strong>What it does:</strong> Builds a naive Bayes model from labelled feature samples.</p>
+      <p><strong>Training rule:</strong> Count labels and feature occurrences per label. The model keeps:</p>
+      <ul>
+        <li>classCounts[label]</li>
+        <li>featureCounts[label][feature]</li>
+        <li>totalSamples</li>
+      </ul>
+      <div class="note"><strong>Interpretation:</strong> This is a simple multinomial naive Bayes setup with Laplace smoothing during prediction.</div>
+      <div class="code"><code>// Example training data for text classification:
+    bayes.train([
+      { label: "spam", features: ["buy", "cheap"] },
+      { label: "ham", features: ["hello", "meeting"] }
+    ]);</code></div>
+
+      <h3>predict(model, features)</h3>
+      <p><strong>What it does:</strong> Returns label probabilities for a feature list under the trained naive Bayes model.</p>
+      <p><strong>Math:</strong> The classifier computes a score proportional to</p>
+      <div class="formula">score(label) ∝ P(label) × Π P(feature_i | label)</div>
+      <p>In log form this becomes a sum, which is more numerically stable. The implementation then softmax-normalizes the scores back into probabilities.</p>
+      <p><strong>Use it for:</strong> categorizing messages, documents, or small structured feature sets where the independence assumption is acceptable.</p>
+      <div class="code"><code>model = bayes.train(samples);
+    bayes.predict(model, ["cheap", "buy"]);</code></div>
+
+      <h3>sequentialUpdate(initialPrior, steps)</h3>
+      <p><strong>What it does:</strong> Repeatedly applies Bayes updates for multiple evidence steps.</p>
+      <div class="formula">posterior_0 = initialPrior
+posterior_t = bayesUpdate(posterior_{t-1}, likelihood_t, evidence_t)</div>
+      <p><strong>Use it for:</strong> incorporating evidence one piece at a time when a new observation arrives after each update.</p>
+      <div class="code"><code>bayes.sequentialUpdate(0.2, [
+  { likelihood: 0.7, evidence: 0.3 },
+  { likelihood: 0.8, evidence: 0.35 }
+]);</code></div>
+    </section>
+
+    <section class="section">
+      <h2>6. Visual Diagrams</h2>
+
+      <h3>Core Probability Flow</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 1060 260" role="img" aria-label="Core probability flow diagram">
+          <defs>
+            <marker id="coreArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#0f766e"></path>
+            </marker>
+          </defs>
+          <rect x="20" y="36" width="130" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="85" y="58" text-anchor="middle">Raw outcomes</text>
+          <rect x="182" y="36" width="150" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="257" y="58" text-anchor="middle">frequencyTable</text>
+          <rect x="360" y="36" width="150" height="34" rx="7" fill="#ecfeff" stroke="#0f766e"></rect>
+          <text x="435" y="58" text-anchor="middle">probability</text>
+          <rect x="540" y="36" width="140" height="34" rx="7" fill="#fff7ed" stroke="#b45309"></rect>
+          <text x="610" y="58" text-anchor="middle">joint / union</text>
+          <rect x="708" y="36" width="150" height="34" rx="7" fill="#fff7ed" stroke="#b45309"></rect>
+          <text x="783" y="58" text-anchor="middle">conditional</text>
+          <rect x="888" y="36" width="150" height="34" rx="7" fill="#f5f3ff" stroke="#7c3aed"></rect>
+          <text x="963" y="58" text-anchor="middle">entropy / normalize</text>
+
+          <rect x="196" y="130" width="110" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="251" y="152" text-anchor="middle">counts</text>
+          <rect x="330" y="130" width="100" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="380" y="152" text-anchor="middle">p(x)</text>
+          <rect x="460" y="130" width="130" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="525" y="152" text-anchor="middle">P(A∩B)</text>
+          <rect x="615" y="130" width="130" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="680" y="152" text-anchor="middle">P(A | B)</text>
+          <rect x="770" y="130" width="130" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="835" y="152" text-anchor="middle">H(P)</text>
+          <rect x="925" y="130" width="100" height="34" rx="7" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="975" y="152" text-anchor="middle">p_i</text>
+
+          <path d="M150 53 L182 53" stroke="#0f766e" stroke-width="2" marker-end="url(#coreArrow)"></path>
+          <path d="M332 53 L360 53" stroke="#0f766e" stroke-width="2" marker-end="url(#coreArrow)"></path>
+          <path d="M510 53 L540 53" stroke="#0f766e" stroke-width="2" marker-end="url(#coreArrow)"></path>
+          <path d="M680 53 L708 53" stroke="#0f766e" stroke-width="2" marker-end="url(#coreArrow)"></path>
+          <path d="M858 53 L888 53" stroke="#0f766e" stroke-width="2" marker-end="url(#coreArrow)"></path>
+
+          <path d="M257 70 L251 130" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#coreArrow)"></path>
+          <path d="M435 70 L380 130" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#coreArrow)"></path>
+          <path d="M610 70 L525 130" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#coreArrow)"></path>
+          <path d="M783 70 L680 130" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#coreArrow)"></path>
+          <path d="M963 70 L975 130" stroke="#94a3b8" stroke-width="1.8" marker-end="url(#coreArrow)"></path>
+        </svg>
+      </div>
+
+      <h3>Distribution Shapes</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 1060 300" role="img" aria-label="Distribution shape diagram">
+          <defs>
+            <marker id="distArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#0f766e"></path>
+            </marker>
+          </defs>
+          <rect x="20" y="28" width="220" height="200" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="130" y="54" text-anchor="middle">Binomial</text>
+          <path d="M40 210 L55 190 L70 160 L85 125 L100 95 L115 85 L130 72 L145 78 L160 95 L175 130 L190 170 L205 195" stroke="#0f766e" stroke-width="3" fill="none"></path>
+          <text x="130" y="236" text-anchor="middle">Discrete mass around n p</text>
+
+          <rect x="270" y="28" width="220" height="200" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="380" y="54" text-anchor="middle">Poisson</text>
+          <path d="M290 200 L305 185 L320 165 L335 140 L350 115 L365 95 L380 88 L395 95 L410 113 L425 138 L440 165 L455 188" stroke="#b45309" stroke-width="3" fill="none"></path>
+          <text x="380" y="236" text-anchor="middle">Counts per interval at rate λ</text>
+
+          <rect x="520" y="28" width="220" height="200" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="630" y="54" text-anchor="middle">Normal</text>
+          <path d="M540 190 C575 70, 685 70, 720 190" stroke="#7c3aed" stroke-width="3" fill="none"></path>
+          <path d="M540 190 C560 160, 600 120, 630 112 C660 120, 700 160, 720 190" stroke="#7c3aed" stroke-width="3" fill="none"></path>
+          <text x="630" y="236" text-anchor="middle">Bell curve, mean and sd</text>
+
+          <rect x="770" y="28" width="220" height="200" rx="12" fill="#ffffff" stroke="#d8d2c7"></rect>
+          <text x="880" y="54" text-anchor="middle">Uniform / Geometric</text>
+          <path d="M790 175 L840 175 L840 115 L890 115 L890 175 L940 175" stroke="#0f766e" stroke-width="3" fill="none"></path>
+          <path d="M790 200 L810 185 L830 170 L850 158 L870 145 L890 133 L910 121 L930 111 L950 102" stroke="#b45309" stroke-width="3" fill="none"></path>
+          <text x="880" y="236" text-anchor="middle">Flat density vs. first-success decay</text>
+        </svg>
+      </div>
+
+      <h3>Bayes Update</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 1060 260" role="img" aria-label="Bayes update diagram">
+          <defs>
+            <marker id="bayesArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#0f766e"></path>
+            </marker>
+          </defs>
+          <rect x="30" y="86" width="130" height="40" rx="8" fill="#ecfeff" stroke="#0f766e"></rect>
+          <text x="95" y="111" text-anchor="middle">Prior P(H)</text>
+          <rect x="220" y="86" width="150" height="40" rx="8" fill="#fff7ed" stroke="#b45309"></rect>
+          <text x="295" y="111" text-anchor="middle">Likelihood P(E | H)</text>
+          <rect x="435" y="86" width="130" height="40" rx="8" fill="#f8fafc" stroke="#94a3b8"></rect>
+          <text x="500" y="111" text-anchor="middle">Evidence P(E)</text>
+          <rect x="630" y="86" width="170" height="40" rx="8" fill="#f5f3ff" stroke="#7c3aed"></rect>
+          <text x="715" y="111" text-anchor="middle">Posterior P(H | E)</text>
+          <rect x="840" y="86" width="180" height="40" rx="8" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="930" y="111" text-anchor="middle">normalize over hypotheses</text>
+
+          <path d="M160 106 L220 106" stroke="#0f766e" stroke-width="2" marker-end="url(#bayesArrow)"></path>
+          <path d="M370 106 L435 106" stroke="#0f766e" stroke-width="2" marker-end="url(#bayesArrow)"></path>
+          <path d="M565 106 L630 106" stroke="#0f766e" stroke-width="2" marker-end="url(#bayesArrow)"></path>
+          <path d="M800 106 L840 106" stroke="#0f766e" stroke-width="2" marker-end="url(#bayesArrow)"></path>
+
+          <text x="500" y="30" text-anchor="middle" fill="#334155">P(H | E) = P(E | H) P(H) / P(E)</text>
+          <text x="500" y="210" text-anchor="middle" fill="#334155">For multiple hypotheses: posterior_i = score_i / Σ score_j</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>7. Practical Usage Patterns</h2>
+      <h3>Estimate from observed data</h3>
+      <div class="code"><code>core = prob.core;
+heads = ["H", "T", "H", "H"];
+printline(core.probability(heads, "H"));</code></div>
+
+      <h3>Model counts with a distribution</h3>
+      <div class="code"><code>dist = prob.distributions;
+printline(dist.poissonPMF(2.5, 1));
+printline(dist.normalBetween(160, 180, 170, 10));</code></div>
+
+      <h3>Turn evidence into a decision</h3>
+      <div class="code"><code>bayes = prob.bayes;
+posterior = bayes.bayesUpdate(0.001, 0.99, 0.01098);
+printline(posterior);</code></div>
+
+      <h3>Train and predict with naive Bayes</h3>
+      <div class="code"><code>model = bayes.train([
+  { label: "spam", features: ["buy", "cheap"] },
+  { label: "ham", features: ["hello", "meeting"] }
+]);
+printline(bayes.predict(model, ["buy"])[0].label);</code></div>
+    </section>
+
+    <section class="section">
+      <h2>8. Caveats and Notes</h2>
+      <ul>
+        <li><strong>Approximation quality:</strong> ln, exp, and the normal CDF are implemented with series / approximation formulas, so they are intended for practical educational use rather than high-precision numerical analysis.</li>
+        <li><strong>Discrete vs continuous:</strong> Binomial and Poisson use probabilities directly, while Normal and Uniform use density / CDF approximations. A PDF value is not itself a probability; interval probability comes from the CDF or an integral.</li>
+        <li><strong>Naive Bayes independence:</strong> predict() assumes features are conditionally independent given the label.</li>
+        <li><strong>Runtime behavior:</strong> The ns language is intentionally simple; avoid depending on advanced reflection or external math packages.</li>
+        <li><strong>Numeric extremes:</strong> Extremely large values can magnify approximation error, especially in the custom exp and ln helpers.</li>
+      </ul>
+
+      <div class="note"><strong>Best use:</strong> start with the examples in the prob-stat/examples folder. They show the exact formulas on real scenarios and are usually the quickest way to understand each function.</div>
+    </section>
+  </div>
+</body>
+</html>

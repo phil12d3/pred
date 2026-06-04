@@ -1,0 +1,7 @@
+// prob-stat umbrella module
+// Provides probability calculation utilities: basic probability,
+// common distributions, and Bayesian inference.
+
+core          = import("./src/core.ns");
+distributions = import("./src/distributions.ns");
+bayes         = import("./src/bayes.ns");
