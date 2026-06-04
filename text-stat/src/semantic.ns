@@ -722,11 +722,14 @@ relationships = func(corpus, word, limit) {
 
         diff = this.abs(nSpec.specificity - wordSpec.specificity);
         sim = defined(neighbors) && defined(neighbors[n]) ? this.contextSimilarity(cooc, word, n) : 0;
-        siblingBonus = defined(siblingSupport[n]) ? (1 + siblingSupport[n]) : 1;
-        coocBonus = defined(neighbors) && defined(neighbors[n]) ? 1 : 0.35;
+        sharedParentCount = defined(siblingSupport[n]) ? siblingSupport[n] : 0;
+        siblingBonus = sharedParentCount > 0 ? (1 + sharedParentCount) : 0;
+        coocBonus = defined(neighbors) && defined(neighbors[n]) ? 1 : 0.2;
+
+        if (sharedParentCount == 0) continue;
 
         // Peer score balances similar genericity, contextual overlap, and shared parentage.
-        peerScore = (sim * 1.5 + coocBonus) * this.safeDiv(1, 1 + diff) * siblingBonus;
+        peerScore = (sim * 2 + coocBonus) * this.safeDiv(1, 1 + diff) * siblingBonus;
         if (peerScore <= 0) continue;
 
         skipPeer = false;

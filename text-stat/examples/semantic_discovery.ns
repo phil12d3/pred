@@ -11,10 +11,18 @@ Dogs are loyal. Cats are independent.
 Birds can fly. Dogs can run. Fish can swim.
 "
 
+spaceText = "
+Stars emit light. Planets orbit stars. Moons orbit planets.
+Rockets launch from Earth. Satellites orbit Earth. Astronauts travel in rockets.
+Telescopes observe stars. Engineers build rockets. Scientists study planets.
+"
+
+mixedText = animalText + "\n" + spaceText
+
 printline("=== SEMANTIC RELATIONSHIP DISCOVERY ===")
 printline("")
 
-corpus = ts.stats.from(animalText)
+corpus = ts.stats.from(mixedText)
 
 printline("1. SPECIFICITY SCORING")
 printline("   Measures a corpus-derived generality score for each word")
@@ -194,4 +202,43 @@ while (v < 10 && v < tax.generalToSpecific.count()) {
   w = tax.generalToSpecific[v];
   printline("   {v+1}. {w.word} (score: {w.specificity})");
   v = v + 1;
+}
+
+printline("")
+printline("8. MIXED-CORPUS CHECK")
+printline("   The space text is included in the same corpus above, so the outputs show how a second domain skews the model")
+printline("")
+
+mixedRels = ts.semantic.relationships(corpus, "rockets", 4);
+printline("   Relationships for 'rockets' inside the mixed corpus:")
+printline("     Hypernyms: {mixedRels.hypernyms.count()}");
+y = 0;
+while (y < mixedRels.hypernyms.count()) {
+  h = mixedRels.hypernyms[y];
+  printline("       - {h.word}");
+  y = y + 1;
+}
+
+printline("     Hyponyms: {mixedRels.hyponyms.count()}");
+z = 0;
+while (z < mixedRels.hyponyms.count()) {
+  h = mixedRels.hyponyms[z];
+  printline("       - {h.word}");
+  z = z + 1;
+}
+
+printline("     Attributes: {mixedRels.attributes.count()}");
+aa = 0;
+while (aa < mixedRels.attributes.count()) {
+  h = mixedRels.attributes[aa];
+  printline("       - {h.word}");
+  aa = aa + 1;
+}
+
+printline("     Behaviors: {mixedRels.behaviors.count()}");
+ab = 0;
+while (ab < mixedRels.behaviors.count()) {
+  h = mixedRels.behaviors[ab];
+  printline("       - {h.word}");
+  ab = ab + 1;
 }
