@@ -1,0 +1,27 @@
+ts = import("./text-stat.ns");
+
+// Focused example: pass text in, get a list of bigrams out.
+// A bigram is a pair of adjacent words.
+
+text = [
+    "service outage detected service outage resolved",
+    "service outage postmortem created",
+    "incident response service outage playbook"
+];
+
+bigrams = ts.stats.bigramsFrom(text);
+
+printline("=== Bigrams Only Example ===");
+printline("Note: output is sorted by count descending.");
+printline("Raw list output:");
+printraw(bigrams);
+
+printline("");
+printline("Readable summary:");
+for (i = 0; i < bigrams.count(); i = i + 1) {
+    b = bigrams[i];
+    printline("  ", b.pair, " -> ", b.count);
+}
+
+printline("");
+printline("Note: repeated adjacent phrases indicate common language patterns.");

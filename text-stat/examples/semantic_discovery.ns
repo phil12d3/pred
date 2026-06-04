@@ -1,0 +1,197 @@
+ts = import("./text-stat.ns")
+
+
+animalText = "
+Dogs are animals. Cats are animals. Birds are animals. Fish are animals.
+Poodles are dogs. Bulldogs are dogs. Terriers are dogs.
+Siamese cats are cats. Persian cats are cats.
+Parrots are birds. Sparrows are birds.
+Salmon are fish. Trout are fish.
+Dogs are loyal. Cats are independent.
+Birds can fly. Dogs can run. Fish can swim.
+"
+
+printline("=== SEMANTIC RELATIONSHIP DISCOVERY ===")
+printline("")
+
+corpus = ts.stats.from(animalText)
+
+printline("1. SPECIFICITY SCORING")
+printline("   Measures a corpus-derived generality score for each word")
+printline("")
+
+words = ["animals", "dogs", "cats", "poodles", "birds"];
+
+i = 0;
+while (i < words.count()) {
+  w = words[i];
+  spec = ts.semantic.specificity(corpus, w);
+  printline("   {w}: specificity = {spec.specificity} (neighbors: {spec.numNeighbors})");
+  i = i + 1;
+}
+
+printline("")
+printline("   --- Interpretation ---")
+printline("   Higher score = more central/general in this corpus")
+printline("   Lower score = more specific/local in this corpus")
+printline("")
+
+printline("2. DISCOVERING HYPERNYMS (Parent Concepts)")
+printline("   Find what category a word belongs to")
+printline("")
+
+queryWords = ["poodles", "siamese"];
+
+j = 0;
+while (j < queryWords.count()) {
+  w = queryWords[j];
+  rel = ts.semantic.relationships(corpus, w, 3);
+  hyper = rel.hypernyms;
+  printline("   Hypernyms of '{w}':");
+  
+  k = 0;
+  while (k < hyper.count()) {
+    h = hyper[k];
+    printline("     - {h.word} (score: {h.score})");
+    k = k + 1;
+  }
+  printline("");
+  j = j + 1;
+}
+
+printline("3. DISCOVERING HYPONYMS (Specific Examples)")
+printline("   Find specific instances of a category")
+printline("")
+
+hypoWords = ["animals", "dogs", "birds"];
+
+m = 0;
+while (m < hypoWords.count()) {
+  w = hypoWords[m];
+  hypo = ts.semantic.hyponyms(corpus, w, 4);
+  printline("   Hyponyms of '{w}':");
+  
+  n = 0;
+  while (n < hypo.count()) {
+    h = hypo[n];
+    printline("     - {h.word}");
+    n = n + 1;
+  }
+  printline("");
+  m = m + 1;
+}
+
+printline("4. FINDING PEERS (Related Concepts)")
+printline("   Find words at similar specificity level")
+printline("")
+
+peers = ts.semantic.relationships(corpus, "dogs", 5);
+printline("   Peers of 'dogs': {peers.peers.count()} found");
+p = 0;
+while (p < peers.peers.count()) {
+  peer = peers.peers[p];
+  printline("     - {peer.word}");
+  p = p + 1;
+}
+printline("")
+
+printline("4b. CONNECTOR WORDS (Function/Bridge Tokens)")
+printline("   Corpus-derived connector group")
+printline("")
+
+connectors = ts.semantic.connectors(corpus, 8);
+printline("   Connectors discovered: {connectors.count()}");
+cx = 0;
+while (cx < connectors.count()) {
+  c = connectors[cx];
+  printline("     - {c.word} (score: {c.score})");
+  cx = cx + 1;
+}
+printline("")
+
+printline("5. FULL RELATIONSHIP MAP")
+printline("   All relationships for one word")
+printline("")
+
+dogRels = ts.semantic.relationships(corpus, "dogs", 3);
+printline("   Word: {dogRels.word}")
+printline("   Hypernyms: {dogRels.hypernyms.count()} found")
+q = 0;
+while (q < dogRels.hypernyms.count()) {
+  h = dogRels.hypernyms[q];
+  printline("     - {h.word}");
+  q = q + 1;
+}
+
+printline("   Hyponyms: {dogRels.hyponyms.count()} found")
+r = 0;
+while (r < dogRels.hyponyms.count()) {
+  h = dogRels.hyponyms[r];
+  printline("     - {h.word}");
+  r = r + 1;
+}
+
+printline("   Peers: {dogRels.peers.count()} found")
+s = 0;
+while (s < dogRels.peers.count()) {
+  p = dogRels.peers[s];
+  printline("     - {p.word}");
+  s = s + 1;
+}
+
+printline("   Attributes: {dogRels.attributes.count()} found")
+at = 0;
+while (at < dogRels.attributes.count()) {
+  a = dogRels.attributes[at];
+  printline("     - {a.word}");
+  at = at + 1;
+}
+
+printline("   Behaviors: {dogRels.behaviors.count()} found")
+bh = 0;
+while (bh < dogRels.behaviors.count()) {
+  b = dogRels.behaviors[bh];
+  printline("     - {b.word}");
+  bh = bh + 1;
+}
+
+printline("   Connector neighbors: {dogRels.connectorNeighbors.count()} found")
+cn = 0;
+while (cn < dogRels.connectorNeighbors.count()) {
+  x = dogRels.connectorNeighbors[cn];
+  printline("     - {x.word}");
+  cn = cn + 1;
+}
+printline("")
+
+printline("6. SEMANTIC CLUSTERING")
+printline("   Group words that co-occur together")
+printline("")
+
+clusters = ts.semantic.semanticClusters(corpus);
+printline("   Found {clusters.count()} clusters:");
+t = 0;
+while (t < clusters.count()) {
+  c = clusters[t];
+  printline("   Cluster {t+1}: {c.count()} words");
+  u = 0;
+  while (u < c.count()) {
+    printline("     - {c[u]}");
+    u = u + 1;
+  }
+  t = t + 1;
+}
+printline("")
+
+printline("7. WORD HIERARCHY")
+printline("   All words sorted from general to specific")
+printline("")
+
+tax = ts.semantic.taxonomy(corpus);
+printline("   Top 10 most general concepts:")
+v = 0;
+while (v < 10 && v < tax.generalToSpecific.count()) {
+  w = tax.generalToSpecific[v];
+  printline("   {v+1}. {w.word} (score: {w.specificity})");
+  v = v + 1;
+}

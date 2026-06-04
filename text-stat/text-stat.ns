@@ -1,0 +1,6 @@
+// text-stat umbrella module
+
+tokenize = import("./src/tokenize.ns");
+stats = import("./src/stats.ns");
+utils = import("./src/utils.ns");
+semantic = import("./src/semantic.ns");

@@ -1,0 +1,44 @@
+ts = import("./text-stat.ns");
+
+// Example goal:
+// Generate one consolidated report object for dashboards/pipelines.
+
+docs = [
+    "forecast demand model demand trend",
+    "trend analysis and demand planning",
+    "planning model calibration and validation"
+];
+
+report = ts.stats.report(docs, {
+    topN: 6,
+    tailN: 4,
+    windowSize: 2,
+    prefixLen: 4
+});
+
+printline("=== Full Report Example ===");
+printline("docs=", report.docs, " tokens=", report.tokens, " unique=", report.uniqueWords);
+
+printline("");
+printline("Leading words:");
+for (i = 0; i < report.leadingWords.count(); i = i + 1) {
+    row = report.leadingWords[i];
+    printline("  ", row.word, " -> ", row.count, " ratio=", row.ratio);
+}
+
+printline("");
+printline("Tail words:");
+for (i = 0; i < report.tailWords.count(); i = i + 1) {
+    row = report.tailWords[i];
+    printline("  ", row.word, " -> ", row.count);
+}
+
+printline("");
+printline("Top groups:");
+for (i = 0; i < report.groups.count() && i < 5; i = i + 1) {
+    g = report.groups[i];
+    printline("  ", g.group, " total=", g.total, " members=", g.words.count());
+}
+
+printline("");
+printline("Note: use report.coOccurrence for drill-down neighbor analysis by keyword.");

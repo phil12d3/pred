@@ -1,0 +1,24 @@
+ts = import("./text-stat.ns");
+
+// Example goal:
+// Compare how similar terms are using normalized Levenshtein similarity.
+// Score range is [0, 1].
+
+pairs = [
+    {a: "analysis", b: "analysis"},
+    {a: "analysis", b: "analyst"},
+    {a: "model", b: "models"},
+    {a: "analysis", b: "banana"}
+];
+
+printline("=== Similarity Example ===");
+printline("Note: 1.0 means exact match; closer to 0 means more different.");
+
+for (i = 0; i < pairs.count(); i = i + 1) {
+    p = pairs[i];
+    score = ts.stats.similarity(p.a, p.b);
+    printline("  ", p.a, " vs ", p.b, " => ", score);
+}
+
+printline("");
+printline("Note: this is spelling-form similarity, not semantic meaning similarity.");

@@ -1,0 +1,108 @@
+ts = import("./text-stat.ns")
+
+// Practical Example: Discovering product categories from sales descriptions
+salesText = "
+Customer bought laptop. Customer bought dell laptop. Customer bought hp laptop.
+Customer bought desktop. Customer bought gaming desktop. Customer bought workstation desktop.
+Customer bought monitor. Customer bought gaming monitor. Customer bought ultrawide monitor.
+Customer bought keyboard. Customer bought mechanical keyboard. Customer bought wireless keyboard.
+Laptops are computers. Desktops are computers. Monitors are peripherals. Keyboards are peripherals.
+Computers are electronics. Peripherals are electronics.
+Customers prefer gaming. Customers like performance.
+Gaming desktop has powerful processor. Gaming laptop has graphics card.
+"
+
+printline("=== PRACTICAL: DISCOVERING PRODUCT HIERARCHY ===")
+printline("")
+
+corpus = ts.stats.from(salesText)
+
+printline("FINDING IMPLICIT PRODUCT CATEGORIES:")
+printline("")
+
+// What categories does laptop belong to?
+laptopRels = ts.semantic.relationships(corpus, "laptop", 4)
+
+printline("Laptop:")
+printline("  Is a type of: ")
+i = 0;
+while (i < laptopRels.hypernyms.count()) {
+  h = laptopRels.hypernyms[i];
+  printline("    - {h.word}");
+  i = i + 1;
+}
+
+printline("  Specific models:")
+j = 0;
+while (j < laptopRels.hyponyms.count()) {
+  h = laptopRels.hyponyms[j];
+  printline("    - {h.word}");
+  j = j + 1;
+}
+
+printline("  Similar products:")
+k = 0;
+while (k < laptopRels.peers.count()) {
+  p = laptopRels.peers[k];
+  printline("    - {p.word}");
+  k = k + 1;
+}
+
+printline("")
+
+// What types of products do we have?
+desktopRels = ts.semantic.relationships(corpus, "desktop", 4)
+
+printline("Desktop:")
+printline("  Is a type of:")
+l = 0;
+while (l < desktopRels.hypernyms.count()) {
+  h = desktopRels.hypernyms[l];
+  printline("    - {h.word}");
+  l = l + 1;
+}
+
+printline("  Related products:")
+m = 0;
+while (m < desktopRels.peers.count()) {
+  p = desktopRels.peers[m];
+  printline("    - {p.word}");
+  m = m + 1;
+}
+
+printline("")
+
+// Discover the overall hierarchy
+printline("HIERARCHY OF DISCOVERED CONCEPTS:")
+
+tax = ts.semantic.taxonomy(corpus)
+
+// Get top 15 most general words
+topGeneral = [];
+n = 0;
+while (n < 15 && n < tax.generalToSpecific.count()) {
+  topGeneral.add(tax.generalToSpecific[n]);
+  n = n + 1;
+}
+
+printline("Most general concepts:")
+o = 0;
+while (o < topGeneral.count()) {
+  w = topGeneral[o];
+  printline("  {w.word}");
+  o = o + 1;
+}
+
+printline("")
+
+// Discover automatic clusters
+printline("AUTOMATIC CLUSTERING:")
+clusters = ts.semantic.semanticClusters(corpus)
+
+printline("Discovered product groups:")
+p = 0;
+while (p < clusters.count()) {
+  cluster = clusters[p];
+  printline("  Group: {cluster[0]} + {cluster.count() - 1} related");
+  p = p + 1;
+}

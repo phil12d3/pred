@@ -1,0 +1,48 @@
+ts = import("./text-stat.ns");
+
+docs = [
+    "The model learns patterns from text and reports leading and tail words.",
+    "Text analysis can report co occurrence neighbors and grouped stems.",
+    "Leading words indicate dominant themes, tail words indicate rare terms.",
+    "Similarity helps compare analyst and analysis style tokens."
+];
+
+corpus = ts.stats.from(docs);
+rep = ts.stats.report(docs, {topN: 8, tailN: 5, windowSize: 2, prefixLen: 4});
+
+printline("=== text-stat demo ===");
+printline("docs: ", rep.docs, " tokens: ", rep.tokens, " unique: ", rep.uniqueWords);
+
+printline("");
+printline("Top words:");
+for (i = 0; i < rep.leadingWords.count(); i = i + 1) {
+    row = rep.leadingWords[i];
+    printline("  ", row.word, " : ", row.count, " (", row.ratio, ")");
+}
+
+printline("");
+printline("Tail words:");
+for (i = 0; i < rep.tailWords.count(); i = i + 1) {
+    row = rep.tailWords[i];
+    printline("  ", row.word, " : ", row.count);
+}
+
+printline("");
+printline("Neighbors for 'text':");
+neighbors = ts.stats.neighbors(corpus, "text", 8, 2);
+for (i = 0; i < neighbors.count(); i = i + 1) {
+    n = neighbors[i];
+    printline("  ", n.word, " : ", n.count);
+}
+
+printline("");
+printline("Similarity samples:");
+printline("  analysis vs analyst = ", ts.stats.similarity("analysis", "analyst"));
+printline("  analysis vs banana  = ", ts.stats.similarity("analysis", "banana"));
+
+printline("");
+printline("Top grouped stems:");
+for (i = 0; i < rep.groups.count() && i < 5; i = i + 1) {
+    g = rep.groups[i];
+    printline("  ", g.group, " total=", g.total, " members=", g.words.count());
+}

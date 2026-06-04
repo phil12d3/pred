@@ -1,0 +1,793 @@
+tokenize = import("./src/tokenize.ns");
+stats = import("./src/stats.ns");
+utils = import("./src/utils.ns");
+
+// Helper: absolute value
+abs = func(n) {
+    return n < 0 ? 0 - n : n;
+};
+
+// Helper: minimum
+min = func(a, b) {
+    return a < b ? a : b;
+};
+
+// Helper: maximum
+max = func(a, b) {
+    return a > b ? a : b;
+};
+
+// Helper: safe division
+safeDiv = func(numerator, denominator) {
+    return denominator == 0 ? 0 : numerator / denominator;
+};
+
+// Split text into neutral segments (sentence-like units) for distribution stats.
+splitSegments = func(text) {
+    segments = [];
+    current = "";
+    s = stringify(text);
+
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        boundary = ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == "\n";
+
+        if (boundary) {
+            toks = this.tokenize.tokens(current);
+            if (toks.count() > 0) segments.add(current);
+            current = "";
+        } else {
+            current = current + ch;
+        }
+    }
+
+    tailToks = this.tokenize.tokens(current);
+    if (tailToks.count() > 0) segments.add(current);
+    return segments;
+};
+
+// Semantic co-occurrence should respect segment boundaries so unrelated
+// neighboring sentences do not leak into the same context window.
+semanticCoOccurrence = func(corpus, windowSize) {
+    win = defined(windowSize) ? windowSize : 2;
+    if (win < 1) win = 1;
+
+    matrix = {};
+    for (di = 0; di < corpus.docs.count(); di = di + 1) {
+        segments = this.splitSegments(corpus.docs[di]);
+        if (segments.count() == 0) segments.add(corpus.docs[di]);
+
+        for (si = 0; si < segments.count(); si = si + 1) {
+            toks = this.tokenize.tokens(segments[si]);
+            for (i = 0; i < toks.count(); i = i + 1) {
+                w = toks[i];
+                if (!defined(matrix[w])) matrix[w] = {};
+
+                start = i - win;
+                if (start < 0) start = 0;
+                end = i + win;
+                if (end > toks.count() - 1) end = toks.count() - 1;
+
+                for (j = start; j <= end; j = j + 1) {
+                    if (j == i) continue;
+                    other = toks[j];
+                    if (!defined(matrix[w][other])) matrix[w][other] = 0;
+                    matrix[w][other] = matrix[w][other] + 1;
+                }
+            }
+        }
+    }
+
+    return matrix;
+};
+
+// Build corpus-level term stats from co-occurrence + distribution across segments.
+termStats = func(corpus) {
+    cooc = this.semanticCoOccurrence(corpus, 2);
+
+    segments = [];
+    for (di = 0; di < corpus.docs.count(); di = di + 1) {
+        parts = this.splitSegments(corpus.docs[di]);
+        if (parts.count() == 0) {
+            segments.add(corpus.docs[di]);
+        } else {
+            for (pi = 0; pi < parts.count(); pi = pi + 1) segments.add(parts[pi]);
+        }
+    }
+
+    if (segments.count() == 0) segments.add("");
+
+    docFreq = {};
+    for (si = 0; si < segments.count(); si = si + 1) {
+        toks = this.tokenize.uniqueTokens(segments[si]);
+        for (ti = 0; ti < toks.count(); ti = ti + 1) {
+            w = toks[ti];
+            if (!defined(docFreq[w])) docFreq[w] = 0;
+            docFreq[w] = docFreq[w] + 1;
+        }
+    }
+
+    profile = {};
+    degreeRows = [];
+    maxNeighborCount = 0;
+    maxSegmentRatio = 0;
+    foreach(w in cooc.props) {
+        c = cooc[w].props.count();
+        if (c > maxNeighborCount) maxNeighborCount = c;
+        degreeRows.add({word: w, degree: c});
+    }
+
+    degreeRows = degreeRows.sort(func(indexA, itemA, indexB, itemB) => itemB.degree - itemA.degree);
+    topDegree = degreeRows.count() > 0 ? degreeRows[0].degree : 0;
+    secondDegree = degreeRows.count() > 1 ? degreeRows[1].degree : 0;
+
+    foreach(w in cooc.props) {
+        neighborCount = 0;
+        totalWeight = 0;
+        foreach(n in cooc[w].props) {
+            neighborCount = neighborCount + 1;
+            totalWeight = totalWeight + cooc[w][n];
+        }
+
+        df = defined(docFreq[w]) ? docFreq[w] : 0;
+        ubiquity = this.safeDiv(df, segments.count());
+        if (ubiquity > maxSegmentRatio) maxSegmentRatio = ubiquity;
+    }
+
+    foreach(w in cooc.props) {
+        neighborCount = 0;
+        totalWeight = 0;
+        foreach(n in cooc[w].props) {
+            neighborCount = neighborCount + 1;
+            totalWeight = totalWeight + cooc[w][n];
+        }
+
+        df = defined(docFreq[w]) ? docFreq[w] : 0;
+        ubiquity = this.safeDiv(df, segments.count());
+        // Mid-range ubiquity is favored, but keep a floor so true categories
+        // in small corpora do not collapse to zero weight.
+        balanceRaw = 1 - (this.abs((2 * ubiquity) - 1));
+        if (balanceRaw < 0) balanceRaw = 0;
+        balance = 0.25 + (0.75 * balanceRaw);
+
+        // Corpus-derived rarity signal retained for diagnostics and optional scoring terms.
+        rarity = this.safeDiv(segments.count(), df + 1);
+        // Hub penalty for universal connectors based on degree within this corpus.
+        hubRatio = this.safeDiv(neighborCount, this.max(maxNeighborCount, 1));
+        hubPenalty = 1 - (0.5 * hubRatio);
+        if (hubPenalty < 0) hubPenalty = 0;
+
+        ubiqRatio = this.safeDiv(ubiquity, this.max(maxSegmentRatio, 0.00001));
+        // Purely corpus-driven connector likelihood using local outlier rank.
+        isTopDegreeOutlier = neighborCount == topDegree && topDegree > secondDegree;
+        connectorLike = (hubRatio >= 0.9 && ubiqRatio >= 0.9 && (df >= 3 || isTopDegreeOutlier));
+
+        // Genericity uses corpus-derived structure; avoid boosting rare terms.
+        base = neighborCount * balance * this.safeDiv(totalWeight, this.max(neighborCount, 1));
+        genericity = base * hubPenalty;
+
+        profile[w] = {
+            word: w,
+            neighborCount: neighborCount,
+            totalWeight: totalWeight,
+            segmentFrequency: df,
+            segmentRatio: ubiquity,
+            balance: balance,
+            rarity: rarity,
+            hubPenalty: hubPenalty,
+            hubRatio: hubRatio,
+            connectorLike: connectorLike,
+            genericity: genericity
+        };
+    }
+
+    return {
+        cooc: cooc,
+        segments: segments.count(),
+        profile: profile
+    };
+};
+
+specificityFromDerived = func(derived, word) {
+    p = derived.profile[word];
+    if (!defined(p)) return {word: word, specificity: 0, numNeighbors: 0, totalCooc: 0, segmentRatio: 0, balance: 0};
+
+    bridgeLike = false;
+    if (defined(derived.edgeGraph) && defined(derived.edgeGraph.bridgeUseCount[word])) {
+        bridgeLike = derived.edgeGraph.bridgeUseCount[word] >= 2;
+    }
+
+    if (defined(derived.edgeGraph)) {
+        incomingCount = defined(derived.edgeGraph.categoryIncoming[word]) ? derived.edgeGraph.categoryIncoming[word] : 0;
+        outgoingCount = defined(derived.edgeGraph.categoryOutgoing[word]) ? derived.edgeGraph.categoryOutgoing[word] : 0;
+        if (incomingCount > 0 || outgoingCount > 0) {
+            taxonomyScore = (incomingCount * 4) - (outgoingCount * 2) + p.balance;
+            if (taxonomyScore < 0) taxonomyScore = 0;
+
+            return {
+                word: word,
+                specificity: taxonomyScore,
+                numNeighbors: p.neighborCount,
+                totalCooc: p.totalWeight,
+                segmentRatio: p.segmentRatio,
+                balance: p.balance,
+                rarity: p.rarity,
+                hubPenalty: p.hubPenalty,
+                hubRatio: p.hubRatio,
+                connectorLike: p.connectorLike || bridgeLike,
+                parentLike: incomingCount,
+                childLike: outgoingCount
+            };
+        }
+    }
+
+    // Taxonomy-oriented specificity: a term is more general when it explains
+    // many other terms better than they explain it.
+    parentLike = 0;
+    childLike = 0;
+    matrix = derived.cooc;
+    if (defined(matrix[word])) {
+        foreach(other in matrix[word].props) {
+            if (other == word) continue;
+            if (!defined(derived.profile[other])) continue;
+            otherProfile = derived.profile[other];
+            if (otherProfile.connectorLike) continue;
+
+            forward = this.sharedNeighborRatio(matrix, other, word);
+            backward = this.sharedNeighborRatio(matrix, word, other);
+            gap = forward - backward;
+            weight = this.safeDiv(matrix[word][other], this.max(p.totalWeight, 1));
+
+            if (gap > 0) {
+                parentLike = parentLike + (gap * weight);
+            } else {
+                childLike = childLike + ((0 - gap) * weight);
+            }
+        }
+    }
+
+    taxonomyScore = (parentLike * 10) - (childLike * 4) + (p.balance * 2);
+    if (taxonomyScore < 0) taxonomyScore = 0;
+
+    return {
+        word: word,
+        specificity: taxonomyScore,
+        numNeighbors: p.neighborCount,
+        totalCooc: p.totalWeight,
+        segmentRatio: p.segmentRatio,
+        balance: p.balance,
+        rarity: p.rarity,
+        hubPenalty: p.hubPenalty,
+        hubRatio: p.hubRatio,
+        connectorLike: p.connectorLike || bridgeLike,
+        parentLike: parentLike,
+        childLike: childLike
+    };
+};
+
+connectorsFromDerived = func(derived, limit) {
+    lim = defined(limit) ? limit : 10;
+    out = [];
+
+    foreach(w in derived.profile.props) {
+        p = derived.profile[w];
+        if (!p.connectorLike) continue;
+        out.add({
+            word: w,
+            hubRatio: p.hubRatio,
+            segmentRatio: p.segmentRatio,
+            neighborCount: p.neighborCount,
+            score: p.hubRatio * p.segmentRatio
+        });
+    }
+
+    out = out.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+
+    result = [];
+    i = 0;
+    maxN = this.min(lim, out.count());
+    while (i < maxN) {
+        result.add(out[i]);
+        i = i + 1;
+    }
+    return result;
+};
+
+connectors = func(corpus, limit) {
+    derived = this.termStats(corpus);
+    return this.connectorsFromDerived(derived, limit);
+};
+
+connectorEdgeGraph = func(corpus, derived) {
+    bridgeEdges = {};
+    targetIncomingByBridge = {};
+    bridgeUseCount = {};
+    bestBridge = "";
+    bestBridgeScore = -1;
+
+    for (di = 0; di < corpus.docs.count(); di = di + 1) {
+        segments = this.splitSegments(corpus.docs[di]);
+        if (segments.count() == 0) segments.add(corpus.docs[di]);
+
+        for (si = 0; si < segments.count(); si = si + 1) {
+            toks = this.tokenize.tokens(segments[si]);
+            for (i = 1; i + 1 < toks.count(); i = i + 1) {
+                connector = toks[i];
+                connectorProfile = defined(derived.profile[connector]) ? derived.profile[connector] : null;
+                if (!defined(connectorProfile)) continue;
+
+                child = toks[i - 1];
+                parent = toks[i + 1];
+                childProfile = defined(derived.profile[child]) ? derived.profile[child] : null;
+                parentProfile = defined(derived.profile[parent]) ? derived.profile[parent] : null;
+                if (!defined(childProfile) || !defined(parentProfile)) continue;
+                if (childProfile.connectorLike || parentProfile.connectorLike) continue;
+
+                // Recover a modifier in patterns like "siamese cats are cats".
+                if (child == parent && i - 2 >= 0) {
+                    alt = toks[i - 2];
+                    altProfile = defined(derived.profile[alt]) ? derived.profile[alt] : null;
+                    if (defined(altProfile) && !altProfile.connectorLike) child = alt;
+                }
+
+                if (child == parent) continue;
+
+                if (!defined(bridgeUseCount[connector])) bridgeUseCount[connector] = 0;
+                bridgeUseCount[connector] = bridgeUseCount[connector] + 1;
+
+                if (!defined(bridgeEdges[connector])) bridgeEdges[connector] = {};
+                if (!defined(bridgeEdges[connector][child])) bridgeEdges[connector][child] = {};
+                if (!defined(bridgeEdges[connector][child][parent])) bridgeEdges[connector][child][parent] = 0;
+                bridgeEdges[connector][child][parent] = bridgeEdges[connector][child][parent] + 1;
+
+                if (!defined(targetIncomingByBridge[connector])) targetIncomingByBridge[connector] = {};
+                if (!defined(targetIncomingByBridge[connector][parent])) targetIncomingByBridge[connector][parent] = 0;
+                targetIncomingByBridge[connector][parent] = targetIncomingByBridge[connector][parent] + 1;
+            }
+        }
+    }
+
+    foreach(bridge in bridgeEdges.props) {
+        if (!derived.profile[bridge].connectorLike && bridgeUseCount[bridge] < 2) continue;
+
+        seenTargets = {};
+        targetCount = 0;
+        incomingSum = 0;
+        foreach(child in bridgeEdges[bridge].props) {
+            foreach(target in bridgeEdges[bridge][child].props) {
+                if (seenTargets[target]) continue;
+                seenTargets[target] = true;
+                targetCount = targetCount + 1;
+                incomingSum = incomingSum + targetIncomingByBridge[bridge][target];
+            }
+        }
+        bridgeScore = this.safeDiv(incomingSum, this.max(targetCount, 1));
+        if (bridgeScore > bestBridgeScore) {
+            bestBridgeScore = bridgeScore;
+            bestBridge = bridge;
+        }
+    }
+
+    categoryEdges = {};
+    categoryIncoming = {};
+    categoryOutgoing = {};
+    attributeEdges = {};
+    behaviorEdges = {};
+
+    foreach(bridge in bridgeEdges.props) {
+        if (!derived.profile[bridge].connectorLike && bridgeUseCount[bridge] < 2) continue;
+
+        isTaxonomyBridge = bridge == bestBridge;
+        foreach(child in bridgeEdges[bridge].props) {
+            foreach(target in bridgeEdges[bridge][child].props) {
+                count = bridgeEdges[bridge][child][target];
+                targetIncoming = targetIncomingByBridge[bridge][target];
+
+                if (isTaxonomyBridge && targetIncoming >= 2) {
+                    if (!defined(categoryEdges[child])) categoryEdges[child] = {};
+                    categoryEdges[child][target] = count;
+                    if (!defined(categoryIncoming[target])) categoryIncoming[target] = 0;
+                    categoryIncoming[target] = categoryIncoming[target] + count;
+                    if (!defined(categoryOutgoing[child])) categoryOutgoing[child] = 0;
+                    categoryOutgoing[child] = categoryOutgoing[child] + count;
+                } else if (isTaxonomyBridge) {
+                    if (!defined(attributeEdges[child])) attributeEdges[child] = {};
+                    attributeEdges[child][target] = count;
+                } else {
+                    if (!defined(behaviorEdges[child])) behaviorEdges[child] = {};
+                    behaviorEdges[child][target] = count;
+                }
+            }
+        }
+    }
+
+    return {
+        dominantBridge: bestBridge,
+        bridgeUseCount: bridgeUseCount,
+        categoryEdges: categoryEdges,
+        categoryIncoming: categoryIncoming,
+        categoryOutgoing: categoryOutgoing,
+        attributeEdges: attributeEdges,
+        behaviorEdges: behaviorEdges
+    };
+};
+
+connectorNeighbors = func(corpus, word, limit) {
+    lim = defined(limit) ? limit : 10;
+    derived = this.termStats(corpus);
+    derived.edgeGraph = this.connectorEdgeGraph(corpus, derived);
+    matrix = derived.cooc;
+    if (!defined(matrix[word])) return [];
+
+    out = [];
+    foreach(other in matrix[word].props) {
+        p = this.specificityFromDerived(derived, other);
+        if (!p.connectorLike) continue;
+        out.add({word: other, count: matrix[word][other]});
+    }
+    out = out.sort(func(indexA, itemA, indexB, itemB) => itemB.count - itemA.count);
+
+    result = [];
+    i = 0;
+    maxN = this.min(lim, out.count());
+    while (i < maxN) {
+        result.add(out[i]);
+        i = i + 1;
+    }
+    return result;
+};
+
+sharedNeighborRatio = func(matrix, a, b) {
+    if (!defined(matrix[a]) || !defined(matrix[b])) return 0;
+    totalA = matrix[a].props.count();
+    if (totalA == 0) return 0;
+
+    shared = 0;
+    foreach(n in matrix[a].props) {
+        if (defined(matrix[b][n])) shared = shared + 1;
+    }
+    return this.safeDiv(shared, totalA);
+};
+
+directionalCoverage = func(matrix, child, parent) {
+    forward = this.sharedNeighborRatio(matrix, child, parent);
+    backward = this.sharedNeighborRatio(matrix, parent, child);
+    gap = forward - backward;
+    return gap > 0 ? gap : 0;
+};
+
+contextSimilarity = func(matrix, a, b) {
+    if (!defined(matrix[a]) || !defined(matrix[b])) return 0;
+
+    sumMin = 0;
+    sumMax = 0;
+    seen = {};
+
+    foreach(n in matrix[a].props) {
+        av = matrix[a][n];
+        bv = defined(matrix[b][n]) ? matrix[b][n] : 0;
+        sumMin = sumMin + this.min(av, bv);
+        sumMax = sumMax + this.max(av, bv);
+        seen[n] = true;
+    }
+
+    foreach(n in matrix[b].props) {
+        if (seen[n]) continue;
+        sumMax = sumMax + matrix[b][n];
+    }
+
+    return this.safeDiv(sumMin, sumMax);
+};
+
+// Calculate specificity: how general or specific a word is based on context diversity
+// Higher score = more general (appears with many different words)
+// Lower score = more specific (appears with few words)
+specificity = func(corpus, word) {
+    derived = this.termStats(corpus);
+    derived.edgeGraph = this.connectorEdgeGraph(corpus, derived);
+    return this.specificityFromDerived(derived, word);
+};
+
+// Find hypernyms (parent concepts) - words more general than the target
+hypernyms = func(corpus, word, limit) {
+    lim = defined(limit) ? limit : 5;
+    derived = this.termStats(corpus);
+    derived.edgeGraph = this.connectorEdgeGraph(corpus, derived);
+
+    if (defined(derived.edgeGraph.categoryEdges[word])) {
+        direct = [];
+        foreach(parent in derived.edgeGraph.categoryEdges[word].props) {
+            parentSpec = this.specificityFromDerived(derived, parent);
+            direct.add({
+                word: parent,
+                specificity: parentSpec.specificity,
+                connectorLike: parentSpec.connectorLike,
+                overlap: 1,
+                direction: 1,
+                score: derived.edgeGraph.categoryEdges[word][parent]
+            });
+        }
+        direct = direct.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+        directResult = [];
+        di = 0;
+        directLimit = this.min(lim, direct.count());
+        while (di < directLimit) {
+            directResult.add(direct[di]);
+            di = di + 1;
+        }
+        if (directResult.count() > 0) return directResult;
+    }
+
+    cooc = derived.cooc;
+    neighbors = cooc[word];
+    if (!defined(neighbors)) return [];
+
+    wordSpec = this.specificityFromDerived(derived, word);
+    candidates = [];
+    
+    foreach(n in neighbors.props) {
+        if (!defined(derived.profile[n])) continue;
+        nSpec = this.specificityFromDerived(derived, n);
+
+        // Directionality: parent should be more generic and cover child context.
+        uplift = nSpec.specificity - wordSpec.specificity;
+        if (uplift > 0) {
+            overlap = this.sharedNeighborRatio(cooc, word, n);
+            direction = this.directionalCoverage(cooc, word, n);
+            edge = neighbors[n];
+            score = uplift * overlap * direction * this.safeDiv(edge, this.max(wordSpec.totalCooc, 1));
+            if (score > 0) {
+                candidates.add({
+                    word: n,
+                    specificity: nSpec.specificity,
+                    connectorLike: nSpec.connectorLike,
+                    overlap: overlap,
+                    direction: direction,
+                    score: score
+                });
+            }
+        }
+    }
+    
+    candidates = candidates.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+
+    result = [];
+    i = 0;
+    minLim = this.min(lim, candidates.count());
+    while (i < minLim) {
+        result.add(candidates[i]);
+        i = i + 1;
+    }
+    
+    return result;
+};
+
+// Find hyponyms (specific examples) - words more specific than the target
+hyponyms = func(corpus, word, limit) {
+    lim = defined(limit) ? limit : 5;
+    derived = this.termStats(corpus);
+    derived.edgeGraph = this.connectorEdgeGraph(corpus, derived);
+
+    direct = [];
+    foreach(child in derived.edgeGraph.categoryEdges.props) {
+        if (!defined(derived.edgeGraph.categoryEdges[child][word])) continue;
+        childSpec = this.specificityFromDerived(derived, child);
+        direct.add({
+            word: child,
+            specificity: childSpec.specificity,
+            connectorLike: childSpec.connectorLike,
+            overlap: 1,
+            direction: 1,
+            score: derived.edgeGraph.categoryEdges[child][word]
+        });
+    }
+    if (direct.count() > 0) {
+        direct = direct.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+        directResult = [];
+        di = 0;
+        directLimit = this.min(lim, direct.count());
+        while (di < directLimit) {
+            directResult.add(direct[di]);
+            di = di + 1;
+        }
+        return directResult;
+    }
+
+    cooc = derived.cooc;
+    neighbors = cooc[word];
+    if (!defined(neighbors)) return [];
+
+    wordSpec = this.specificityFromDerived(derived, word);
+    candidates = [];
+    
+    foreach(n in neighbors.props) {
+        if (!defined(derived.profile[n])) continue;
+        nSpec = this.specificityFromDerived(derived, n);
+
+        drop = wordSpec.specificity - nSpec.specificity;
+        if (drop > 0) {
+            overlap = this.sharedNeighborRatio(cooc, n, word);
+            direction = this.directionalCoverage(cooc, n, word);
+            edge = neighbors[n];
+            score = drop * overlap * direction * this.safeDiv(edge, this.max(wordSpec.totalCooc, 1));
+            if (score > 0) {
+                candidates.add({
+                    word: n,
+                    specificity: nSpec.specificity,
+                    connectorLike: nSpec.connectorLike,
+                    overlap: overlap,
+                    direction: direction,
+                    score: score
+                });
+            }
+        }
+    }
+    
+    candidates = candidates.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+
+    result = [];
+    i = 0;
+    minLim = this.min(lim, candidates.count());
+    while (i < minLim) {
+        result.add(candidates[i]);
+        i = i + 1;
+    }
+    
+    return result;
+};
+
+// Get all relationships for a word
+relationships = func(corpus, word, limit) {
+    lim = defined(limit) ? limit : 3;
+    derived = this.termStats(corpus);
+    derived.edgeGraph = this.connectorEdgeGraph(corpus, derived);
+    
+    hyper = this.hypernyms(corpus, word, lim);
+    hypo = this.hyponyms(corpus, word, lim);
+
+    // Keep hypernyms meaningful for presentation: if all are connector-like,
+    // return no parent prediction rather than a misleading one.
+    nonConnectorHyper = [];
+    foreach(h in hyper) {
+        if (!h.connectorLike) nonConnectorHyper.add(h);
+    }
+    if (nonConnectorHyper.count() > 0) {
+        hyper = nonConnectorHyper;
+    } else {
+        hyper = [];
+    }
+
+    attributes = [];
+    if (defined(derived.edgeGraph.attributeEdges[word])) {
+        foreach(target in derived.edgeGraph.attributeEdges[word].props) {
+            attributes.add({word: target, score: derived.edgeGraph.attributeEdges[word][target]});
+        }
+        attributes = attributes.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+    }
+
+    behaviors = [];
+    if (defined(derived.edgeGraph.behaviorEdges[word])) {
+        foreach(target in derived.edgeGraph.behaviorEdges[word].props) {
+            behaviors.add({word: target, score: derived.edgeGraph.behaviorEdges[word][target]});
+        }
+        behaviors = behaviors.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+    }
+
+    connectorList = this.connectorsFromDerived(derived, lim);
+    connectorLinks = this.connectorNeighbors(corpus, word, lim);
+    
+    // Find peers - similar specificity
+    cooc = derived.cooc;
+    neighbors = cooc[word];
+    wordSpec = this.specificityFromDerived(derived, word);
+    
+    peers = [];
+    if (defined(neighbors)) {
+        foreach(n in neighbors.props) {
+            nSpec = this.specificityFromDerived(derived, n);
+            if (nSpec.connectorLike) continue;
+            connectorPenalty = nSpec.connectorLike ? 0.2 : 1;
+            diff = this.abs(nSpec.specificity - wordSpec.specificity);
+
+            sim = this.contextSimilarity(cooc, word, n);
+            // Peer score balances similar genericity and contextual overlap.
+            peerScore = sim * this.safeDiv(1, 1 + diff) * connectorPenalty;
+            if (peerScore > 0) {
+                skipPeer = false;
+                ai = 0;
+                while (ai < attributes.count()) {
+                    if (attributes[ai].word == n) skipPeer = true;
+                    ai = ai + 1;
+                }
+                bi = 0;
+                while (bi < behaviors.count()) {
+                    if (behaviors[bi].word == n) skipPeer = true;
+                    bi = bi + 1;
+                }
+                if (skipPeer) continue;
+                peers.add({
+                    word: n,
+                    specificity: nSpec.specificity,
+                    similarity: sim,
+                    score: peerScore,
+                    adjacency: neighbors[n]
+                });
+            }
+        }
+        
+        peers = peers.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+        
+        result = [];
+        i = 0;
+        minLim = this.min(lim, peers.count());
+        while (i < minLim) {
+            result.add(peers[i]);
+            i = i + 1;
+        }
+        peers = result;
+    }
+    
+    return {
+        word: word,
+        hypernyms: hyper,
+        hyponyms: hypo,
+        attributes: attributes,
+        behaviors: behaviors,
+        peers: peers,
+        connectors: connectorList,
+        connectorNeighbors: connectorLinks
+    };
+};
+
+// Find semantic clusters based on shared neighbors
+semanticClusters = func(corpus) {
+    cooc = this.semanticCoOccurrence(corpus, 2);
+    clusters = [];
+    processed = {};
+    
+    foreach(word1 in cooc.props) {
+        if (processed[word1]) continue;
+        
+        cluster = [word1];
+        processed[word1] = true;
+        
+        neighbors1 = cooc[word1];
+        
+        foreach(word2 in cooc.props) {
+            if (word2 == word1 || processed[word2]) continue;
+            
+            neighbors2 = cooc[word2];
+
+            sim = this.contextSimilarity(cooc, word1, word2);
+            // Similarity threshold is generic and corpus-agnostic.
+            if (sim >= 0.25) {
+                cluster.add(word2);
+                processed[word2] = true;
+            }
+        }
+        
+        if (cluster.count() >= 2) {
+            clusters.add(cluster);
+        }
+    }
+    
+    return clusters;
+};
+
+// Build taxonomy: all words sorted by specificity
+taxonomy = func(corpus) {
+    derived = this.termStats(corpus);
+    derived.edgeGraph = this.connectorEdgeGraph(corpus, derived);
+    cooc = derived.cooc;
+    allWords = [];
+    
+    foreach(w in cooc.props) {
+        spec = this.specificityFromDerived(derived, w);
+        if (spec.connectorLike) continue;
+        allWords.add({word: w, specificity: spec.specificity});
+    }
+    
+    allWords = allWords.sort(func(indexA, itemA, indexB, itemB) => itemB.specificity - itemA.specificity);
+    
+    return {generalToSpecific: allWords, wordCount: allWords.count()};
+};

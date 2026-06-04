@@ -1,0 +1,98 @@
+// Tokenization helpers for text statistics.
+// Produces lowercase alphanumeric tokens and strips punctuation.
+
+normalize = func(text) {
+    if (!defined(text) || text == null) return "";
+    if (type(text).typename == "String") return text;
+    return stringify(text);
+}
+
+toLowerText = func(text) {
+    s = this.normalize(text);
+    out = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        if (ch == "A") ch = "a";
+        else if (ch == "B") ch = "b";
+        else if (ch == "C") ch = "c";
+        else if (ch == "D") ch = "d";
+        else if (ch == "E") ch = "e";
+        else if (ch == "F") ch = "f";
+        else if (ch == "G") ch = "g";
+        else if (ch == "H") ch = "h";
+        else if (ch == "I") ch = "i";
+        else if (ch == "J") ch = "j";
+        else if (ch == "K") ch = "k";
+        else if (ch == "L") ch = "l";
+        else if (ch == "M") ch = "m";
+        else if (ch == "N") ch = "n";
+        else if (ch == "O") ch = "o";
+        else if (ch == "P") ch = "p";
+        else if (ch == "Q") ch = "q";
+        else if (ch == "R") ch = "r";
+        else if (ch == "S") ch = "s";
+        else if (ch == "T") ch = "t";
+        else if (ch == "U") ch = "u";
+        else if (ch == "V") ch = "v";
+        else if (ch == "W") ch = "w";
+        else if (ch == "X") ch = "x";
+        else if (ch == "Y") ch = "y";
+        else if (ch == "Z") ch = "z";
+        out = out + ch;
+    }
+    return out;
+}
+
+tokens = func(text) {
+    s = this.toLowerText(text);
+    out = [];
+    word = "";
+
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        isAlphaNum = (ch >= "a" && ch <= "z") ||
+                     (ch >= "A" && ch <= "Z") ||
+                     (ch >= "0" && ch <= "9");
+        if (isAlphaNum) {
+            word = word + ch;
+        } else {
+            if (word != "") {
+                out.add(word);
+                word = "";
+            }
+        }
+    }
+
+    if (word != "") out.add(word);
+    return out;
+}
+
+uniqueTokens = func(text) {
+    list = this.tokens(text);
+    out = [];
+    seen = {};
+    for (i = 0; i < list.count(); i = i + 1) {
+        tok = list[i];
+        if (defined(seen[tok])) continue;
+        seen[tok] = true;
+        out.add(tok);
+    }
+    return out;
+}
+
+lines = func(text) {
+    s = this.normalize(text);
+    rows = [];
+    line = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        if (ch == "\n") {
+            rows.add(line);
+            line = "";
+        } else {
+            line = line + ch;
+        }
+    }
+    rows.add(line);
+    return rows;
+}

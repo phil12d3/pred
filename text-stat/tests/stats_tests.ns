@@ -1,0 +1,66 @@
+[test]
+word_counts_and_leading_tail_words = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from([
+        "alpha beta beta gamma",
+        "beta gamma delta",
+        "alpha alpha delta"
+    ]);
+
+    ranked = ts.stats.rankedWords(corpus);
+    lead = ts.stats.leadingWords(corpus, 2);
+    tail = ts.stats.tailWords(corpus, 2);
+
+    t.truthy(ranked.count() >= 4, "ranked words includes full vocabulary");
+    t.equal(lead[0].word, "alpha", "leading words include most frequent token");
+    t.truthy(lead[0].count >= lead[1].count, "leading words are sorted by count");
+    t.truthy(tail[0].count <= tail[1].count, "tail words are sorted ascending by rarity");
+};
+
+[test]
+similarity_scores_are_reasonable = func(t) {
+    ts = import("./text-stat.ns");
+
+    same = ts.stats.similarity("analysis", "analysis");
+    near = ts.stats.similarity("analysis", "analyst");
+    far  = ts.stats.similarity("analysis", "banana");
+
+    t.equal(same, 1, "identical words have similarity 1");
+    t.truthy(near > far, "related words score higher than unrelated words");
+    t.truthy(far >= 0, "similarity lower bound is >= 0");
+};
+
+[test]
+cooccurrence_neighbors_and_groups = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from([
+        "red apple sweet apple pie",
+        "green apple sour apple",
+        "apple pie recipe"
+    ]);
+
+    neigh = ts.stats.neighbors(corpus, "apple", 5, 2);
+    groups = ts.stats.prefixGroups(corpus, 2, 2);
+
+    t.truthy(neigh.count() > 0, "neighbors returns co-occurring words for target token");
+    t.truthy(defined(neigh[0].word), "neighbors row includes word field");
+    t.truthy(groups.count() > 0, "prefix grouping finds grouped stems");
+};
+
+[test]
+report_includes_requested_sections = func(t) {
+    ts = import("./text-stat.ns");
+
+    report = ts.stats.report([
+        "leading words and trailing words",
+        "word co occurrence report"
+    ], {topN: 3, tailN: 2, windowSize: 2, prefixLen: 3});
+
+    t.truthy(report.docs == 2, "report includes document count");
+    t.truthy(report.tokens > 0, "report includes token count");
+    t.equal(report.leadingWords.count(), 3, "report respects topN for leading words");
+    t.equal(report.tailWords.count(), 2, "report respects tailN for tail words");
+    t.truthy(defined(report.coOccurrence), "report includes co-occurrence matrix");
+};

@@ -23,4 +23,11 @@ echo "== Running decision-tree tests =="
 )
 
 echo
+echo "== Running text-stat tests =="
+(
+  cd "$ROOT_DIR/text-stat"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
 echo "All test suites passed."

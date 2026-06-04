@@ -1,0 +1,34 @@
+ts = import("./text-stat.ns");
+
+// Example goal:
+// Show adjacent term patterns (bigrams) and simple prefix grouping.
+
+docs = [
+    "analyze analyst analysis analytics",
+    "report reporting reports",
+    "analysis report analytics report"
+];
+
+corpus = ts.stats.from(docs);
+bigrams = ts.stats.bigrams(corpus);
+groups = ts.stats.prefixGroups(corpus, 4, 2);
+
+printline("=== Grouping + Bigrams Example ===");
+printline("Top bigrams:");
+printline("Note: bigrams reveal common adjacent phrase patterns.");
+for (i = 0; i < bigrams.count() && i < 10; i = i + 1) {
+    b = bigrams[i];
+    printline("  ", b.pair, " -> ", b.count);
+}
+
+printline("");
+printline("Prefix groups:");
+printline("Note: prefixGroups is heuristic; useful for rough family grouping.");
+for (i = 0; i < groups.count(); i = i + 1) {
+    g = groups[i];
+    printline("  group=", g.group, " total=", g.total);
+    for (j = 0; j < g.words.count(); j = j + 1) {
+        w = g.words[j];
+        printline("    - ", w.word, " (", w.count, ")");
+    }
+}

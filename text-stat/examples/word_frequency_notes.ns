@@ -1,0 +1,38 @@
+ts = import("./text-stat.ns");
+
+// Example goal:
+// Understand raw word usage and identify dominant vs rare terms.
+
+docs = [
+    "alerts alerts critical warning",
+    "warning info warning notice",
+    "notice info info debug"
+];
+
+corpus = ts.stats.from(docs);
+ranked = ts.stats.rankedWords(corpus);
+leading = ts.stats.leadingWords(corpus, 5);
+tail = ts.stats.tailWords(corpus, 5);
+
+printline("=== Word Frequency Example ===");
+printline("Note: rankedWords returns all terms sorted by frequency descending.");
+for (i = 0; i < ranked.count(); i = i + 1) {
+    r = ranked[i];
+    printline("  ", r.word, " count=", r.count, " ratio=", r.ratio);
+}
+
+printline("");
+printline("Leading words (top N):");
+printline("Note: useful for quickly understanding dominant vocabulary.");
+for (i = 0; i < leading.count(); i = i + 1) {
+    r = leading[i];
+    printline("  ", r.word, " -> ", r.count);
+}
+
+printline("");
+printline("Tail words (rare terms):");
+printline("Note: rare terms can highlight outliers, typos, or niche topics.");
+for (i = 0; i < tail.count(); i = i + 1) {
+    r = tail[i];
+    printline("  ", r.word, " -> ", r.count);
+}

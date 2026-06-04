@@ -1,0 +1,147 @@
+create = func() {
+    suiteTimer = timer();
+    suiteTimer.start();
+    state = {
+        passed: 0,
+        failed: 0,
+        failures: [],
+        testFiles: 0,
+        testCases: 0,
+        suiteTimer: suiteTimer,
+        currentCaseTimer: null
+    };
+
+    return {
+        state: state,
+        formatDuration: func(ms) {
+            value = defined(ms) ? ms : 0;
+            if (value <= 0) return "<1ms";
+            return value + "ms";
+        },
+        writeColourLine: func(colour, message) {
+            set_colour(colour);
+            printline(message);
+            set_colour("reset");
+            return true;
+        },
+        formatException: func(ex) {
+            if (defined(ex) && ex != null) {
+                if (type(ex).typename == "Object") {
+                    foreach(propName in ex.props) {
+                        if (propName != "message") continue;
+                        messageText = ex[propName];
+                        if (type(messageText).typename == "Null") break;
+                        if (messageText == "") break;
+                        if (type(messageText).typename == "String") return messageText;
+                        return stringify(messageText);
+                    }
+                }
+                if (type(ex).typename == "String") return ex;
+                return stringify(ex);
+            }
+            return "Unknown error";
+        },
+        beginFile: func(path) {
+            this.state.testFiles = this.state.testFiles + 1;
+            this.writeColourLine("light_yellow", "== {path} ==");
+            return true;
+        },
+        runCase: func(path, name, fn) {
+            self = this;
+            self.state.currentCaseTimer = timer();
+            self.state.currentCaseTimer.start();
+            try {
+                fn(self);
+            } catch (ex) {
+                self.caseError(path, name, ex);
+            }
+            self.state.currentCaseTimer = null;
+            return true;
+        },
+        pass: func(message) {
+            this.state.passed = this.state.passed + 1;
+            this.state.testCases = this.state.testCases + 1;
+            durationMs = 0;
+            if (defined(this.state.currentCaseTimer) && this.state.currentCaseTimer != null) durationMs = this.state.currentCaseTimer.duration();
+            durationText = this.formatDuration(durationMs);
+            set_colour("light_green");
+            print("[PASS] ");
+            set_colour("light_cyan");
+            print("{message}");
+            set_colour("light_black");
+            printline(" ({durationText})");
+            set_colour("reset");
+            return true;
+        },
+        fail: func(message) {
+            this.state.failed = this.state.failed + 1;
+            this.state.testCases = this.state.testCases + 1;
+            this.state.failures.add(message);
+            durationMs = 0;
+            if (defined(this.state.currentCaseTimer) && this.state.currentCaseTimer != null) durationMs = this.state.currentCaseTimer.duration();
+            durationText = this.formatDuration(durationMs);
+            set_colour("light_red");
+            print("[FAIL] ");
+            set_colour("light_cyan");
+            print("{message}");
+            set_colour("light_black");
+            printline(" ({durationText})");
+            set_colour("reset");
+            return false;
+        },
+        equal: func(actual, expected, message) {
+            if (actual == expected) return this.pass(message);
+            return this.fail(message + " expected=" + stringify(expected) + " actual=" + stringify(actual));
+        },
+        truthy: func(value, message) {
+            if (value) return this.pass(message);
+            return this.fail(message + " expected truthy value");
+        },
+        fileError: func(path, ex) {
+            msg = path + " threw " + this.formatException(ex);
+            this.state.failed = this.state.failed + 1;
+            this.state.failures.add(msg);
+            set_colour("light_red");
+            print("[FAIL] ");
+            set_colour("light_cyan");
+            printline("{msg}");
+            set_colour("reset");
+            return false;
+        },
+        caseError: func(path, name, ex) {
+            msg = path + "::" + name + " threw " + this.formatException(ex);
+            this.state.failed = this.state.failed + 1;
+            this.state.testCases = this.state.testCases + 1;
+            this.state.failures.add(msg);
+            durationMs = 0;
+            if (defined(this.state.currentCaseTimer) && this.state.currentCaseTimer != null) durationMs = this.state.currentCaseTimer.duration();
+            durationText = this.formatDuration(durationMs);
+            set_colour("light_red");
+            print("[FAIL] ");
+            set_colour("light_cyan");
+            print("{msg}");
+            set_colour("light_black");
+            printline(" ({durationText})");
+            set_colour("reset");
+            return false;
+        },
+        summary: func() {
+            totalText = this.formatDuration(this.state.suiteTimer.duration());
+            printline("");
+            this.writeColourLine("light_black", "Files: {this.state.testFiles}");
+            this.writeColourLine("light_black", "Cases: {this.state.testCases}");
+            this.writeColourLine("light_green", "Passed: {this.state.passed}");
+            if (this.state.failed > 0) this.writeColourLine("light_red", "Failed: {this.state.failed}");
+            else this.writeColourLine("light_black", "Failed: {this.state.failed}");
+            this.writeColourLine("light_black", "Total: {totalText}");
+            if (this.state.failed > 0) {
+                printline("");
+                this.writeColourLine("light_red", "Failures:");
+                for (i = 0; i < this.state.failures.count(); i = i + 1) {
+                    this.writeColourLine("light_red", "- " + this.state.failures[i]);
+                }
+            }
+            return this.state.failed == 0;
+        }
+    };
+}

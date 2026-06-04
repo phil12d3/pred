@@ -1,0 +1,235 @@
+tokenize = import("./src/tokenize.ns");
+utils = import("./src/utils.ns");
+
+// Build a corpus from one string or list of strings.
+from = func(textOrList) {
+    docs = [];
+    if (!defined(textOrList) || textOrList == null) return {docs: docs};
+    if (defined(textOrList.count)) {
+        for (i = 0; i < textOrList.count(); i = i + 1) docs.add(stringify(textOrList[i]));
+    } else {
+        docs.add(stringify(textOrList));
+    }
+    return {docs: docs};
+}
+
+// Token counts over the whole corpus.
+wordCounts = func(corpus) {
+    counts = {};
+    total = 0;
+    for (di = 0; di < corpus.docs.count(); di = di + 1) {
+        toks = this.tokenize.tokens(corpus.docs[di]);
+        for (ti = 0; ti < toks.count(); ti = ti + 1) {
+            w = toks[ti];
+            if (!defined(counts[w])) counts[w] = 0;
+            counts[w] = counts[w] + 1;
+            total = total + 1;
+        }
+    }
+    return {counts: counts, total: total};
+}
+
+// Sorted list of [{word, count, ratio}] descending by frequency.
+rankedWords = func(corpus) {
+    wc = this.wordCounts(corpus);
+    rows = [];
+    foreach(word in wc.counts.props) {
+        c = wc.counts[word];
+        ratio = wc.total > 0 ? c / wc.total : 0;
+        rows.add({word: word, count: c, ratio: ratio});
+    }
+    return this.utils.sortByNumberDesc(rows, "count");
+}
+
+leadingWords = func(corpus, n) {
+    limit = defined(n) ? n : 10;
+    ranked = this.rankedWords(corpus);
+    out = [];
+    for (i = 0; i < ranked.count() && i < limit; i = i + 1) out.add(ranked[i]);
+    return out;
+}
+
+tailWords = func(corpus, n) {
+    limit = defined(n) ? n : 10;
+    ranked = this.rankedWords(corpus);
+    // Ascending by count for tail extraction.
+    ranked = ranked.sort(func(ai, av, bi, bv) => av.count - bv.count);
+    out = [];
+    for (i = 0; i < ranked.count() && i < limit; i = i + 1) out.add(ranked[i]);
+    return out;
+}
+
+// Bigram counts: pairs of adjacent words.
+bigrams = func(corpus) {
+    counts = {};
+    for (di = 0; di < corpus.docs.count(); di = di + 1) {
+        toks = this.tokenize.tokens(corpus.docs[di]);
+        for (i = 0; i + 1 < toks.count(); i = i + 1) {
+            key = toks[i] + " " + toks[i + 1];
+            if (!defined(counts[key])) counts[key] = 0;
+            counts[key] = counts[key] + 1;
+        }
+    }
+
+    out = [];
+    foreach(k in counts.props) out.add({pair: k, count: counts[k]});
+    return this.utils.sortByNumberDesc(out, "count");
+}
+
+// Convenience: accept raw text or list and return bigrams directly.
+bigramsFrom = func(textOrList) {
+    corpus = this.from(textOrList);
+    return this.bigrams(corpus);
+}
+
+// Co-occurrence across a context window.
+// For each token, count how often another token appears within +/- window.
+coOccurrence = func(corpus, windowSize) {
+    win = defined(windowSize) ? windowSize : 2;
+    if (win < 1) win = 1;
+
+    matrix = {};
+    for (di = 0; di < corpus.docs.count(); di = di + 1) {
+        toks = this.tokenize.tokens(corpus.docs[di]);
+        for (i = 0; i < toks.count(); i = i + 1) {
+            w = toks[i];
+            if (!defined(matrix[w])) matrix[w] = {};
+            start = i - win;
+            if (start < 0) start = 0;
+            end = i + win;
+            if (end > toks.count() - 1) end = toks.count() - 1;
+
+            for (j = start; j <= end; j = j + 1) {
+                if (j == i) continue;
+                c = toks[j];
+                if (!defined(matrix[w][c])) matrix[w][c] = 0;
+                matrix[w][c] = matrix[w][c] + 1;
+            }
+        }
+    }
+
+    return matrix;
+}
+
+// Ranked co-occurrence neighbors for a target word.
+neighbors = func(corpus, word, limit, windowSize) {
+    n = defined(limit) ? limit : 10;
+    w = this.tokenize.toLowerText(word);
+    matrix = this.coOccurrence(corpus, windowSize);
+    if (!defined(matrix[w])) return [];
+
+    out = [];
+    foreach(other in matrix[w].props) {
+        out.add({word: other, count: matrix[w][other]});
+    }
+    out = this.utils.sortByNumberDesc(out, "count");
+
+    top = [];
+    for (i = 0; i < out.count() && i < n; i = i + 1) top.add(out[i]);
+    return top;
+}
+
+// Simple string similarity (normalized Levenshtein, range [0, 1]).
+levenshteinDistance = func(a, b) {
+    s1 = this.tokenize.toLowerText(a);
+    s2 = this.tokenize.toLowerText(b);
+    m = s1.length;
+    n = s2.length;
+
+    if (m == 0) return n;
+    if (n == 0) return m;
+
+    prev = [];
+    curr = [];
+    for (j = 0; j <= n; j = j + 1) prev.add(j);
+
+    for (i = 1; i <= m; i = i + 1) {
+        curr = [i];
+        c1 = s1[i - 1];
+        for (j = 1; j <= n; j = j + 1) {
+            c2 = s2[j - 1];
+            cost = c1 == c2 ? 0 : 1;
+            del = prev[j] + 1;
+            ins = curr[j - 1] + 1;
+            sub = prev[j - 1] + cost;
+            best = del;
+            if (ins < best) best = ins;
+            if (sub < best) best = sub;
+            curr.add(best);
+        }
+        prev = curr;
+    }
+
+    return prev[n];
+}
+
+similarity = func(a, b) {
+    s1 = stringify(a);
+    s2 = stringify(b);
+    maxLen = this.utils.max(s1.length, s2.length);
+    if (maxLen == 0) return 1;
+    d = this.levenshteinDistance(s1, s2);
+    score = 1 - (d / maxLen);
+    if (score < 0) score = 0;
+    if (score > 1) score = 1;
+    return score;
+}
+
+// Group words by stem-like prefix (simple heuristic).
+// Example: analysis, analyst -> analy
+prefixGroups = func(corpus, prefixLen, minGroupSize) {
+    pLen = defined(prefixLen) ? prefixLen : 4;
+    minN = defined(minGroupSize) ? minGroupSize : 2;
+    wc = this.wordCounts(corpus);
+
+    groups = {};
+    foreach(word in wc.counts.props) {
+        if (word.length < pLen) continue;
+        stem = substring(word, 0, pLen);
+        if (!defined(groups[stem])) groups[stem] = [];
+        groups[stem].add({word: word, count: wc.counts[word]});
+    }
+
+    out = [];
+    foreach(stem in groups.props) {
+        if (groups[stem].count() < minN) continue;
+        members = this.utils.sortByNumberDesc(groups[stem], "count");
+        total = 0;
+        for (i = 0; i < members.count(); i = i + 1) total = total + members[i].count;
+        out.add({group: stem, total: total, words: members});
+    }
+
+    out = this.utils.sortByNumberDesc(out, "total");
+    return out;
+}
+
+// Convenience: accept raw text or list and return prefix-based stubs directly.
+stubsFrom = func(textOrList, prefixLen, minGroupSize) {
+    corpus = this.from(textOrList);
+    pLen = defined(prefixLen) ? prefixLen : 4;
+    minN = defined(minGroupSize) ? minGroupSize : 2;
+    return this.prefixGroups(corpus, pLen, minN);
+}
+
+// Full report bundling core metrics.
+report = func(textOrList, config) {
+    cfg = defined(config) && config != null ? config : {};
+    topN = defined(cfg.topN) ? cfg.topN : 10;
+    tailN = defined(cfg.tailN) ? cfg.tailN : 10;
+    windowSize = defined(cfg.windowSize) ? cfg.windowSize : 2;
+    prefixLen = defined(cfg.prefixLen) ? cfg.prefixLen : 4;
+
+    corpus = this.from(textOrList);
+    wc = this.wordCounts(corpus);
+
+    return {
+        docs: corpus.docs.count(),
+        tokens: wc.total,
+        uniqueWords: wc.counts.props.count(),
+        leadingWords: this.leadingWords(corpus, topN),
+        tailWords: this.tailWords(corpus, tailN),
+        bigrams: this.bigrams(corpus),
+        coOccurrence: this.coOccurrence(corpus, windowSize),
+        groups: this.prefixGroups(corpus, prefixLen, 2)
+    };
+}

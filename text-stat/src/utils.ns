@@ -1,0 +1,35 @@
+isNumber = func(value) {
+    return defined(value) && type(value).typename == "Number";
+}
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+abs = func(value) {
+    return value < 0 ? 0 - value : value;
+}
+
+min = func(a, b) {
+    return a < b ? a : b;
+}
+
+max = func(a, b) {
+    return a > b ? a : b;
+}
+
+clamp = func(value, low, high) {
+    v = value;
+    if (v < low) v = low;
+    if (v > high) v = high;
+    return v;
+}
+
+sortByNumberDesc = func(rows, keyName) {
+    copy = this.copyArray(rows);
+    copy.sort(func(ai, av, bi, bv) => bv[keyName] - av[keyName]);
+    return copy;
+}

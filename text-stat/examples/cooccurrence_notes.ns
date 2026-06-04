@@ -1,0 +1,33 @@
+ts = import("./text-stat.ns");
+
+// Example goal:
+// Inspect local context relationships with co-occurrence and neighbors.
+
+docs = [
+    "payment failed card retry payment",
+    "payment approved card success",
+    "retry request timeout payment retry"
+];
+
+corpus = ts.stats.from(docs);
+matrix = ts.stats.coOccurrence(corpus, 2);
+neighbors = ts.stats.neighbors(corpus, "payment", 10, 2);
+
+printline("=== Co-occurrence Example ===");
+printline("Note: matrix[word][other] = count seen within window.");
+printline("Neighbors for 'payment':");
+for (i = 0; i < neighbors.count(); i = i + 1) {
+    n = neighbors[i];
+    printline("  ", n.word, " -> ", n.count);
+}
+
+printline("");
+printline("Raw matrix entries for 'payment':");
+if (defined(matrix["payment"])) {
+    foreach(other in matrix["payment"].props) {
+        printline("  payment ~ ", other, " = ", matrix["payment"][other]);
+    }
+}
+
+printline("");
+printline("Note: increase window size to capture broader context relationships.");

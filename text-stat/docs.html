@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>text-stat Documentation</title>
+  <style>
+    :root {
+      --bg: #f7f7f2;
+      --panel: #ffffff;
+      --ink: #1f2933;
+      --muted: #52606d;
+      --line: #d9e2ec;
+      --accent: #0f766e;
+      --accent2: #b45309;
+      --radius: 12px;
+      --max: 1120px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fdfdf8 0%, #f5f6ef 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+
+    body { padding: 28px 16px 48px; }
+
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+
+    .hero {
+      background: radial-gradient(circle at 0% 0%, #e6f8f5 0%, #ffffff 60%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 26px;
+      margin-bottom: 18px;
+    }
+
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; }
+
+    h1 { font-size: 2.3rem; margin-bottom: 8px; }
+    h2 {
+      font-size: 1.55rem;
+      margin-top: 24px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    h3 {
+      font-size: 1.14rem;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      color: var(--accent);
+    }
+
+    p { margin: 10px 0; }
+
+    .muted { color: var(--muted); }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+
+    .code {
+      background: #f8fafc;
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+
+    .code code {
+      white-space: pre;
+      display: block;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+
+    .prop {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      margin: 8px 0;
+      background: #fffdfa;
+    }
+
+    .prop .name {
+      color: var(--accent);
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.94rem;
+      font-weight: bold;
+    }
+
+    .note {
+      border-left: 4px solid var(--accent2);
+      background: #fff7ed;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+
+    ul { margin: 8px 0 8px 22px; }
+
+    .toc {
+      columns: 2;
+      gap: 22px;
+    }
+
+    @media (max-width: 900px) {
+      .toc { columns: 1; }
+      h1 { font-size: 1.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>text-stat Complete Documentation</h1>
+      <p class="muted">Deep reference guide for every public function in the text-stat module, including return shapes, practical usage advice, and interpretation notes.</p>
+      <p class="muted">This document is intentionally detailed. It explains not only what each function returns, but also why you would use it and what to watch out for.</p>
+    </section>
+
+    <section class="section">
+      <h2>Table of Contents</h2>
+      <div class="toc">
+        <ul>
+          <li>1. What text-stat is for</li>
+          <li>2. Import and module layout</li>
+          <li>3. Data model and return object shapes</li>
+          <li>4. tokenize functions (text cleanup and tokenization)</li>
+          <li>5. stats functions (analysis and reports)</li>
+          <li>6. utility functions (internal helpers)</li>
+          <li>7. End-to-end usage patterns</li>
+          <li>8. Interpretation notes and caveats</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>1) What text-stat Is For</h2>
+      <p>The text-stat module gives you practical text analytics from raw text input, with a focus on clear, inspectable outputs rather than black-box model behavior. You can pass one string or a list of strings, then get back:</p>
+      <ul>
+        <li>Word frequency counts</li>
+        <li>Top terms (leading words)</li>
+        <li>Rare terms (tail words)</li>
+        <li>Bigrams (adjacent two-word phrases)</li>
+        <li>Co-occurrence relationships within a context window</li>
+        <li>Neighbor words for a selected token</li>
+        <li>Word-form similarity scores</li>
+        <li>Stub/prefix groupings for related word families</li>
+        <li>A combined report object for dashboards and pipelines</li>
+      </ul>
+
+      <div class="note">
+        <strong>Important:</strong> Similarity in this module is spelling/form similarity, not semantic meaning. For example, "analysis" and "analyst" are close by character edits, but "doctor" and "physician" may score low even though they are semantically related.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>2) Import and Module Layout</h2>
+      <p>The umbrella import file is text-stat.ns and exposes three namespaces:</p>
+      <ul>
+        <li>tokenize</li>
+        <li>stats</li>
+        <li>utils</li>
+      </ul>
+
+      <div class="code"><code>ts = import("./text-stat.ns");
+
+// Examples:
+words = ts.tokenize.tokens("Alpha beta, beta.");
+report = ts.stats.report(["alpha beta", "beta gamma"]);
+</code></div>
+
+      <p>Namespace roles:</p>
+      <div class="prop"><span class="name">tokenize.*</span><br>Functions to normalize text and turn it into token arrays.</div>
+      <div class="prop"><span class="name">stats.*</span><br>Main analytics API. This is where most users spend their time.</div>
+      <div class="prop"><span class="name">utils.*</span><br>Shared helper functions used internally (sorting, numeric helpers).</div>
+    </section>
+
+    <section class="section">
+      <h2>3) Data Model and Return Shapes</h2>
+
+      <h3>3.1 Corpus Object</h3>
+      <p>Several stats functions accept a corpus object. A corpus is currently a simple object with one property:</p>
+      <div class="code"><code>{
+  docs: ["doc one text", "doc two text", ...]
+}</code></div>
+      <p>You usually create this with stats.from(...).</p>
+
+      <h3>3.2 Common Row Shapes</h3>
+      <div class="prop"><span class="name">ranked word row</span><br>{ word: string, count: number, ratio: number }</div>
+      <div class="prop"><span class="name">bigram row</span><br>{ pair: string, count: number }</div>
+      <div class="prop"><span class="name">neighbor row</span><br>{ word: string, count: number }</div>
+      <div class="prop"><span class="name">stub group row</span><br>{ group: string, total: number, words: [ {word, count}, ... ] }</div>
+
+      <h3>3.3 Full Report Shape</h3>
+      <div class="code"><code>{
+  docs: number,
+  tokens: number,
+  uniqueWords: number,
+  leadingWords: [ {word, count, ratio}, ... ],
+  tailWords: [ {word, count, ratio}, ... ],
+  bigrams: [ {pair, count}, ... ],
+  coOccurrence: {
+    tokenA: { tokenB: count, tokenC: count, ... },
+    tokenB: { tokenA: count, ... }
+  },
+  groups: [ {group, total, words: [...]}, ... ]
+}</code></div>
+    </section>
+
+    <section class="section">
+      <h2>4) tokenize Functions</h2>
+
+      <h3>tokenize.normalize(text)</h3>
+      <p><strong>Purpose:</strong> Convert input to a predictable string.</p>
+      <p><strong>Behavior:</strong></p>
+      <ul>
+        <li>Returns empty string for null/undefined input</li>
+        <li>Returns input directly when it is already a string</li>
+        <li>Uses stringify for non-string values</li>
+      </ul>
+      <div class="code"><code>s = ts.tokenize.normalize(42);         // "42"
+s2 = ts.tokenize.normalize(null);      // ""
+s3 = ts.tokenize.normalize("Hello");   // "Hello"</code></div>
+
+      <h3>tokenize.toLowerText(text)</h3>
+      <p><strong>Purpose:</strong> Lowercase text in a runtime-safe way.</p>
+      <p><strong>When to use:</strong> Anytime you need case-insensitive matching before token-level operations.</p>
+      <div class="code"><code>low = ts.tokenize.toLowerText("Alert HIGH CPU");
+// "alert high cpu"</code></div>
+
+      <h3>tokenize.tokens(text)</h3>
+      <p><strong>Purpose:</strong> Split text into lowercase alphanumeric tokens.</p>
+      <p><strong>Behavior details:</strong></p>
+      <ul>
+        <li>Punctuation is treated as a separator</li>
+        <li>Only letters and numbers are kept in tokens</li>
+        <li>Output is lowercase</li>
+      </ul>
+      <div class="code"><code>tokens = ts.tokenize.tokens("CPU spike! CPU 95%, server-1 unstable");
+// ["cpu", "spike", "cpu", "95", "server", "1", "unstable"]</code></div>
+
+      <h3>tokenize.uniqueTokens(text)</h3>
+      <p><strong>Purpose:</strong> Return unique tokens only, first-seen order.</p>
+      <div class="code"><code>u = ts.tokenize.uniqueTokens("a a b c c b");
+// ["a", "b", "c"]</code></div>
+
+      <h3>tokenize.lines(text)</h3>
+      <p><strong>Purpose:</strong> Split text by newline.</p>
+      <div class="code"><code>rows = ts.tokenize.lines("line1\nline2\nline3");
+// ["line1", "line2", "line3"]</code></div>
+    </section>
+
+    <section class="section">
+      <h2>5) stats Functions</h2>
+
+      <h3>stats.from(textOrList)</h3>
+      <p><strong>Purpose:</strong> Build a corpus object from one string or an array/list of strings.</p>
+      <div class="code"><code>c1 = ts.stats.from("single document");
+c2 = ts.stats.from(["doc one", "doc two"]);
+
+// c2 shape:
+// { docs: ["doc one", "doc two"] }</code></div>
+
+      <h3>stats.wordCounts(corpus)</h3>
+      <p><strong>Purpose:</strong> Count token usage across all corpus documents.</p>
+      <p><strong>Returns:</strong> { counts: object, total: number }</p>
+      <div class="code"><code>c = ts.stats.from(["a b b", "b c"]);
+wc = ts.stats.wordCounts(c);
+
+// wc.total = 5
+// wc.counts = {a:1, b:3, c:1}</code></div>
+
+      <h3>stats.rankedWords(corpus)</h3>
+      <p><strong>Purpose:</strong> Convert raw counts into sorted rows with relative frequency ratio.</p>
+      <p><strong>Returns:</strong> [ {word, count, ratio}, ... ] sorted by count descending.</p>
+      <div class="code"><code>rows = ts.stats.rankedWords(corpus);
+// Example row: {word:"error", count:12, ratio:0.18}</code></div>
+
+      <h3>stats.leadingWords(corpus, n)</h3>
+      <p><strong>Purpose:</strong> Return top N frequent tokens.</p>
+      <p><strong>Default n:</strong> 10</p>
+      <div class="code"><code>top10 = ts.stats.leadingWords(corpus);
+top5 = ts.stats.leadingWords(corpus, 5);</code></div>
+
+      <h3>stats.tailWords(corpus, n)</h3>
+      <p><strong>Purpose:</strong> Return N least frequent tokens.</p>
+      <p><strong>Default n:</strong> 10</p>
+      <div class="note"><strong>Interpretation note:</strong> tail words are useful for anomaly review (rare terms, one-off IDs, or possible misspellings).</div>
+
+      <h3>stats.bigrams(corpus)</h3>
+      <p><strong>Purpose:</strong> Count adjacent two-token phrases (token[i] + token[i+1]).</p>
+      <p><strong>Returns:</strong> [ {pair, count}, ... ] sorted descending by count.</p>
+      <div class="code"><code>c = ts.stats.from(["service outage service outage"]);
+b = ts.stats.bigrams(c);
+// [{pair:"service outage", count:2}, {pair:"outage service", count:1}]</code></div>
+
+      <h3>stats.bigramsFrom(textOrList)</h3>
+      <p><strong>Purpose:</strong> Convenience wrapper for text-in/list-in to bigram-list-out.</p>
+      <div class="code"><code>b = ts.stats.bigramsFrom([
+  "service outage detected",
+  "service outage resolved"
+]);
+printraw(b);</code></div>
+
+      <h3>stats.coOccurrence(corpus, windowSize)</h3>
+      <p><strong>Purpose:</strong> Build token co-occurrence matrix using local context window.</p>
+      <p><strong>Definition used:</strong> For each token at index i, all tokens in range [i-windowSize, i+windowSize] excluding i are counted.</p>
+      <p><strong>Defaults:</strong> windowSize defaults to 2, minimum effective window is 1.</p>
+      <div class="code"><code>m = ts.stats.coOccurrence(corpus, 2);
+
+// Example access:
+// m["payment"]["retry"] => how often retry appears near payment</code></div>
+
+      <h3>stats.neighbors(corpus, word, limit, windowSize)</h3>
+      <p><strong>Purpose:</strong> Get most common neighbors for one target token.</p>
+      <p><strong>Returns:</strong> [ {word, count}, ... ] sorted descending.</p>
+      <p><strong>Defaults:</strong> limit = 10, windowSize = 2</p>
+      <div class="code"><code>n = ts.stats.neighbors(corpus, "payment", 8, 2);
+for (i = 0; i < n.count(); i = i + 1) {
+  printline(n[i].word, " -> ", n[i].count);
+}</code></div>
+
+      <h3>stats.levenshteinDistance(a, b)</h3>
+      <p><strong>Purpose:</strong> Compute raw edit distance between two strings (insert/delete/replace cost 1).</p>
+      <div class="code"><code>d1 = ts.stats.levenshteinDistance("analysis", "analyst");
+d2 = ts.stats.levenshteinDistance("abc", "xyz");</code></div>
+
+      <h3>stats.similarity(a, b)</h3>
+      <p><strong>Purpose:</strong> Return normalized similarity score in range [0, 1].</p>
+      <p><strong>Formula:</strong> score = 1 - distance / max(length(a), length(b)), then clamped to [0,1].</p>
+      <div class="code"><code>same = ts.stats.similarity("analysis", "analysis");  // 1
+near = ts.stats.similarity("analysis", "analyst");   // e.g. 0.8
+far  = ts.stats.similarity("analysis", "banana");    // lower</code></div>
+
+      <h3>stats.prefixGroups(corpus, prefixLen, minGroupSize)</h3>
+      <p><strong>Purpose:</strong> Group words by leading prefix "stub".</p>
+      <p><strong>Defaults:</strong> prefixLen = 4, minGroupSize = 2</p>
+      <p><strong>Returns:</strong> [ {group, total, words:[{word,count}, ...]}, ... ] sorted by total descending.</p>
+      <div class="code"><code>groups = ts.stats.prefixGroups(corpus, 4, 2);
+
+// Example group row:
+// {
+//   group: "anal",
+//   total: 12,
+//   words: [
+//     {word:"analysis", count:5},
+//     {word:"analyst", count:3},
+//     ...
+//   ]
+// }</code></div>
+
+      <h3>stats.stubsFrom(textOrList, prefixLen, minGroupSize)</h3>
+      <p><strong>Purpose:</strong> Convenience wrapper for text/list input to stub-group list output.</p>
+      <div class="code"><code>stubs = ts.stats.stubsFrom([
+  "analysis analyst analytics analyze",
+  "report reports reporting"
+], 4, 2);
+printraw(stubs);</code></div>
+
+      <h3>stats.report(textOrList, config)</h3>
+      <p><strong>Purpose:</strong> Build one consolidated report object with all core analytics sections.</p>
+      <p><strong>Config properties:</strong></p>
+      <div class="prop"><span class="name">topN</span><br>How many entries to include in leadingWords. Default 10.</div>
+      <div class="prop"><span class="name">tailN</span><br>How many entries to include in tailWords. Default 10.</div>
+      <div class="prop"><span class="name">windowSize</span><br>Context window size for coOccurrence. Default 2.</div>
+      <div class="prop"><span class="name">prefixLen</span><br>Stub length used for groups. Default 4.</div>
+
+      <div class="code"><code>report = ts.stats.report(docs, {
+  topN: 12,
+  tailN: 8,
+  windowSize: 3,
+  prefixLen: 5
+});
+
+printline("docs:", report.docs);
+printline("tokens:", report.tokens);
+printline("unique:", report.uniqueWords);
+printraw(report.leadingWords);
+printraw(report.bigrams);
+printraw(report.groups);</code></div>
+    </section>
+
+    <section class="section">
+      <h2>6) utils Functions (Reference)</h2>
+      <p>These are mostly internal helpers, but documented here for completeness.</p>
+
+      <div class="prop"><span class="name">utils.isNumber(value)</span><br>True when value is numeric.</div>
+      <div class="prop"><span class="name">utils.copyArray(values)</span><br>Shallow copy of list values.</div>
+      <div class="prop"><span class="name">utils.abs(value)</span><br>Absolute value.</div>
+      <div class="prop"><span class="name">utils.min(a,b)</span><br>Minimum of two numbers.</div>
+      <div class="prop"><span class="name">utils.max(a,b)</span><br>Maximum of two numbers.</div>
+      <div class="prop"><span class="name">utils.clamp(value, low, high)</span><br>Bound value to a closed interval.</div>
+      <div class="prop"><span class="name">utils.sortByNumberDesc(rows, keyName)</span><br>Sort row list descending by numeric key field.</div>
+    </section>
+
+    <section class="section">
+      <h2>7) End-to-End Usage Patterns</h2>
+
+      <h3>Pattern A: Direct convenience API (fastest path)</h3>
+      <div class="code"><code>ts = import("./text-stat.ns");
+
+text = [
+  "service outage detected",
+  "service outage resolved"
+];
+
+bigrams = ts.stats.bigramsFrom(text);
+stubs = ts.stats.stubsFrom(text, 4, 2);
+report = ts.stats.report(text, {topN: 5, tailN: 5, windowSize: 2, prefixLen: 4});</code></div>
+
+      <h3>Pattern B: Build once, analyze many ways</h3>
+      <div class="code"><code>corpus = ts.stats.from(text);
+
+wc = ts.stats.wordCounts(corpus);
+ranked = ts.stats.rankedWords(corpus);
+neighbors = ts.stats.neighbors(corpus, "service", 10, 2);
+groups = ts.stats.prefixGroups(corpus, 4, 2);</code></div>
+
+      <h3>Pattern C: Inspect then render</h3>
+      <p>Use printraw during development for structure inspection, then build formatted output for end users.</p>
+      <div class="code"><code>rows = ts.stats.leadingWords(corpus, 10);
+printraw(rows);   // development inspection
+
+for (i = 0; i < rows.count(); i = i + 1) {
+  printline(rows[i].word, " -> ", rows[i].count);
+}</code></div>
+    </section>
+
+    <section class="section">
+      <h2>8) Interpretation Notes and Caveats</h2>
+
+      <h3>Ties in frequency-based sorting</h3>
+      <p>When counts tie, relative ordering may depend on the underlying sort behavior and insertion order. Do not assume a stable deterministic order among equal counts unless you add a tie-breaker rule yourself.</p>
+
+      <h3>Prefix groups are heuristic</h3>
+      <p>Prefix grouping does not perform linguistic stemming. It groups by literal leading characters. This is useful and fast, but it can merge unrelated words that happen to share a prefix, and split related words that do not.</p>
+
+      <h3>Co-occurrence is context-window based</h3>
+      <p>A larger window captures broader topical association, while a smaller window captures tighter local phrase association. Choose window size based on your analysis goal.</p>
+
+      <h3>Tokenization is alphanumeric-focused</h3>
+      <p>Punctuation is treated as separators and discarded. If you need punctuation-aware behavior (for example hashtags, emails, or programming symbols), you can extend tokenize.tokens logic.</p>
+
+      <h3>Similarity is form-based, not semantic</h3>
+      <p>Normalized Levenshtein similarity measures character edit closeness. It is ideal for typo-like or inflection-like comparisons, but not a substitute for semantic embeddings.</p>
+    </section>
+
+    <section class="section">
+      <h2>Quick Function Index</h2>
+      <p><strong>tokenize:</strong> normalize, toLowerText, tokens, uniqueTokens, lines</p>
+      <p><strong>stats:</strong> from, wordCounts, rankedWords, leadingWords, tailWords, bigrams, bigramsFrom, coOccurrence, neighbors, levenshteinDistance, similarity, prefixGroups, stubsFrom, report</p>
+      <p><strong>utils:</strong> isNumber, copyArray, abs, min, max, clamp, sortByNumberDesc</p>
+      <p class="muted">You can now use this as the canonical docs page for text-stat.</p>
+    </section>
+  </div>
+</body>
+</html>

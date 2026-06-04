@@ -1,0 +1,180 @@
+[test]
+specificity_scoring = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("dogs are animals. cats are animals. poodles are dogs.");
+    animalSpec = ts.semantic.specificity(corpus, "animals");
+    dogSpec = ts.semantic.specificity(corpus, "dogs");
+    
+    t.truthy(animalSpec.specificity > 0, "animal should have specificity");
+    t.truthy(dogSpec.numNeighbors > 0, "dog should have neighbors");
+    t.truthy(animalSpec.specificity >= dogSpec.specificity, "animals should rank at least as general as dogs");
+};
+
+[test]
+hypernyms_discovery = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("poodles are dogs. bulldogs are dogs. dogs are animals.");
+    hyper = ts.semantic.hypernyms(corpus, "poodles", 5);
+    
+    t.truthy(hyper.count() > 0, "hypernyms should return candidates");
+    hasDogs = false;
+    foreach(row in hyper) if (row.word == "dogs") hasDogs = true;
+    t.truthy(hasDogs, "hypernyms for poodles should include dogs");
+};
+
+[test]
+hyponyms_discovery = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("poodles are dogs. bulldogs are dogs. dogs are animals.");
+    hypo = ts.semantic.hyponyms(corpus, "dogs", 5);
+    
+    t.truthy(hypo.count() > 0, "hyponyms should return candidates");
+    containsPoodles = false;
+    containsBulldogs = false;
+    foreach(row in hypo) {
+        if (row.word == "poodles") containsPoodles = true;
+        if (row.word == "bulldogs") containsBulldogs = true;
+    }
+    t.truthy(containsPoodles || containsBulldogs, "dogs should have specific dog types as hyponyms");
+};
+
+[test]
+relationships_complete = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("poodles are dogs. cats are animals. dogs are animals.");
+    rels = ts.semantic.relationships(corpus, "dogs", 3);
+    
+    t.equal(rels.word, "dogs", "should return correct word");
+    t.equal(defined(rels.hypernyms), true, "should have hypernyms");
+    t.equal(defined(rels.hyponyms), true, "should have hyponyms");
+    t.equal(defined(rels.attributes), true, "should have attributes");
+    t.equal(defined(rels.behaviors), true, "should have behaviors");
+    t.equal(defined(rels.peers), true, "should have peers");
+    if (rels.hypernyms.count() > 0) {
+        t.truthy(rels.hypernyms[0].word != "are", "top hypernym should not be connector token");
+        t.truthy(rels.hypernyms[0].word != "loyal", "top hypernym should not be attribute token");
+    }
+};
+
+[test]
+semantic_clustering = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("dogs and cats. poodles and bulldogs. birds and fish.");
+    clusters = ts.semantic.semanticClusters(corpus);
+    
+    t.equal(defined(clusters), true, "should return clusters");
+};
+
+[test]
+taxonomy_building = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("poodles are dogs. dogs are animals. animals exist.");
+    tax = ts.semantic.taxonomy(corpus);
+    
+    t.equal(defined(tax.generalToSpecific), true, "should have sorted list");
+    t.truthy(tax.wordCount > 0, "should have words");
+};
+
+[test]
+relationships_with_missing_word = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("dogs and cats");
+    rels = ts.semantic.relationships(corpus, "zebras", 3);
+    
+    t.equal(rels.word, "zebras", "should handle missing word gracefully");
+    t.equal(rels.hypernyms.count(), 0, "should have no hypernyms for missing word");
+};
+
+[test]
+empty_corpus_handling = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("");
+    spec = ts.semantic.specificity(corpus, "word");
+    hyper = ts.semantic.hypernyms(corpus, "word", 5);
+    
+    t.equal(spec.specificity, 0, "empty corpus = zero specificity");
+    t.equal(hyper.count(), 0, "empty corpus = no hypernyms");
+};
+
+[test]
+realistic_taxonomy = func(t) {
+    ts = import("./text-stat.ns");
+    
+    corpus = ts.stats.from("golden retrievers are dogs. labrador retrievers are dogs. terriers are dogs. dogs are loyal animals. cats are independent animals. animals need food.");
+    
+    dogRels = ts.semantic.relationships(corpus, "dogs", 3);
+    
+    t.equal(defined(dogRels.hypernyms), true, "should find relationships");
+    t.equal(defined(dogRels.hyponyms), true, "should find specific words");
+    t.equal(defined(dogRels.attributes), true, "should expose attributes");
+    hasLoyalAttribute = false;
+    foreach(row in dogRels.attributes) {
+        if (row.word == "loyal") hasLoyalAttribute = true;
+    }
+    t.truthy(hasLoyalAttribute, "loyal should be treated as attribute");
+    // Quality guard: connector token should not dominate early predictions.
+    hasAreInTop2 = false;
+    i = 0;
+    while (i < 2 && i < dogRels.hypernyms.count()) {
+        if (dogRels.hypernyms[i].word == "are") hasAreInTop2 = true;
+        i = i + 1;
+    }
+    t.truthy(!hasAreInTop2, "connector token should not dominate top realistic hypernyms");
+};
+
+[test]
+taxonomy_prefers_categories_over_connectors = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from("dogs are animals. cats are animals. poodles are dogs. bulldogs are dogs. animals need food.");
+    tax = ts.semantic.taxonomy(corpus);
+
+    t.truthy(tax.generalToSpecific.count() > 0, "taxonomy should produce ranking");
+
+    top = [];
+    i = 0;
+    while (i < 3 && i < tax.generalToSpecific.count()) {
+        top.add(tax.generalToSpecific[i].word);
+        i = i + 1;
+    }
+
+    hasCategory = false;
+    foreach(w in top) {
+        if (w == "animals" || w == "dogs" || w == "cats") hasCategory = true;
+    }
+    t.truthy(hasCategory, "top taxonomy terms should include meaningful categories");
+};
+
+[test]
+connector_grouping_available = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from("dogs are animals. cats are animals. birds can fly. fish can swim. dogs can run.");
+    connectors = ts.semantic.connectors(corpus, 10);
+
+    t.equal(defined(connectors), true, "connectors list should be defined");
+    t.truthy(connectors.count() >= 0, "connectors should return an array-like list");
+    if (connectors.count() > 0) {
+        t.equal(defined(connectors[0].word), true, "connector row should include word");
+        t.equal(defined(connectors[0].score), true, "connector row should include score");
+    }
+};
+
+[test]
+connector_neighbors_present_in_relationships = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from("dogs are animals. cats are animals. birds can fly. fish can swim. dogs can run.");
+    rels = ts.semantic.relationships(corpus, "dogs", 5);
+
+    t.equal(defined(rels.connectors), true, "relationships should include connectors list");
+    t.equal(defined(rels.connectorNeighbors), true, "relationships should include connector neighbors");
+};
