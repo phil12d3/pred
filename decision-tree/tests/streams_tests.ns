@@ -1,0 +1,20 @@
+[test]
+streams_predict_all_and_importance = func(t) {
+    dt = import("./des-tree.ns");
+
+    rows = [
+        {temp: 16, humidity: 88, rain: 0.8, wind: 6},
+        {temp: 19, humidity: 80, rain: 0.6, wind: 8},
+        {temp: 23, humidity: 70, rain: 0.4, wind: 9},
+        {temp: 27, humidity: 55, rain: 0.2, wind: 11},
+        {temp: 30, humidity: 45, rain: 0.1, wind: 13}
+    ];
+
+    system = dt.streams.train(["temp", "humidity", "rain", "wind"], rows, {maxDepth: 4, minSamples: 1});
+    all = dt.streams.predictAll(system, {temp: 22});
+    imp = dt.streams.allImportance(system);
+
+    t.truthy(defined(all.humidity.value), "streams predictAll returns humidity prediction");
+    t.truthy(defined(all.rain.value), "streams predictAll returns rain prediction");
+    t.truthy(defined(imp.temp), "streams allImportance returns map for each target stream");
+};

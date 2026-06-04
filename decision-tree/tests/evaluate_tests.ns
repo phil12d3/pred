@@ -1,0 +1,42 @@
+[test]
+evaluate_reports_accuracy_and_holdout_sizes = func(t) {
+    dt = import("./des-tree.ns");
+
+    results = [
+        {predicted: "a", actual: "a"},
+        {predicted: "b", actual: "a"},
+        {predicted: "b", actual: "b"}
+    ];
+    acc = dt.evaluate.accuracy(results);
+    diff = acc - 0.6666667;
+    if (diff < 0) diff = 0 - diff;
+    t.truthy(diff <= 0.0001, "evaluate.accuracy computes expected fraction");
+
+    rows = [];
+    for (i = 0; i < 20; i = i + 1) rows.add({features: {x: i}, target: i % 2 == 0 ? "e" : "o"});
+    split = dt.evaluate.holdout(rows, 0.2);
+
+    t.equal(split.train.count(), 16, "holdout uses 80% train rows");
+    t.equal(split.test.count(), 4, "holdout uses 20% test rows");
+};
+
+[test]
+evaluate_kfold_returns_fold_summaries = func(t) {
+    dt = import("./des-tree.ns");
+
+    rows = [];
+    for (i = 0; i < 25; i = i + 1) {
+        rows.add({features: {x: i, y: i % 3}, target: i % 2 == 0 ? "even" : "odd"});
+    }
+
+    folds = dt.evaluate.kFold(
+        rows,
+        5,
+        func(trainRows) => dt.tabular.train(trainRows, {maxDepth: 4, minSamples: 1}),
+        func(model, features) => dt.tabular.predict(model, features).value
+    );
+    summary = dt.evaluate.summarizeKFold(folds);
+
+    t.truthy(folds.count() > 0, "kFold returns fold-level results");
+    t.truthy(summary.folds > 0, "kFold summary includes fold count");
+};

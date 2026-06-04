@@ -1,0 +1,80 @@
+historyLib = import("./src/history.ns");
+predictor = import("./src/predictor.ns");
+utils = import("./src/utils.ns");
+
+// Walk-forward backtesting.
+// For each fold t in [minTrainSize, allRows.count()-1]:
+//   train on rows[0..t-1], predict row t, compare to actual.
+// windowSize limits how many rows are fed to the trainer (0 = all).
+run = func(streamNames, allRows, config, minTrainSize, windowSize) {
+    if (!defined(minTrainSize) || minTrainSize <= 1) minTrainSize = 3;
+    if (!defined(windowSize)) windowSize = 0;
+
+    n = allRows.count();
+    folds = [];
+
+    for (t = minTrainSize; t < n; t = t + 1) {
+        trainEnd = t;
+        trainStart = 0;
+        if (windowSize > 0 && trainEnd > windowSize) {
+            trainStart = trainEnd - windowSize;
+        }
+
+        trainRows = [];
+        for (i = trainStart; i < trainEnd; i = i + 1) {
+            trainRows.add(allRows[i]);
+        }
+
+        actual = allRows[t];
+        history = this.historyLib.fromRows(streamNames, trainRows);
+        system = this.predictor.train(history, config);
+        predictions = this.predictor.predictAll(system, history);
+
+        foldErrors = {};
+        for (si = 0; si < streamNames.count(); si = si + 1) {
+            stream = streamNames[si];
+            predicted = predictions[stream].value;
+            truth = actual[stream];
+            if (this.utils.isNumber(predicted) && this.utils.isNumber(truth)) {
+                diff = predicted - truth;
+                err = diff < 0 ? -diff : diff;
+                foldErrors[stream] = {type: "numeric", predicted: predicted, actual: truth, error: err};
+            } else {
+                hit = predicted == truth ? 1 : 0;
+                foldErrors[stream] = {type: "categorical", predicted: predicted, actual: truth, correct: hit};
+            }
+        }
+
+        folds.add({t: t, errors: foldErrors});
+    }
+
+    return this.summarize(streamNames, folds);
+}
+
+summarize = func(streamNames, folds) {
+    stats = {};
+    for (si = 0; si < streamNames.count(); si = si + 1) {
+        stream = streamNames[si];
+        totalError = 0;
+        totalCorrect = 0;
+        numericCount = 0;
+        categoricalCount = 0;
+        for (fi = 0; fi < folds.count(); fi = fi + 1) {
+            err = folds[fi].errors[stream];
+            if (err.type == "numeric") {
+                totalError = totalError + err.error;
+                numericCount = numericCount + 1;
+            } else {
+                totalCorrect = totalCorrect + err.correct;
+                categoricalCount = categoricalCount + 1;
+            }
+        }
+        if (numericCount > 0) {
+            stats[stream] = {type: "numeric", mae: totalError / numericCount, folds: numericCount};
+        } else {
+            acc = categoricalCount > 0 ? totalCorrect / categoricalCount : 0;
+            stats[stream] = {type: "categorical", accuracy: acc, folds: categoricalCount};
+        }
+    }
+    return {folds: folds, stats: stats, foldCount: folds.count()};
+}

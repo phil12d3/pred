@@ -1,0 +1,70 @@
+// Text classification demo: classify short product reviews as positive / negative.
+
+dt = import("./des-tree.ns");
+
+trainData = [
+    {text: "great product love it highly recommend", label: "positive"},
+    {text: "terrible waste of money do not buy",     label: "negative"},
+    {text: "excellent quality fast delivery",        label: "positive"},
+    {text: "broke after one day very disappointed",  label: "negative"},
+    {text: "best purchase ever works perfectly",     label: "positive"},
+    {text: "awful customer service never again",     label: "negative"},
+    {text: "fantastic value for the price",          label: "positive"},
+    {text: "completely useless does not work",       label: "negative"},
+    {text: "really happy with this product",         label: "positive"},
+    {text: "stopped working after a week poor quality", label: "negative"},
+    {text: "solid build quality great design",       label: "positive"},
+    {text: "misleading description very poor",       label: "negative"},
+    {text: "works exactly as described love it",     label: "positive"},
+    {text: "total rubbish regret buying this",       label: "negative"},
+    {text: "outstanding performance highly satisfied", label: "positive"},
+    {text: "cheap materials broke immediately",      label: "negative"},
+    {text: "super fast delivery great packaging",    label: "positive"},
+    {text: "not worth the price at all",             label: "negative"}
+];
+
+system = dt.text.train(trainData, {maxVocab: 100, minCount: 1, maxDepth: 5, minSamples: 2});
+
+printline("=== Text Classification: Sentiment ===");
+printline("Vocabulary size : ", system.vocabSize);
+printline("");
+
+testTexts = [
+    "love the quality highly recommended",
+    "does not work at all terrible",
+    "great value excellent product",
+    "poor design broke after two days"
+];
+
+for (i = 0; i < testTexts.count(); i = i + 1) {
+    result = dt.text.classify(system, testTexts[i]);
+    printline("\"", testTexts[i], "\"");
+    printline("  → ", result.label, "  support=", result.support);
+}
+
+// Top discriminating words
+printline("");
+printline("Top discriminating words:");
+top = dt.text.topWords(system, 8);
+for (i = 0; i < top.count(); i = i + 1) {
+    printline("  ", top[i].feature, " : ", top[i].score);
+}
+
+// Cross-validation
+printline("");
+printline("=== 3-fold cross-validation ===");
+cvRows = [];
+for (i = 0; i < trainData.count(); i = i + 1) {
+    cvRows.add({
+        features: dt.text.textToFeatures(trainData[i].text, system.vocab),
+        target:   trainData[i].label
+    });
+}
+
+folds = dt.evaluate.kFold(
+    cvRows, 3,
+    func(rows) => dt.tree.train(rows, {maxDepth: 4, minSamples: 2}),
+    func(model, features) => dt.tree.predict(model, features).value
+);
+summary = dt.evaluate.summarizeKFold(folds);
+printline("Avg accuracy : ", summary.accuracy, "  (", summary.folds, " folds)");

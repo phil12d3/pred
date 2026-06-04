@@ -1,0 +1,79 @@
+// Retail sales example.
+// Streams: sales (units/day), stockLevel (units), dayOfWeek (mon-sun), promotion (yes/no).
+// The system learns that promotions boost sales, weekends dip, and low stock constrains sales.
+
+prediction = import("./src/prediction.ns");
+
+rows = [];
+rows.add({sales: 50,  stockLevel: 200, dayOfWeek: "mon", promotion: "no"});
+rows.add({sales: 48,  stockLevel: 152, dayOfWeek: "tue", promotion: "no"});
+rows.add({sales: 55,  stockLevel: 104, dayOfWeek: "wed", promotion: "yes"});
+rows.add({sales: 70,  stockLevel: 234, dayOfWeek: "thu", promotion: "yes"});
+rows.add({sales: 65,  stockLevel: 169, dayOfWeek: "fri", promotion: "yes"});
+rows.add({sales: 30,  stockLevel: 139, dayOfWeek: "sat", promotion: "no"});
+rows.add({sales: 25,  stockLevel: 314, dayOfWeek: "sun", promotion: "no"});
+rows.add({sales: 52,  stockLevel: 262, dayOfWeek: "mon", promotion: "no"});
+rows.add({sales: 49,  stockLevel: 213, dayOfWeek: "tue", promotion: "no"});
+rows.add({sales: 58,  stockLevel: 164, dayOfWeek: "wed", promotion: "yes"});
+rows.add({sales: 72,  stockLevel: 392, dayOfWeek: "thu", promotion: "yes"});
+rows.add({sales: 68,  stockLevel: 324, dayOfWeek: "fri", promotion: "yes"});
+rows.add({sales: 28,  stockLevel: 296, dayOfWeek: "sat", promotion: "no"});
+rows.add({sales: 22,  stockLevel: 474, dayOfWeek: "sun", promotion: "no"});
+rows.add({sales: 51,  stockLevel: 423, dayOfWeek: "mon", promotion: "no"});
+
+streamNames = ["sales", "stockLevel", "dayOfWeek", "promotion"];
+
+history = prediction.history.fromRows(streamNames, rows);
+system = prediction.predictor.train(history, {
+    feature: {lags: 2, rolling: 3, pattern: 3},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+
+current = prediction.history.window(history, 7);
+forecast = prediction.predictor.predictNextState(system, current);
+
+printline("=== Retail Sales Predictor ===");
+printline("");
+printline("Recent history:");
+printline("idx | sales | stockLevel | dayOfWeek | promotion");
+for (i = 0; i < current.rows.count(); i = i + 1) {
+    row = current.rows[i];
+    printline(i, " | ", row.sales, " | ", row.stockLevel, " | ", row.dayOfWeek, " | ", row.promotion);
+}
+
+printline("");
+printline("Next state forecast:");
+printline("stream | value | support | depth");
+summary = prediction.explain.summarizePrediction(forecast.predictions);
+for (i = 0; i < summary.count(); i = i + 1) {
+    item = summary[i];
+    p = forecast.predictions[item.stream];
+    printline(item.stream, " | ", item.value, " | ", p.support, " | ", p.depth);
+}
+printline("consistency | ", forecast.consistency.score);
+
+printline("");
+printline("Counterfactual: what if a promotion runs tomorrow?");
+influence = prediction.predictor.counterfactualInfluence(system, current, {promotion: "yes"});
+influenceRows = prediction.explain.summarizeInfluence(influence);
+for (i = 0; i < influenceRows.count(); i = i + 1) {
+    row = influenceRows[i];
+    printline("- changing ", row.source, " from ", row.from, " to ", row.to, " most affected ", row.strongestTarget, " by ", row.strongestDelta);
+}
+
+printline("");
+printline("Backtest (walk-forward):");
+printline("stream | type | metric | value | folds");
+bt = prediction.backtest.run(streamNames, rows, {
+    feature: {lags: 2, rolling: 3, pattern: 3},
+    tree: {maxDepth: 3, minSamples: 2}
+}, 5, 0);
+for (si = 0; si < streamNames.count(); si = si + 1) {
+    sname = streamNames[si];
+    s = bt.stats[sname];
+    if (s.type == "numeric") {
+        printline(sname, " | numeric | MAE | ", s.mae, " | ", s.folds);
+    } else {
+        printline(sname, " | categorical | accuracy | ", s.accuracy, " | ", s.folds);
+    }
+}

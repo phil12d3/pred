@@ -1,0 +1,86 @@
+// Tabular data: train and predict on rows with arbitrary mixed feature columns.
+// Row shape for training: { features: { col: value, ... }, target: value }
+// Categorical feature values are label-encoded automatically.
+
+utils = import("./src/utils.ns");
+tree  = import("./src/tree.ns");
+
+defaultConfig = func() {
+    return {maxDepth: 6, minSamples: 2, minGain: 0.00001};
+}
+
+// Encode a single features object.
+// categories holds the label-encoding map (mutated in place).
+encodeFeatures = func(features, categories) {
+    encoded = {};
+    foreach(name in features.props) {
+        value = features[name];
+        if (this.utils.isNumber(value)) {
+            encoded[name] = value;
+        } else {
+            // label-encode: each unique (column, value) pair gets a positive integer
+            mapKey = "col:" + name + ":val:" + this.utils.keyOf(value);
+            if (!defined(categories[mapKey])) categories[mapKey] = categories.props.count() + 1;
+            encoded[name] = categories[mapKey];
+        }
+    }
+    return encoded;
+}
+
+// Convert raw training rows to tree-ready rows, building the categories map.
+buildRows = func(rawRows) {
+    cats = {};
+    rows = [];
+    for (i = 0; i < rawRows.count(); i = i + 1) {
+        enc = this.encodeFeatures(rawRows[i].features, cats);
+        rows.add({features: enc, target: rawRows[i].target});
+    }
+    return {rows: rows, categories: cats};
+}
+
+// Train a tabular model.
+// rawRows: array of { features: {}, target: value }
+// config:  { maxDepth, minSamples, minGain }
+train = func(rawRows, config) {
+    cfg   = defined(config) ? config : this.defaultConfig();
+    built = this.buildRows(rawRows);
+    model = this.tree.train(built.rows, cfg);
+    return {
+        model:      model,
+        categories: built.categories,
+        config:     cfg,
+        kind:       model.kind
+    };
+}
+
+// Predict for a single features object (values may be raw / un-encoded).
+predict = func(system, features) {
+    enc    = this.encodeFeatures(features, system.categories);
+    result = this.tree.predict(system.model, enc);
+    support = 0;
+    if (defined(system.model.root.samples) && system.model.root.samples > 0) {
+        support = result.samples / system.model.root.samples;
+    }
+    return {
+        value:         result.value,
+        support:       support,
+        depth:         result.depth,
+        path:          result.path,
+        probabilities: result.probabilities,
+        kind:          system.kind
+    };
+}
+
+// Convenience: predict for a list of feature objects.
+predictBatch = func(system, featureList) {
+    results = [];
+    for (i = 0; i < featureList.count(); i = i + 1) {
+        results.add(this.predict(system, featureList[i]));
+    }
+    return results;
+}
+
+// Feature importance scores from the trained tree.
+importance = func(system) {
+    return this.tree.featureImportance(system.model);
+}

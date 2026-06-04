@@ -1,0 +1,56 @@
+// Utility helpers shared across the decision-tree library.
+
+isNumber = func(value) {
+    return defined(value) && type(value).typename == "Number";
+}
+
+isMissing = func(value) {
+    return !defined(value) || value == null;
+}
+
+asNumber = func(value, fallback) {
+    if (defined(value) && type(value).typename == "Number") return value;
+    if (defined(value) && type(value).typename == "String") {
+        n = number(value);
+        if (defined(n) && n != null) return n;
+    }
+    return fallback;
+}
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+copyObject = func(obj) {
+    out = {};
+    if (!defined(obj) || obj == null) return out;
+    foreach(name in obj.props) out[name] = obj[name];
+    return out;
+}
+
+keyOf = func(value) {
+    if (!defined(value) || value == null) return "null";
+    return type(value).typename + ":" + stringify(value);
+}
+
+abs = func(value) {
+    return value < 0 ? 0 - value : value;
+}
+
+clamp = func(value, low, high) {
+    next = value;
+    if (next < low) next = low;
+    if (next > high) next = high;
+    return next;
+}
+
+max = func(a, b) {
+    return a >= b ? a : b;
+}
+
+min = func(a, b) {
+    return a <= b ? a : b;
+}

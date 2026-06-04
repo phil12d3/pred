@@ -1,0 +1,79 @@
+// Health tracking example.
+// Streams: restingHR (bpm), sleepHours, steps (thousands), mood (good/neutral/poor).
+// The system learns that poor sleep and low steps precede high resting HR and poor mood.
+
+prediction = import("./src/prediction.ns");
+
+rows = [];
+rows.add({restingHR: 58, sleepHours: 8,   steps: 9,  mood: "good"});
+rows.add({restingHR: 57, sleepHours: 7.5, steps: 10, mood: "good"});
+rows.add({restingHR: 60, sleepHours: 6,   steps: 6,  mood: "neutral"});
+rows.add({restingHR: 63, sleepHours: 5.5, steps: 4,  mood: "neutral"});
+rows.add({restingHR: 67, sleepHours: 5,   steps: 3,  mood: "poor"});
+rows.add({restingHR: 70, sleepHours: 4.5, steps: 2,  mood: "poor"});
+rows.add({restingHR: 68, sleepHours: 6,   steps: 5,  mood: "poor"});
+rows.add({restingHR: 64, sleepHours: 7,   steps: 7,  mood: "neutral"});
+rows.add({restingHR: 60, sleepHours: 7.5, steps: 8,  mood: "neutral"});
+rows.add({restingHR: 58, sleepHours: 8,   steps: 10, mood: "good"});
+rows.add({restingHR: 57, sleepHours: 8,   steps: 11, mood: "good"});
+rows.add({restingHR: 59, sleepHours: 6.5, steps: 7,  mood: "neutral"});
+rows.add({restingHR: 65, sleepHours: 5,   steps: 3,  mood: "poor"});
+rows.add({restingHR: 69, sleepHours: 4.5, steps: 2,  mood: "poor"});
+rows.add({restingHR: 66, sleepHours: 6,   steps: 5,  mood: "poor"});
+
+streamNames = ["restingHR", "sleepHours", "steps", "mood"];
+
+history = prediction.history.fromRows(streamNames, rows);
+system = prediction.predictor.train(history, {
+    feature: {lags: 2, rolling: 3, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+
+current = prediction.history.window(history, 6);
+forecast = prediction.predictor.predictNextState(system, current);
+
+printline("=== Health Tracking Predictor ===");
+printline("");
+printline("Recent history:");
+printline("idx | restingHR | sleepHours | steps | mood");
+for (i = 0; i < current.rows.count(); i = i + 1) {
+    row = current.rows[i];
+    printline(i, " | ", row.restingHR, " | ", row.sleepHours, " | ", row.steps, " | ", row.mood);
+}
+
+printline("");
+printline("Next state forecast:");
+printline("stream | value | support | depth");
+summary = prediction.explain.summarizePrediction(forecast.predictions);
+for (i = 0; i < summary.count(); i = i + 1) {
+    item = summary[i];
+    p = forecast.predictions[item.stream];
+    printline(item.stream, " | ", item.value, " | ", p.support, " | ", p.depth);
+}
+printline("consistency | ", forecast.consistency.score);
+
+printline("");
+printline("Counterfactual: what if sleep improves to 8 hours?");
+influence = prediction.predictor.counterfactualInfluence(system, current, {sleepHours: 8});
+influenceRows = prediction.explain.summarizeInfluence(influence);
+for (i = 0; i < influenceRows.count(); i = i + 1) {
+    row = influenceRows[i];
+    printline("- changing ", row.source, " from ", row.from, " to ", row.to, " most affected ", row.strongestTarget, " by ", row.strongestDelta);
+}
+
+printline("");
+printline("Backtest (walk-forward):");
+printline("stream | type | metric | value | folds");
+bt = prediction.backtest.run(streamNames, rows, {
+    feature: {lags: 2, rolling: 3, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+}, 5, 0);
+for (si = 0; si < streamNames.count(); si = si + 1) {
+    sname = streamNames[si];
+    s = bt.stats[sname];
+    if (s.type == "numeric") {
+        printline(sname, " | numeric | MAE | ", s.mae, " | ", s.folds);
+    } else {
+        printline(sname, " | categorical | accuracy | ", s.accuracy, " | ", s.folds);
+    }
+}

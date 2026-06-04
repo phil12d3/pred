@@ -1,0 +1,90 @@
+// Vector / embedding classification demo.
+// Simulates pre-computed 4-dimensional feature vectors (e.g. sensor readings or embeddings).
+// Clusters:
+//   "A" lives near [1, 1, 0, 0]
+//   "B" lives near [0, 0, 1, 1]
+//   "C" lives near [1, 0, 1, 0]
+
+dt = import("./des-tree.ns");
+
+// Generate synthetic training vectors with small noise
+makeVec = func(base, noise) {
+    v = [];
+    for (i = 0; i < base.count(); i = i + 1) {
+        n = noise * ((i % 3) - 1);   // simple deterministic noise
+        v.add(base[i] + n);
+    }
+    return v;
+}
+
+trainRows = [];
+baseA = [1, 1, 0, 0];
+baseB = [0, 0, 1, 1];
+baseC = [1, 0, 1, 0];
+
+for (i = 0; i < 10; i = i + 1) {
+    nA = (i % 5) * 0.05;
+    nB = (i % 4) * 0.06;
+    nC = (i % 3) * 0.07;
+    trainRows.add({dims: makeVec(baseA, nA), target: "A"});
+    trainRows.add({dims: makeVec(baseB, nB), target: "B"});
+    trainRows.add({dims: makeVec(baseC, nC), target: "C"});
+}
+
+system = dt.vectors.train(trainRows, {maxDepth: 5, minSamples: 2});
+
+printline("=== Vector Classification ===");
+printline("kind : ", system.kind);
+printline("");
+
+testVecs = [
+    {dims: [0.95, 0.98, 0.02, 0.01], label: "A"},
+    {dims: [0.01, 0.02, 0.96, 0.97], label: "B"},
+    {dims: [0.97, 0.03, 0.95, 0.04], label: "C"},
+    {dims: [0.5,  0.5,  0.5,  0.5],  label: "?"}
+];
+
+results = [];
+for (i = 0; i < testVecs.count(); i = i + 1) {
+    tv = testVecs[i];
+    r  = dt.vectors.predict(system, tv.dims);
+    printline("dims=[", tv.dims[0], ", ", tv.dims[1], ", ", tv.dims[2], ", ", tv.dims[3], "]",
+              "  expected=", tv.label, "  predicted=", r.value,
+              "  support=", r.support);
+    if (tv.label != "?") {
+        results.add({predicted: r.value, actual: tv.label});
+    }
+}
+
+printline("");
+printline("Test accuracy : ", dt.evaluate.accuracy(results));
+
+// Dimension importance
+printline("");
+printline("Dimension importance:");
+imp = dt.vectors.dimensionImportance(system);
+foreach(d in imp.props) {
+    printline("  ", d, " : ", imp[d]);
+}
+
+// Regression on vectors: predict a numeric score from 3-dim vector
+printline("");
+printline("=== Vector Regression ===");
+regRows = [];
+for (i = 0; i < 20; i = i + 1) {
+    d0 = i * 0.1;
+    d1 = (i % 5) * 0.2;
+    d2 = (i % 3) * 0.15;
+    score = d0 * 3 + d1 * 2 - d2 + 0.5;
+    regRows.add({dims: [d0, d1, d2], target: score});
+}
+
+regSystem = dt.vectors.train(regRows, {maxDepth: 6, minSamples: 2});
+split     = dt.evaluate.holdout(regRows, 0.25);
+
+regResults = [];
+for (i = 0; i < split.test.count(); i = i + 1) {
+    pred = dt.vectors.predict(regSystem, split.test[i].dims);
+    regResults.add({predicted: pred.value, actual: split.test[i].target});
+}
+dt.evaluate.report("Vector regression holdout", regResults, "regression");

@@ -1,0 +1,79 @@
+// Personal finance example.
+// Streams: food (spend/week), transport, entertainment, savings — all in currency units.
+// The system learns spending patterns across weeks and predicts the next week's category totals.
+
+prediction = import("./src/prediction.ns");
+
+rows = [];
+rows.add({food: 120, transport: 40, entertainment: 60,  savings: 200});
+rows.add({food: 115, transport: 38, entertainment: 80,  savings: 180});
+rows.add({food: 130, transport: 45, entertainment: 100, savings: 120});
+rows.add({food: 125, transport: 42, entertainment: 90,  savings: 140});
+rows.add({food: 110, transport: 35, entertainment: 50,  savings: 220});
+rows.add({food: 118, transport: 38, entertainment: 55,  savings: 210});
+rows.add({food: 122, transport: 40, entertainment: 70,  savings: 190});
+rows.add({food: 135, transport: 50, entertainment: 110, savings: 100});
+rows.add({food: 128, transport: 48, entertainment: 95,  savings: 125});
+rows.add({food: 112, transport: 36, entertainment: 52,  savings: 215});
+rows.add({food: 116, transport: 37, entertainment: 58,  savings: 205});
+rows.add({food: 121, transport: 41, entertainment: 72,  savings: 188});
+rows.add({food: 132, transport: 47, entertainment: 105, savings: 110});
+rows.add({food: 126, transport: 43, entertainment: 88,  savings: 135});
+rows.add({food: 111, transport: 34, entertainment: 48,  savings: 225});
+
+streamNames = ["food", "transport", "entertainment", "savings"];
+
+history = prediction.history.fromRows(streamNames, rows);
+system = prediction.predictor.train(history, {
+    feature: {lags: 2, rolling: 4, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+
+current = prediction.history.window(history, 6);
+forecast = prediction.predictor.predictNextState(system, current);
+
+printline("=== Personal Finance Predictor ===");
+printline("");
+printline("Recent weekly spending history:");
+printline("idx | food | transport | entertainment | savings");
+for (i = 0; i < current.rows.count(); i = i + 1) {
+    row = current.rows[i];
+    printline(i, " | ", row.food, " | ", row.transport, " | ", row.entertainment, " | ", row.savings);
+}
+
+printline("");
+printline("Next week forecast:");
+printline("stream | value | support | depth");
+summary = prediction.explain.summarizePrediction(forecast.predictions);
+for (i = 0; i < summary.count(); i = i + 1) {
+    item = summary[i];
+    p = forecast.predictions[item.stream];
+    printline(item.stream, " | ", item.value, " | ", p.support, " | ", p.depth);
+}
+printline("consistency | ", forecast.consistency.score);
+
+printline("");
+printline("Counterfactual: what if entertainment spend drops to 30?");
+influence = prediction.predictor.counterfactualInfluence(system, current, {entertainment: 30});
+influenceRows = prediction.explain.summarizeInfluence(influence);
+for (i = 0; i < influenceRows.count(); i = i + 1) {
+    row = influenceRows[i];
+    printline("- changing ", row.source, " from ", row.from, " to ", row.to, " most affected ", row.strongestTarget, " by ", row.strongestDelta);
+}
+
+printline("");
+printline("Backtest (walk-forward):");
+printline("stream | type | metric | value | folds");
+bt = prediction.backtest.run(streamNames, rows, {
+    feature: {lags: 2, rolling: 4, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+}, 5, 0);
+for (si = 0; si < streamNames.count(); si = si + 1) {
+    sname = streamNames[si];
+    s = bt.stats[sname];
+    if (s.type == "numeric") {
+        printline(sname, " | numeric | MAE | ", s.mae, " | ", s.folds);
+    } else {
+        printline(sname, " | categorical | accuracy | ", s.accuracy, " | ", s.folds);
+    }
+}

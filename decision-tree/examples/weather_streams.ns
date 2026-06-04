@@ -1,0 +1,109 @@
+// Multi-stream weather demo.
+//
+// Streams: temp (°C), humidity (%), rain_chance (0–1), wind_speed (km/h)
+//
+// Shows:
+//  1. Predict rain_chance from temp + humidity alone
+//  2. Predict temp from humidity + rain_chance (reverse direction)
+//  3. Predict ALL streams from a partial observation (only temp known)
+//  4. Feature importance — what each stream depends on most
+
+dt = import("./des-tree.ns");
+
+// ── Training data ─────────────────────────────────────────────────────────────
+// Synthetic but realistic: higher humidity → higher rain chance
+//                          lower temp + high humidity → lower wind
+
+observations = [
+    {temp: 28, humidity: 45, rain_chance: 0.05, wind_speed: 18},
+    {temp: 22, humidity: 80, rain_chance: 0.70, wind_speed: 12},
+    {temp: 30, humidity: 40, rain_chance: 0.02, wind_speed: 22},
+    {temp: 18, humidity: 90, rain_chance: 0.85, wind_speed: 8},
+    {temp: 25, humidity: 60, rain_chance: 0.25, wind_speed: 15},
+    {temp: 15, humidity: 88, rain_chance: 0.80, wind_speed: 7},
+    {temp: 32, humidity: 38, rain_chance: 0.01, wind_speed: 25},
+    {temp: 20, humidity: 75, rain_chance: 0.60, wind_speed: 10},
+    {temp: 27, humidity: 55, rain_chance: 0.15, wind_speed: 17},
+    {temp: 16, humidity: 92, rain_chance: 0.90, wind_speed: 6},
+    {temp: 29, humidity: 42, rain_chance: 0.03, wind_speed: 21},
+    {temp: 21, humidity: 78, rain_chance: 0.65, wind_speed: 11},
+    {temp: 24, humidity: 62, rain_chance: 0.30, wind_speed: 14},
+    {temp: 17, humidity: 85, rain_chance: 0.75, wind_speed: 9},
+    {temp: 33, humidity: 35, rain_chance: 0.01, wind_speed: 27},
+    {temp: 19, humidity: 82, rain_chance: 0.72, wind_speed: 10},
+    {temp: 26, humidity: 50, rain_chance: 0.10, wind_speed: 16},
+    {temp: 23, humidity: 70, rain_chance: 0.45, wind_speed: 13},
+    {temp: 31, humidity: 44, rain_chance: 0.04, wind_speed: 20},
+    {temp: 14, humidity: 95, rain_chance: 0.92, wind_speed: 5}
+];
+
+streamNames = ["temp", "humidity", "rain_chance", "wind_speed"];
+system = dt.streams.train(streamNames, observations, {maxDepth: 5, minSamples: 2});
+
+printline("=== Weather Multi-Stream Predictions ===");
+printline("Streams: ", streamNames[0], ", ", streamNames[1], ", ", streamNames[2], ", ", streamNames[3]);
+printline("");
+
+// ── 1. Predict rain_chance from temp + humidity ───────────────────────────────
+printline("--- Predict rain_chance from temp + humidity ---");
+testCases = [
+    {temp: 18, humidity: 89},
+    {temp: 30, humidity: 41},
+    {temp: 23, humidity: 72}
+];
+for (i = 0; i < testCases.count(); i = i + 1) {
+    tc = testCases[i];
+    r  = dt.streams.predict(system, tc, "rain_chance");
+    printline("  temp=", tc.temp, "  humidity=", tc.humidity,
+              "  → rain_chance=", r.value, "  support=", r.support);
+}
+
+// ── 2. Predict temp from humidity + rain_chance (reverse) ────────────────────
+printline("");
+printline("--- Predict temp from humidity + rain_chance (reverse) ---");
+reverseCases = [
+    {humidity: 90, rain_chance: 0.88},
+    {humidity: 40, rain_chance: 0.02},
+    {humidity: 65, rain_chance: 0.35}
+];
+for (i = 0; i < reverseCases.count(); i = i + 1) {
+    tc = reverseCases[i];
+    r  = dt.streams.predict(system, tc, "temp");
+    printline("  humidity=", tc.humidity, "  rain_chance=", tc.rain_chance,
+              "  → temp=", r.value, "  support=", r.support);
+}
+
+// ── 3. Predict ALL streams from a partial observation ─────────────────────────
+printline("");
+printline("--- Predict ALL streams knowing only temp=20 ---");
+partial   = {temp: 20};
+allResult = dt.streams.predictAll(system, partial);
+printline("  humidity    → ", allResult.humidity.value,    "  support=", allResult.humidity.support);
+printline("  rain_chance → ", allResult.rain_chance.value, "  support=", allResult.rain_chance.support);
+printline("  wind_speed  → ", allResult.wind_speed.value,  "  support=", allResult.wind_speed.support);
+printline("  temp (self) → ", allResult.temp.value,        "  (predicted from other streams)");
+
+// ── 4. Feature importance per stream ─────────────────────────────────────────
+printline("");
+printline("--- Feature importance per stream ---");
+imp = dt.streams.allImportance(system);
+
+for (si = 0; si < streamNames.count(); si = si + 1) {
+    s = streamNames[si];
+    printline("  [", s, " is driven by]:");
+    foreach(f in imp[s].props) {
+        printline("      ", f, " : ", imp[s][f]);
+    }
+}
+
+// ── 5. Cross-stream consistency check ────────────────────────────────────────
+// Does the model agree with itself? Re-predict using the predicted values.
+printline("");
+printline("--- Consistency check: predict from fully known observation ---");
+known = {temp: 22, humidity: 80, rain_chance: 0.70, wind_speed: 12};
+check = dt.streams.predictAll(system, known);
+printline("  Known:     temp=22  humidity=80  rain_chance=0.7  wind_speed=12");
+printline("  Predicted: temp=", check.temp.value,
+          "  humidity=", check.humidity.value,
+          "  rain_chance=", check.rain_chance.value,
+          "  wind_speed=", check.wind_speed.value);

@@ -1,0 +1,79 @@
+// CI/CD pipeline example.
+// Streams: buildTime (seconds), testFailures, deployFrequency (deploys/day), incidentCount, pipelineHealth (green/yellow/red).
+// The system learns that rising build times and test failures precede incidents and a red pipeline.
+
+prediction = import("./src/prediction.ns");
+
+rows = [];
+rows.add({buildTime: 90,  testFailures: 0, deployFrequency: 4, incidentCount: 0, pipelineHealth: "green"});
+rows.add({buildTime: 92,  testFailures: 0, deployFrequency: 4, incidentCount: 0, pipelineHealth: "green"});
+rows.add({buildTime: 95,  testFailures: 1, deployFrequency: 3, incidentCount: 0, pipelineHealth: "green"});
+rows.add({buildTime: 110, testFailures: 2, deployFrequency: 3, incidentCount: 0, pipelineHealth: "yellow"});
+rows.add({buildTime: 130, testFailures: 5, deployFrequency: 2, incidentCount: 1, pipelineHealth: "yellow"});
+rows.add({buildTime: 180, testFailures: 8, deployFrequency: 1, incidentCount: 2, pipelineHealth: "red"});
+rows.add({buildTime: 200, testFailures: 12, deployFrequency: 0, incidentCount: 3, pipelineHealth: "red"});
+rows.add({buildTime: 150, testFailures: 6, deployFrequency: 1, incidentCount: 1, pipelineHealth: "yellow"});
+rows.add({buildTime: 100, testFailures: 2, deployFrequency: 3, incidentCount: 0, pipelineHealth: "yellow"});
+rows.add({buildTime: 91,  testFailures: 0, deployFrequency: 4, incidentCount: 0, pipelineHealth: "green"});
+rows.add({buildTime: 89,  testFailures: 0, deployFrequency: 5, incidentCount: 0, pipelineHealth: "green"});
+rows.add({buildTime: 93,  testFailures: 1, deployFrequency: 4, incidentCount: 0, pipelineHealth: "green"});
+rows.add({buildTime: 115, testFailures: 3, deployFrequency: 2, incidentCount: 1, pipelineHealth: "yellow"});
+rows.add({buildTime: 170, testFailures: 9, deployFrequency: 1, incidentCount: 2, pipelineHealth: "red"});
+rows.add({buildTime: 195, testFailures: 11, deployFrequency: 0, incidentCount: 3, pipelineHealth: "red"});
+
+streamNames = ["buildTime", "testFailures", "deployFrequency", "incidentCount", "pipelineHealth"];
+
+history = prediction.history.fromRows(streamNames, rows);
+system = prediction.predictor.train(history, {
+    feature: {lags: 2, rolling: 3, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+
+current = prediction.history.window(history, 6);
+forecast = prediction.predictor.predictNextState(system, current);
+
+printline("=== CI/CD Pipeline Predictor ===");
+printline("");
+printline("Recent history:");
+printline("idx | buildTime | testFailures | deployFreq | incidents | health");
+for (i = 0; i < current.rows.count(); i = i + 1) {
+    row = current.rows[i];
+    printline(i, " | ", row.buildTime, " | ", row.testFailures, " | ", row.deployFrequency, " | ", row.incidentCount, " | ", row.pipelineHealth);
+}
+
+printline("");
+printline("Next state forecast:");
+printline("stream | value | support | depth");
+summary = prediction.explain.summarizePrediction(forecast.predictions);
+for (i = 0; i < summary.count(); i = i + 1) {
+    item = summary[i];
+    p = forecast.predictions[item.stream];
+    printline(item.stream, " | ", item.value, " | ", p.support, " | ", p.depth);
+}
+printline("consistency | ", forecast.consistency.score);
+
+printline("");
+printline("Counterfactual: what if test failures jump to 15?");
+influence = prediction.predictor.counterfactualInfluence(system, current, {testFailures: 15});
+influenceRows = prediction.explain.summarizeInfluence(influence);
+for (i = 0; i < influenceRows.count(); i = i + 1) {
+    row = influenceRows[i];
+    printline("- changing ", row.source, " from ", row.from, " to ", row.to, " most affected ", row.strongestTarget, " by ", row.strongestDelta);
+}
+
+printline("");
+printline("Backtest (walk-forward):");
+printline("stream | type | metric | value | folds");
+bt = prediction.backtest.run(streamNames, rows, {
+    feature: {lags: 2, rolling: 3, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+}, 5, 0);
+for (si = 0; si < streamNames.count(); si = si + 1) {
+    sname = streamNames[si];
+    s = bt.stats[sname];
+    if (s.type == "numeric") {
+        printline(sname, " | numeric | MAE | ", s.mae, " | ", s.folds);
+    } else {
+        printline(sname, " | categorical | accuracy | ", s.accuracy, " | ", s.folds);
+    }
+}

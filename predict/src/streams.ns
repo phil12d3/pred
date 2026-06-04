@@ -1,0 +1,67 @@
+// High-level multi-stream API for the predict package.
+// This module wraps history + predictor + backtest into a simple interface
+// that is closer to the decision-tree module shape.
+
+historyLib = import("./src/history.ns");
+predictor  = import("./src/predictor.ns");
+backtest   = import("./src/backtest.ns");
+utils      = import("./src/utils.ns");
+
+// Internal helper to normalize either raw rows or a history object.
+asHistory = func(streamNames, rowsOrHistory) {
+    if (defined(rowsOrHistory) && defined(rowsOrHistory.rows) && defined(rowsOrHistory.streamNames)) {
+        return rowsOrHistory;
+    }
+    rows = defined(rowsOrHistory) && rowsOrHistory != null ? rowsOrHistory : [];
+    return this.historyLib.fromRows(streamNames, rows);
+}
+
+// Train a system from stream names + rows.
+// streamNames: ["A", "B", "C"]
+// rows: [{A:1, B:2, C:"idle"}, ...]
+train = func(streamNames, rows, config) {
+    history = this.asHistory(streamNames, rows);
+    model = this.predictor.train(history, config);
+    return {
+        streamNames: this.utils.copyArray(history.streamNames),
+        model: model,
+        trainRows: this.utils.copyArray(history.rows),
+        config: model.config
+    };
+}
+
+// Predict one target stream from a history window or raw rows.
+predict = func(system, rowsOrHistory, targetStream) {
+    history = this.asHistory(system.streamNames, rowsOrHistory);
+    return this.predictor.predictOne(system.model, history, targetStream);
+}
+
+// Predict all target streams from a history window or raw rows.
+predictAll = func(system, rowsOrHistory) {
+    history = this.asHistory(system.streamNames, rowsOrHistory);
+    return this.predictor.predictAll(system.model, history);
+}
+
+// Predict the full next-state row with consistency report.
+forecast = func(system, rowsOrHistory) {
+    history = this.asHistory(system.streamNames, rowsOrHistory);
+    return this.predictor.predictNextState(system.model, history);
+}
+
+// Evaluate whether a provided forecast row is self-consistent.
+consistency = func(system, rowsOrHistory, forecastRow) {
+    history = this.asHistory(system.streamNames, rowsOrHistory);
+    return this.predictor.checkForecastConsistency(system.model, history, forecastRow);
+}
+
+// Counterfactual influence report for one-step prediction.
+influence = func(system, rowsOrHistory, changes) {
+    history = this.asHistory(system.streamNames, rowsOrHistory);
+    return this.predictor.counterfactualInfluence(system.model, history, changes);
+}
+
+// Walk-forward backtest utility.
+// minTrainSize default=3, windowSize default=0 (use all prior rows)
+backtestRun = func(system, allRows, minTrainSize, windowSize) {
+    return this.backtest.run(system.streamNames, allRows, system.config, minTrainSize, windowSize);
+}

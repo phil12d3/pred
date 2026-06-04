@@ -1,0 +1,53 @@
+utils = import("./src/utils.ns");
+
+create = func(streamNames) {
+    return {
+        streamNames: this.utils.copyArray(streamNames),
+        rows: []
+    };
+}
+
+addRow = func(history, row) {
+    next = {
+        streamNames: this.utils.copyArray(history.streamNames),
+        rows: this.utils.copyArray(history.rows)
+    };
+    next.rows.add(this.utils.copyObject(row));
+    return next;
+}
+
+fromRows = func(streamNames, rows) {
+    history = this.create(streamNames);
+    for (i = 0; i < rows.count(); i = i + 1) {
+        history = this.addRow(history, rows[i]);
+    }
+    return history;
+}
+
+lastRow = func(history) {
+    if (!defined(history) || history.rows.count() == 0) return {};
+    return history.rows[history.rows.count() - 1];
+}
+
+window = func(history, maxRows) {
+    if (!defined(maxRows) || maxRows <= 0 || history.rows.count() <= maxRows) return history;
+    rows = [];
+    start = history.rows.count() - maxRows;
+    for (i = start; i < history.rows.count(); i = i + 1) rows.add(history.rows[i]);
+    return {
+        streamNames: this.utils.copyArray(history.streamNames),
+        rows: rows
+    };
+}
+
+withCounterfactual = func(history, streamName, value) {
+    nextRows = this.utils.copyArray(history.rows);
+    if (nextRows.count() == 0) return history;
+    last = this.utils.copyObject(nextRows[nextRows.count() - 1]);
+    last[streamName] = value;
+    nextRows[nextRows.count() - 1] = last;
+    return {
+        streamNames: this.utils.copyArray(history.streamNames),
+        rows: nextRows
+    };
+}

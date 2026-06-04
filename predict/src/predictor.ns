@@ -1,0 +1,193 @@
+features = import("./src/features.ns");
+tree = import("./src/tree.ns");
+historyLib = import("./src/history.ns");
+utils = import("./src/utils.ns");
+
+defaultConfig = func() {
+    return {
+        feature: this.features.defaultConfig(),
+        tree: {
+            maxDepth: 4,
+            minSamples: 2,
+            minGain: 0.00001
+        }
+    };
+}
+
+normalizeConfig = func(config) {
+    base = this.defaultConfig();
+    if (!defined(config) || config == null) return base;
+    if (defined(config.feature)) base.feature = this.features.normalizeConfig(config.feature);
+    if (defined(config.tree)) {
+        foreach(name in config.tree.props) base.tree[name] = config.tree[name];
+    }
+    return base;
+}
+
+train = func(history, config) {
+    cfg = this.normalizeConfig(config);
+    models = {};
+    categories = {};
+    for (si = 0; si < history.streamNames.count(); si = si + 1) {
+        target = history.streamNames[si];
+        training = this.features.buildTrainingSet(history, target, cfg.feature);
+        categories[target] = training.categories;
+        models[target] = this.tree.train(training.rows, cfg.tree);
+    }
+    return {
+        streamNames: this.utils.copyArray(history.streamNames),
+        config: cfg,
+        models: models,
+        categories: categories
+    };
+}
+
+predictOne = func(system, history, targetStream) {
+    index = history.rows.count() - 1;
+    extracted = this.features.extractAt(history, index, system.config.feature, system.categories[targetStream]);
+    system.categories[targetStream] = extracted.categories;
+    result = this.tree.predict(system.models[targetStream], extracted.values);
+    support = 0;
+    if (defined(system.models[targetStream].root.samples) && system.models[targetStream].root.samples > 0) {
+        support = result.samples / system.models[targetStream].root.samples;
+    }
+    return {
+        stream: targetStream,
+        value: result.value,
+        support: support,
+        samples: result.samples,
+        depth: result.depth,
+        path: result.path,
+        features: extracted.values
+    };
+}
+
+predictAll = func(system, history) {
+    out = {};
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        target = system.streamNames[si];
+        out[target] = this.predictOne(system, history, target);
+    }
+    return out;
+}
+
+rowFromPredictions = func(system, predictions) {
+    row = {};
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        stream = system.streamNames[si];
+        row[stream] = predictions[stream].value;
+    }
+    return row;
+}
+
+sameValue = func(leftValue, rightValue) {
+    if (this.utils.isNumber(leftValue) && this.utils.isNumber(rightValue)) {
+        return this.utils.abs(leftValue - rightValue) < 0.000001;
+    }
+    return leftValue == rightValue;
+}
+
+checkForecastConsistency = func(system, history, forecastRow) {
+    last = this.historyLib.lastRow(history);
+    report = [];
+    comparisons = 0;
+    matches = 0;
+
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        source = system.streamNames[si];
+        fromValue = last[source];
+        toValue = forecastRow[source];
+        changedHistory = this.historyLib.withCounterfactual(history, source, toValue);
+        checked = this.predictAll(system, changedHistory);
+        effects = [];
+
+        for (ti = 0; ti < system.streamNames.count(); ti = ti + 1) {
+            target = system.streamNames[ti];
+            directValue = forecastRow[target];
+            counterfactualValue = checked[target].value;
+            match = this.sameValue(directValue, counterfactualValue);
+            if (match) matches = matches + 1;
+            comparisons = comparisons + 1;
+            effects.add({
+                target: target,
+                direct: directValue,
+                counterfactual: counterfactualValue,
+                matches: match
+            });
+        }
+
+        report.add({
+            source: source,
+            from: fromValue,
+            to: toValue,
+            effects: effects
+        });
+    }
+
+    return {
+        report: report,
+        comparisons: comparisons,
+        matches: matches,
+        score: comparisons > 0 ? matches / comparisons : 1
+    };
+}
+
+predictNextState = func(system, history) {
+    predictions = this.predictAll(system, history);
+    row = this.rowFromPredictions(system, predictions);
+    consistency = this.checkForecastConsistency(system, history, row);
+    return {
+        row: row,
+        predictions: predictions,
+        consistency: consistency
+    };
+}
+
+defaultPerturbation = func(value) {
+    if (this.utils.isNumber(value)) return value + 1;
+    if (value == true) return false;
+    if (value == false) return true;
+    return value + "_changed";
+}
+
+difference = func(baseValue, changedValue) {
+    if (this.utils.isNumber(baseValue) && this.utils.isNumber(changedValue)) return changedValue - baseValue;
+    return baseValue == changedValue ? 0 : 1;
+}
+
+counterfactualInfluence = func(system, history, changes) {
+    base = this.predictAll(system, history);
+    report = [];
+    last = this.historyLib.lastRow(history);
+
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        source = system.streamNames[si];
+        original = last[source];
+        changed = defined(changes) && defined(changes[source]) ? changes[source] : this.defaultPerturbation(original);
+        alternateHistory = this.historyLib.withCounterfactual(history, source, changed);
+        alternate = this.predictAll(system, alternateHistory);
+
+        effects = [];
+        for (ti = 0; ti < system.streamNames.count(); ti = ti + 1) {
+            target = system.streamNames[ti];
+            effects.add({
+                target: target,
+                base: base[target].value,
+                changed: alternate[target].value,
+                delta: this.difference(base[target].value, alternate[target].value)
+            });
+        }
+
+        report.add({
+            source: source,
+            from: original,
+            to: changed,
+            effects: effects
+        });
+    }
+
+    return {
+        base: base,
+        report: report
+    };
+}

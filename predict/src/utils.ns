@@ -1,0 +1,49 @@
+isNumber = func(value) {
+    return defined(value) && type(value).typename == "Number";
+}
+
+isMissing = func(value) {
+    return !defined(value) || value == null;
+}
+
+asNumber = func(value, fallback) {
+    if (defined(value) && type(value).typename == "Number") return value;
+    if (type(value).typename == "String") {
+        try {
+            return number(value);
+        } catch(ex) {
+            return 0;
+        }
+    }
+    return 0;
+}
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+copyObject = func(obj) {
+    out = {};
+    if (!defined(obj) || obj == null) return out;
+    foreach(name in obj.props) out[name] = obj[name];
+    return out;
+}
+
+keyOf = func(value) {
+    if (!defined(value) || value == null) return "null";
+    return type(value).typename + ":" + stringify(value);
+}
+
+abs = func(value) {
+    return value < 0 ? 0 - value : value;
+}
+
+clamp = func(value, low, high) {
+    next = value;
+    if (next < low) next = low;
+    if (next > high) next = high;
+    return next;
+}

@@ -1,0 +1,122 @@
+utils = import("./src/utils.ns");
+
+defaultConfig = func() {
+    return {
+        lags: 3,
+        rolling: 3,
+        pattern: 3
+    };
+}
+
+normalizeConfig = func(config) {
+    base = this.defaultConfig();
+    if (!defined(config) || config == null) return base;
+    if (defined(config.lags)) base.lags = config.lags;
+    if (defined(config.rolling)) base.rolling = config.rolling;
+    if (defined(config.pattern)) base.pattern = config.pattern;
+    return base;
+}
+
+featureName = func(stream, kind, offset) {
+    return stream + "." + kind + (defined(offset) ? "." + offset : "");
+}
+
+lastValue = func(rows, index, stream, fallback) {
+    if (index < 0 || index >= rows.count()) return fallback;
+    value = rows[index][stream];
+    return defined(value) ? value : fallback;
+}
+
+timeSinceChange = func(rows, index, stream) {
+    if (index <= 0) return index;
+    current = this.lastValue(rows, index, stream, null);
+    age = 0;
+    for (i = index - 1; i >= 0; i = i - 1) {
+        age = age + 1;
+        if (this.lastValue(rows, i, stream, null) != current) return age;
+    }
+    return age;
+}
+
+rollingAverage = func(rows, index, stream, width) {
+    total = 0;
+    count = 0;
+    start = index - width + 1;
+    if (start < 0) start = 0;
+    for (i = start; i <= index; i = i + 1) {
+        value = rows[i][stream];
+        if (this.utils.isNumber(value)) {
+            total = total + value;
+            count = count + 1;
+        }
+    }
+    if (count == 0) return 0;
+    return total / count;
+}
+
+patternCode = func(rows, index, stream, width) {
+    start = index - width + 1;
+    if (start < 0) start = 0;
+    text = "";
+    for (i = start; i <= index; i = i + 1) {
+        if (text != "") text = text + "|";
+        text = text + this.utils.keyOf(rows[i][stream]);
+    }
+    return text;
+}
+
+encodeScalar = func(value, categories) {
+    if (this.utils.isNumber(value)) return value;
+    key = this.utils.keyOf(value);
+    if (!defined(categories[key])) categories[key] = categories.props.count() + 1;
+    return categories[key];
+}
+
+extractAt = func(history, index, config, categories) {
+    cfg = this.normalizeConfig(config);
+    cats = defined(categories) && categories != null ? categories : {};
+    features = {};
+    rows = history.rows;
+
+    for (si = 0; si < history.streamNames.count(); si = si + 1) {
+        stream = history.streamNames[si];
+        current = this.lastValue(rows, index, stream, null);
+        features[this.featureName(stream, "current", null)] = this.encodeScalar(current, cats);
+
+        for (lag = 1; lag <= cfg.lags; lag = lag + 1) {
+            lagValue = this.lastValue(rows, index - lag, stream, null);
+            features[this.featureName(stream, "lag", lag)] = this.encodeScalar(lagValue, cats);
+            currentNum = 0;
+            if (type(current).typename == "Number") currentNum = current;
+            lagNum = 0;
+            if (type(lagValue).typename == "Number") lagNum = lagValue;
+            features[this.featureName(stream, "delta", lag)] = currentNum - lagNum;
+        }
+
+        features[this.featureName(stream, "rolling", cfg.rolling)] = this.rollingAverage(rows, index, stream, cfg.rolling);
+        features[this.featureName(stream, "timeSinceChange", null)] = this.timeSinceChange(rows, index, stream);
+        features[this.featureName(stream, "pattern", cfg.pattern)] = this.encodeScalar(this.patternCode(rows, index, stream, cfg.pattern), cats);
+    }
+
+    return {
+        values: features,
+        categories: cats
+    };
+}
+
+buildTrainingSet = func(history, targetStream, config) {
+    cats = {};
+    rows = [];
+    for (i = 0; i + 1 < history.rows.count(); i = i + 1) {
+        extracted = this.extractAt(history, i, config, cats);
+        rows.add({
+            features: extracted.values,
+            target: history.rows[i + 1][targetStream]
+        });
+        cats = extracted.categories;
+    }
+    return {
+        rows: rows,
+        categories: cats
+    };
+}

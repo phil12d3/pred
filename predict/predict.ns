@@ -1,0 +1,12 @@
+// Predict library umbrella entrypoint.
+// This mirrors the modular import style used in decision-tree while keeping
+// predict fully separate.
+
+history   = import("./src/history.ns");
+features  = import("./src/features.ns");
+tree      = import("./src/tree.ns");
+predictor = import("./src/predictor.ns");
+explain   = import("./src/explain.ns");
+backtest  = import("./src/backtest.ns");
+streams   = import("./src/streams.ns");
+utils     = import("./src/utils.ns");

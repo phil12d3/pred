@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Decision Tree Framework — Complete Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafaf8;
+      --panel: #ffffff;
+      --ink: #1a1a1a;
+      --muted: #5a5a5a;
+      --line: #e8e8e5;
+      --accent: #2563eb;
+      --accent-2: #059669;
+      --accent-3: #dc2626;
+      --radius: 12px;
+      --max: 1200px;
+      --shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+
+    body {
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: min(100%, var(--max));
+      margin: 0 auto;
+    }
+
+    h1, h2, h3 {
+      font-family: "Syne", sans-serif;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 1.8rem;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 0.5rem;
+    }
+
+    h3 {
+      font-size: 1.3rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.8rem;
+      color: var(--accent);
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    p {
+      margin: 0.8rem 0;
+      color: var(--ink);
+    }
+
+    .code-block {
+      background: #f4f3f0;
+      border-left: 4px solid var(--accent);
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+
+    .code-block code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.9rem;
+      color: #1a1a1a;
+      white-space: pre;
+      display: block;
+    }
+
+    .example {
+      background: #f9f8f6;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1.2rem;
+      margin: 1.2rem 0;
+    }
+
+    .example-label {
+      font-weight: 600;
+      color: var(--accent-2);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+    }
+
+    ul, ol {
+      margin: 0.8rem 0;
+      padding-left: 2rem;
+    }
+
+    li {
+      margin: 0.4rem 0;
+      color: var(--ink);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.2rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .prop {
+      background: #f9f8f6;
+      border-radius: 6px;
+      padding: 0.8rem;
+      margin: 0.6rem 0;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.9rem;
+    }
+
+    .prop-name {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .prop-type {
+      color: #795548;
+      font-weight: 500;
+    }
+
+    .prop-desc {
+      color: var(--muted);
+      margin-top: 0.3rem;
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      font-size: 0.9rem;
+    }
+
+    .warning {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+    }
+
+    .tip {
+      background: #ecfdf5;
+      border-left: 4px solid var(--accent-2);
+      padding: 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+    }
+
+    .nav {
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid var(--line);
+    }
+
+    .nav a {
+      display: inline-block;
+      margin-right: 1.5rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .nav a:hover {
+      text-decoration: underline;
+    }
+
+    .workflow {
+      background: #f0f9ff;
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .workflow-step {
+      display: flex;
+      align-items: flex-start;
+      margin: 1rem 0;
+    }
+
+    .workflow-number {
+      background: var(--accent);
+      color: white;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      margin-right: 1rem;
+      flex-shrink: 0;
+    }
+
+    .workflow-text {
+      flex: 1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+    }
+
+    th {
+      background: #f4f3f0;
+      text-align: left;
+      padding: 0.8rem;
+      border-bottom: 2px solid var(--line);
+      font-weight: 600;
+    }
+
+    td {
+      padding: 0.8rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    tr:hover {
+      background: #f9f8f6;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 2rem 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      border-top: 1px solid var(--line);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Decision Tree Framework</h1>
+    <p class="subtitle">
+      A complete ns library for predictions on tabular data, text, vectors, and multi-stream systems.
+      No external dependencies — pure decision trees with CART algorithm.
+    </p>
+
+    <nav class="nav">
+      <a href="#quick-start">Quick Start</a>
+      <a href="#modules">Modules</a>
+      <a href="#config">Configuration</a>
+      <a href="#return-values">Return Values</a>
+      <a href="#examples">Examples</a>
+      <a href="#patterns">Patterns</a>
+    </nav>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <section class="section" id="quick-start">
+      <h2>Quick Start</h2>
+      <p>Import the library and train your first model in 5 lines:</p>
+      <div class="code-block"><code>dt = import("./des-tree.ns");
+
+rows = [{features: {x: 1, y: 2}, target: "A"},
+        {features: {x: 5, y: 6}, target: "B"}];
+model = dt.tabular.train(rows);
+result = dt.tabular.predict(model, {x: 1.2, y: 2.1});
+printline(result.value);  // → "A"</code></div>
+
+      <p>That's it. The model trained, predicted, and returned the most likely class.</p>
+
+      <div class="tip">
+        <strong>Tip:</strong> Each row has <code>target</code> (what to predict) and <code>features</code> (inputs).
+        The framework auto-detects whether you're doing classification (text targets) or regression (numeric targets).
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <section class="section" id="modules">
+      <h2>Five Modules</h2>
+
+      <div class="grid">
+        <div class="card">
+          <h3>dt.tabular</h3>
+          <p>Mixed numeric and categorical features. Auto label-encodes categories.</p>
+          <p><strong>Use when:</strong> Your data is a flat table with column values.</p>
+        </div>
+
+        <div class="card">
+          <h3>dt.text</h3>
+          <p>String classification. Tokenizes, builds vocabulary, bag-of-words features.</p>
+          <p><strong>Use when:</strong> Classifying short texts or documents.</p>
+        </div>
+
+        <div class="card">
+          <h3>dt.vectors</h3>
+          <p>Dense numeric arrays (embeddings, sensor readings). Maps dimensions to features.</p>
+          <p><strong>Use when:</strong> Input is a fixed-size numeric array.</p>
+        </div>
+
+        <div class="card">
+          <h3>dt.streams</h3>
+          <p>Multi-stream mutual prediction. Each stream predicts all others.</p>
+          <p><strong>Use when:</strong> Variables depend on each other (weather: temp ↔ humidity).</p>
+        </div>
+
+        <div class="card">
+          <h3>dt.evaluate</h3>
+          <p>Metrics and cross-validation. Accuracy, MAE, RMSE, confusion matrices.</p>
+          <p><strong>Use when:</strong> Measuring model quality.</p>
+        </div>
+
+        <div class="card">
+          <h3>dt.tree</h3>
+          <p>Low-level CART engine. Impurity metrics, feature importance, node traversal.</p>
+          <p><strong>Use when:</strong> Building custom prediction pipelines.</p>
+        </div>
+      </div>
+
+      <!-- ───────────────────────────────── -->
+      <h3>dt.tabular — Mixed Features</h3>
+      <p>Train and predict on rows with numeric and categorical columns.</p>
+
+      <div class="code-block"><code>// Train
+system = dt.tabular.train(rows, config);
+
+// Predict single
+result = dt.tabular.predict(system, {age: 30, city: "NYC"});
+
+// Predict batch
+results = dt.tabular.predictBatch(system, features_list);
+
+// Feature importance
+imp = dt.tabular.importance(system);  // {age: 0.7, city: 0.3}</code></div>
+
+      <div class="prop">
+        <span class="prop-name">system.kind</span><br>
+        <span class="prop-type">string</span>
+        <span class="prop-desc">"classification" or "regression" — determined from your training targets.</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">result.value</span><br>
+        <span class="prop-type">any</span>
+        <span class="prop-desc">The predicted class (classification) or number (regression).</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">result.support</span><br>
+        <span class="prop-type">number 0–1</span>
+        <span class="prop-desc">Fraction of training samples that ended at this leaf. Higher = more confident.</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">result.path</span><br>
+        <span class="prop-type">array</span>
+        <span class="prop-desc">Array of split decisions: [{feature: "age", threshold: 25, direction: "left", ...}, ...]</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">result.probabilities</span><br>
+        <span class="prop-type">object</span>
+        <span class="prop-desc">For classification: {label: probability} for each class.</span>
+      </div>
+
+      <!-- ───────────────────────────────── -->
+      <h3>dt.text — Text Classification</h3>
+      <p>Classify or analyze strings. Automatically tokenizes and builds vocabulary.</p>
+
+      <div class="code-block"><code>// Train
+system = dt.text.train(training_rows, config);
+// training_rows = [{text: "great product", label: "positive"}, ...]
+
+// Classify single
+result = dt.text.classify(system, "I love this");
+
+// Classify batch
+results = dt.text.classifyBatch(system, text_list);
+
+// Top discriminating words
+words = dt.text.topWords(system, 10);</code></div>
+
+      <div class="prop">
+        <span class="prop-name">system.vocabSize</span><br>
+        <span class="prop-type">number</span>
+        <span class="prop-desc">Number of unique words selected for the tree.</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">result.label</span><br>
+        <span class="prop-type">any</span>
+        <span class="prop-desc">The predicted class (e.g., "positive", "negative").</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">words[i]</span><br>
+        <span class="prop-type">object</span>
+        <span class="prop-desc">{feature: "w.great", score: 0.25} — the most important word features.</span>
+      </div>
+
+      <!-- ───────────────────────────────── -->
+      <h3>dt.vectors — Dense Arrays</h3>
+      <p>Predict from fixed-size numeric arrays (embeddings, sensor readings).</p>
+
+      <div class="code-block"><code>// Train
+system = dt.vectors.train(rows, config);
+// rows = [{dims: [1.2, 3.4, 5.6], target: "category"}, ...]
+
+// Predict single
+result = dt.vectors.predict(system, [1.1, 3.3, 5.5]);
+
+// Predict batch
+results = dt.vectors.predictBatch(system, array_list);
+
+// Dimension importance
+imp = dt.vectors.dimensionImportance(system);  // {dim0: 0.6, dim1: 0.4}</code></div>
+
+      <div class="prop">
+        <span class="prop-name">result.value</span><br>
+        <span class="prop-type">any</span>
+        <span class="prop-desc">Predicted class or numeric value.</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">result.kind</span><br>
+        <span class="prop-type">string</span>
+        <span class="prop-desc">"classification" or "regression".</span>
+      </div>
+
+      <!-- ───────────────────────────────── -->
+      <h3>dt.streams — Multi-Stream Prediction</h3>
+      <p>Train one model per variable; each predicts all others.</p>
+
+      <div class="code-block"><code>// Train
+system = dt.streams.train(["temp", "humidity", "rain"], rows);
+// rows = [{temp: 20, humidity: 70, rain: 0.5}, ...]
+
+// Predict specific stream
+result = dt.streams.predict(system, {temp: 22, humidity: 75}, "rain");
+
+// Predict all streams at once
+all = dt.streams.predictAll(system, {temp: 22});  // uses default for humidity
+
+// Feature importance
+imp = dt.streams.importance(system, "rain");
+allImp = dt.streams.allImportance(system);</code></div>
+
+      <div class="prop">
+        <span class="prop-name">result.stream</span><br>
+        <span class="prop-type">string</span>
+        <span class="prop-desc">Name of the stream being predicted.</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">knownValues</span><br>
+        <span class="prop-type">object</span>
+        <span class="prop-desc">Partial or full observation: {temp: 20, humidity: 75}. Missing streams use training defaults.</span>
+      </div>
+
+      <!-- ───────────────────────────────── -->
+      <h3>dt.evaluate — Metrics & Cross-Validation</h3>
+      <p>Measure accuracy, error, and model quality.</p>
+
+      <div class="code-block"><code>// Split data
+split = dt.evaluate.holdout(rows, 0.2);  // 80/20 split
+// split.train, split.test
+
+// Per-sample results
+results = [{predicted: "A", actual: "A"}, ...];
+acc = dt.evaluate.accuracy(results);
+mae = dt.evaluate.mae(results);
+
+// Cross-validation
+folds = dt.evaluate.kFold(rows, 5, train_fn, predict_fn);
+summary = dt.evaluate.summarizeKFold(folds);</code></div>
+
+      <div class="prop">
+        <span class="prop-name">split.train, split.test</span><br>
+        <span class="prop-type">array</span>
+        <span class="prop-desc">Original rows split into train and test.</span>
+      </div>
+      <div class="prop">
+        <span class="prop-name">accuracy, mae, rmse</span><br>
+        <span class="prop-type">number 0–1 (accuracy) or error value</span>
+        <span class="prop-desc">Accuracy ranges [0, 1]; MAE and RMSE are absolute or squared error.</span>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <section class="section" id="config">
+      <h2>Configuration: Controlling How the Tree Grows</h2>
+
+      <p>Pass a config object to <code>train()</code> to customize tree depth and split behavior:</p>
+
+      <div class="code-block"><code>config = {
+    maxDepth:    5,        // Stop splitting at this depth
+    minSamples:  3,        // Don't split if fewer samples
+    minGain:     0.0001    // Ignore splits with less gain
+};
+model = dt.tabular.train(rows, config);</code></div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Type</th>
+            <th>Default</th>
+            <th>Effect</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>maxDepth</code></td>
+            <td>number</td>
+            <td>6</td>
+            <td>Maximum tree depth. Deeper = more complex. Shallower = simpler, less overfitting.</td>
+          </tr>
+          <tr>
+            <td><code>minSamples</code></td>
+            <td>number</td>
+            <td>2</td>
+            <td>Minimum samples required to make a split. Higher = smoother predictions, less noise.</td>
+          </tr>
+          <tr>
+            <td><code>minGain</code></td>
+            <td>number</td>
+            <td>0.00001</td>
+            <td>Minimum information gain to accept a split. Higher = only strong splits used.</td>
+          </tr>
+          <tr>
+            <td><code>maxVocab</code> (text only)</td>
+            <td>number</td>
+            <td>500</td>
+            <td>Maximum vocabulary size. Lower = faster, fewer features.</td>
+          </tr>
+          <tr>
+            <td><code>minCount</code> (text only)</td>
+            <td>number</td>
+            <td>1</td>
+            <td>Minimum document frequency for a word to enter vocabulary.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Impact Examples</h3>
+
+      <div class="example">
+        <div class="example-label">Conservative (avoid overfitting)</div>
+        <div class="code-block"><code>{maxDepth: 3, minSamples: 10, minGain: 0.001}</code></div>
+        <p>Result: Simple tree, smooth predictions, slower to train.</p>
+      </div>
+
+      <div class="example">
+        <div class="example-label">Aggressive (capture detail)</div>
+        <div class="code-block"><code>{maxDepth: 10, minSamples: 1, minGain: 0.0001}</code></div>
+        <p>Result: Deep tree, may overfit, very detailed decisions.</p>
+      </div>
+
+      <div class="example">
+        <div class="example-label">Balanced (default)</div>
+        <div class="code-block"><code>{maxDepth: 6, minSamples: 2, minGain: 0.00001}</code></div>
+        <p>Result: Reasonable complexity, generalizes well, good for most use cases.</p>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <section class="section" id="return-values">
+      <h2>Understanding Return Values</h2>
+
+      <p>Every prediction returns a rich object with more than just the prediction:</p>
+
+      <div class="code-block"><code>result = dt.tabular.predict(model, {age: 30, income: 50000});
+
+// result = {
+//   value:         "medium",          // The prediction
+//   support:       0.2,               // 20% of training ended here
+//   depth:         3,                 // Took 3 splits to get here
+//   kind:          "classification",  // Task type
+//   probabilities: {                  // For classification
+//     "low": 0.1,
+//     "medium": 0.8,
+//     "high": 0.1
+//   },
+//   path: [                            // How the tree decided
+//     {feature: "income", threshold: 40000, direction: "right", gain: 0.15},
+//     {feature: "age", threshold: 25, direction: "right", gain: 0.10}
+//   ]
+// }</code></div>
+
+      <h3>Key Properties</h3>
+
+      <div class="prop">
+        <span class="prop-name">value</span><br>
+        <span class="prop-type">any</span>
+        <span class="prop-desc"><strong>The main result.</strong> Class label or numeric prediction.</span>
+      </div>
+
+      <div class="prop">
+        <span class="prop-name">support</span><br>
+        <span class="prop-type">0 to 1</span>
+        <span class="prop-desc"><strong>Confidence indicator.</strong> What fraction of training data reached this leaf? 0.5 = "half the training data was similar to this input."</span>
+      </div>
+
+      <div class="prop">
+        <span class="prop-name">depth</span><br>
+        <span class="prop-type">0 to maxDepth</span>
+        <span class="prop-desc">How many splits were needed. Shallow predictions (depth 1–2) are more general.</span>
+      </div>
+
+      <div class="prop">
+        <span class="prop-name">kind</span><br>
+        <span class="prop-type">"classification" or "regression"</span>
+        <span class="prop-desc">The task type — inferred from your training targets.</span>
+      </div>
+
+      <div class="prop">
+        <span class="prop-name">probabilities</span><br>
+        <span class="prop-type">object (classification only)</span>
+        <span class="prop-desc">Class probabilities: how likely each class is. Sums to 1.0. Missing classes have probability 0.</span>
+      </div>
+
+      <div class="prop">
+        <span class="prop-name">path</span><br>
+        <span class="prop-type">array of objects</span>
+        <span class="prop-desc"><strong>Explainability.</strong> Each step: {feature, threshold, direction, gain}. Shows exactly why the prediction was made.</span>
+      </div>
+
+      <h3>Using the Path for Explainability</h3>
+
+      <p>The path shows exactly which rules led to the prediction:</p>
+
+      <div class="code-block"><code>// Print a human-readable explanation
+result = dt.tabular.predict(model, features);
+printline("Predicted: ", result.value);
+for (i = 0; i < result.path.count(); i = i + 1) {
+    step = result.path[i];
+    op = step.direction == "left" ? "<=" : ">";
+    printline("  ", step.feature, " ", op, " ", step.threshold);
+}</code></div>
+
+      <p>Output:</p>
+      <div class="code-block"><code>Predicted: high_risk
+  age <= 30
+  income > 50000</code></div>
+
+      <p>This is your tree's logic for this prediction. Great for debugging and building trust.</p>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <section class="section" id="examples">
+      <h2>Real Working Examples</h2>
+
+      <p>Four complete runnable examples are in <code>examples/</code>:</p>
+
+      <ul>
+        <li><code>tabular_demo.ns</code> — Classification + regression on mixed data</li>
+        <li><code>text_classify.ns</code> — Sentiment classification with cross-validation</li>
+        <li><code>vector_classify.ns</code> — 4-dim embedding classification</li>
+        <li><code>weather_streams.ns</code> — Multi-stream weather predictions</li>
+      </ul>
+
+      <p>Run from <code>decision-tree/</code> directory:</p>
+
+      <div class="code-block"><code>../../ns/bin/ns examples/tabular_demo.ns</code></div>
+
+      <h3>Example: Risk Classification</h3>
+
+      <p>Predict credit risk from age, income, and debt:</p>
+
+      <div class="code-block"><code>rows = [
+    {features: {age: 22, income: 28000, debt: 12000}, target: "high"},
+    {features: {age: 45, income: 85000, debt: 5000},  target: "low"},
+    {features: {age: 31, income: 42000, debt: 18000}, target: "medium"},
+    ...
+];
+
+system = dt.tabular.train(rows, {maxDepth: 4, minSamples: 2});
+result = dt.tabular.predict(system, {age: 35, income: 55000, debt: 10000});
+
+printline("Risk: ", result.value);
+printline("Support: ", result.support);
+for (i = 0; i < result.path.count(); i = i + 1) {
+    printline("  Rule: ", result.path[i].feature, " ", result.path[i].direction);
+}</code></div>
+
+      <h3>Example: Multi-Stream Weather</h3>
+
+      <p>Predict any weather variable from others:</p>
+
+      <div class="code-block"><code>// Train once with all streams
+system = dt.streams.train(
+    ["temp", "humidity", "rain_chance", "wind"],
+    observations
+);
+
+// Know only temp and humidity → predict rain
+result = dt.streams.predict(
+    system,
+    {temp: 20, humidity: 80},
+    "rain_chance"
+);
+printline("Rain chance: ", result.value);
+
+// Know only rain → predict everything
+all = dt.streams.predictAll(system, {rain_chance: 0.7});
+printline("Expected temp: ", all.temp.value);
+printline("Expected humidity: ", all.humidity.value);</code></div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <section class="section" id="patterns">
+      <h2>Common Patterns & Best Practices</h2>
+
+      <h3>Pattern 1: Classification with Confidence</h3>
+
+      <div class="example">
+        <div class="example-label">Predict and filter by confidence</div>
+        <div class="code-block"><code>result = dt.tabular.predict(system, features);
+if (result.support > 0.3) {
+    // High confidence: support > 30% of training
+    use_prediction(result.value);
+} else {
+    // Low confidence: ask user or use fallback
+    ask_human_for_decision();
+}</code></div>
+      </div>
+
+      <h3>Pattern 2: Explainability</h3>
+
+      <div class="example">
+        <div class="example-label">Show why a prediction was made</div>
+        <div class="code-block"><code>result = dt.tabular.predict(system, features);
+printline("Decision: ", result.value);
+printline("Why? ");
+for (i = 0; i < result.path.count(); i = i + 1) {
+    s = result.path[i];
+    op = s.direction == "left" ? "<=" : ">";
+    val = features[s.feature];
+    printline("  Because ", s.feature, "=", val, " is ", op, " ", s.threshold);
+}</code></div>
+      </div>
+
+      <h3>Pattern 3: Finding Important Features</h3>
+
+      <div class="example">
+        <div class="example-label">What matters most?</div>
+        <div class="code-block"><code>imp = dt.tabular.importance(system);
+printline("Feature importance:");
+foreach(f in imp.props) {
+    printline("  ", f, ": ", imp[f]);
+}</code></div>
+      </div>
+
+      <h3>Pattern 4: Train/Test Split</h3>
+
+      <div class="example">
+        <div class="example-label">Evaluate generalization</div>
+        <div class="code-block"><code>split = dt.evaluate.holdout(all_rows, 0.2);
+
+system = dt.tabular.train(split.train);
+
+results = [];
+for (i = 0; i < split.test.count(); i = i + 1) {
+    pred = dt.tabular.predict(system, split.test[i].features);
+    results.add({
+        predicted: pred.value,
+        actual: split.test[i].target
+    });
+}
+
+accuracy = dt.evaluate.accuracy(results);
+printline("Test accuracy: ", accuracy);</code></div>
+      </div>
+
+      <h3>Pattern 5: Cross-Validation</h3>
+
+      <div class="example">
+        <div class="example-label">Robust accuracy estimate (k-fold)</div>
+        <div class="code-block"><code>buildRows = func(raw) {
+    result = [];
+    for (i = 0; i < raw.count(); i = i + 1) {
+        result.add({
+            features: raw[i].features,
+            target: raw[i].target
+        });
+    }
+    return result;
+};
+
+folds = dt.evaluate.kFold(
+    buildRows(all_rows), 5,
+    func(rows) => dt.tabular.train(rows),
+    func(model, feat) => dt.tabular.predict(model, feat).value
+);
+
+summary = dt.evaluate.summarizeKFold(folds);
+printline("Average accuracy: ", summary.accuracy);</code></div>
+      </div>
+
+      <h3>Pattern 6: Reverse Prediction (Streams)</h3>
+
+      <div class="example">
+        <div class="example-label">Use output as input</div>
+        <div class="code-block"><code>// One-shot: temp/humidity determine rain
+result1 = dt.streams.predict(system, {temp: 20, humidity: 75}, "rain");
+
+// Reverse: rain determines temp/humidity
+result2 = dt.streams.predict(system, {rain: 0.8}, "temp");
+result3 = dt.streams.predict(system, {rain: 0.8}, "humidity");</code></div>
+      </div>
+
+      <h3>General Best Practices</h3>
+
+      <ul>
+        <li><strong>Start simple:</strong> Use default config, then adjust if needed.</li>
+        <li><strong>Guard splits:</strong> Always use <code>holdout()</code> or cross-validation before trusting accuracy.</li>
+        <li><strong>Check support:</strong> Low support (<code>&lt; 0.1</code>) means "not enough similar training data" — treat with caution.</li>
+        <li><strong>Pair with probabilities:</strong> For classification, check <code>result.probabilities</code> to see how close the runner-up was.</li>
+        <li><strong>Inspect the path:</strong> Paths let you debug unexpected predictions and build trust.</li>
+        <li><strong>Use feature importance:</strong> It tells you what the model actually learned (useful for feature engineering).</li>
+      </ul>
+
+      <div class="warning">
+        <strong>⚠️ Remember:</strong> Decision trees are prone to overfitting with deep structures and small datasets.
+        Always validate on held-out test data or use cross-validation. Increasing <code>minSamples</code> or lowering
+        <code>maxDepth</code> helps prevent overfitting.
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+    <section class="section" id="deep-dives">
+      <h2>Deep Dives: Understanding Key Concepts</h2>
+
+      <p>This section thoroughly explains the concepts mentioned throughout the docs so you truly understand what's happening.</p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Train/Test Splits & The Holdout Strategy</h3>
+
+      <p><strong>The problem:</strong> When you train a tree on some data and immediately test it on the same data, the accuracy will be misleadingly high. The tree has memorized patterns including noise.</p>
+
+      <p><strong>Why it happens:</strong> Decision trees can grow arbitrary complex. With enough depth, a tree can perfectly classify training data — including the errors and flukes. This is called <strong>overfitting</strong>.</p>
+
+      <p><strong>What holdout does:</strong> It separates your data into two parts: train (e.g., 80%) and test (e.g., 20%). The tree learns from train data, never seeing the test data. At the end, you measure accuracy only on test data.</p>
+
+      <div class="code-block"><code>// Example: 100 rows → 80 training, 20 test
+split = dt.evaluate.holdout(my_rows, 0.2);
+
+// Train on 80
+system = dt.tabular.train(split.train);
+
+// Test on 20 (data the tree has never seen)
+results = [];
+for (i = 0; i < split.test.count(); i = i + 1) {
+    pred = dt.tabular.predict(system, split.test[i].features);
+    results.add({predicted: pred.value, actual: split.test[i].target});
+}
+
+// This accuracy is realistic — not artificially inflated
+accuracy = dt.evaluate.accuracy(results);</code></div>
+
+      <p><strong>Why it matters:</strong> This is your answer to "how good is my model, really?" If you test on training data, you're lying to yourself.</p>
+
+      <p><strong>Rule of thumb:</strong> Always, always use a held-out test set before shipping a model.</p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Cross-Validation: Better Than Holdout</h3>
+
+      <p><strong>The problem with holdout:</strong> With only one 80/20 split, your test accuracy might be lucky or unlucky depending on which rows happened to be in the test set.</p>
+
+      <p><strong>What k-fold does:</strong> It splits data into k equal parts ("folds"). It trains k times, each time using a different fold as test and the rest as train. Final accuracy is the average across all folds.</p>
+
+      <div class="code-block"><code>// Example: 5-fold cross-validation on 100 rows
+// Fold 1: train on rows 20-100, test on rows 0-19
+// Fold 2: train on rows 0-19 + 40-100, test on rows 20-39
+// ... etc ...
+// Final accuracy = average of 5 test accuracies
+
+folds = dt.evaluate.kFold(
+    rows, 5,
+    func(train_rows) => dt.tabular.train(train_rows),
+    func(model, test_features) => dt.tabular.predict(model, test_features).value
+);
+
+summary = dt.evaluate.summarizeKFold(folds);
+printline("Cross-validated accuracy: ", summary.accuracy);</code></div>
+
+      <p><strong>Why it matters:</strong> You get 5 independent accuracy estimates instead of 1. More robust.</p>
+
+      <p><strong>When to use:</strong>
+        <ul>
+          <li><strong>Holdout:</strong> You have lots of data (1000+ rows) and a single 80/20 split is reliable.</li>
+          <li><strong>k-fold:</strong> You have limited data (100–500 rows) and want a robust estimate.</li>
+        </ul>
+      </p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Support: Measuring Confidence</h3>
+
+      <p><strong>What is it?</strong> The fraction of training samples that ended up at the same leaf node as your prediction.</p>
+
+      <div class="code-block"><code>result = dt.tabular.predict(system, features);
+printline("Support: ", result.support);  // e.g., 0.15 = 15% of training</code></div>
+
+      <p><strong>Interpretation:</strong></p>
+      <ul>
+        <li><code>support = 0.5</code> → Half of training data was similar to this input. Model is confident.</li>
+        <li><code>support = 0.1</code> → Only 10% of training was similar. Model is somewhat confident.</li>
+        <li><code>support = 0.01</code> → Only 1% of training was similar. Model is guessing in unfamiliar territory.</li>
+      </ul>
+
+      <p><strong>Why it matters:</strong> Low support predicts ions are more likely to be wrong. Use it to decide when to ask a human or reject the prediction.</p>
+
+      <div class="code-block"><code>result = dt.tabular.predict(system, features);
+if (result.support < 0.05) {
+    printline("Low confidence (only 5% of training looks like this).");
+    printline("I suggest asking a human.");
+} else {
+    printline("Prediction: ", result.value);
+}</code></div>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Probabilities: Understanding Class Likelihood</h3>
+
+      <p><strong>What are they?</strong> For classification tasks, probabilities tell you the likelihood of each class at that leaf node.</p>
+
+      <div class="code-block"><code>result = dt.tabular.predict(system, my_features);
+
+// result.probabilities = {
+//   "low":     0.1,    // 10% of leaf samples are "low"
+//   "medium":  0.8,    // 80% of leaf samples are "medium"
+//   "high":    0.1     // 10% of leaf samples are "high"
+// }</code></div>
+
+      <p><strong>Why it matters:</strong> The top predicted class might be "medium" with 80%, but the runner-up is "high" with 10%. These are close! Use probabilities to decide how confident you are:</p>
+
+      <div class="code-block"><code>result = dt.tabular.predict(system, features);
+
+// Sort probabilities to find top 2
+probs = [];
+foreach(label in result.probabilities.props) {
+    probs.add({label: label, prob: result.probabilities[label]});
+}
+probs = probs.sort(func(ai, av, bi, bv) => bv.prob - av.prob);
+
+top = probs[0];
+runner_up = probs.count() > 1 ? probs[1] : null;
+
+margin = runner_up != null ? top.prob - runner_up.prob : top.prob;
+
+if (margin > 0.5) {
+    printline("Very confident: ", top.label);
+} else if (margin > 0.2) {
+    printline("Somewhat confident: ", top.label);
+} else {
+    printline("Close call, could be either ", top.label, " or ", runner_up.label);
+}</code></div>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Feature Importance: What the Model Learned</h3>
+
+      <p><strong>What is it?</strong> A score (0 to 1) for each feature, showing how much it contributed to the splits in the tree.</p>
+
+      <div class="code-block"><code>imp = dt.tabular.importance(system);
+
+// imp might be:
+// { age: 0.6, income: 0.3, debt: 0.1 }
+// Age drove most of the splits, income some, debt barely used.</code></div>
+
+      <p><strong>Why it matters:</strong></p>
+      <ul>
+        <li><strong>Debugging:</strong> If a feature you expected to be important isn't, maybe it's uncorrelated with the target.</li>
+        <li><strong>Feature engineering:</strong> Features with low importance might be dropped to simplify the model.</li>
+        <li><strong>Understanding the model:</strong> See what the model actually uses vs. what you assumed.</li>
+      </ul>
+
+      <p><strong>Interpretation:</strong>
+        <ul>
+          <li><code>score = 0.7</code> → This feature was responsible for 70% of the predictive power.</li>
+          <li><code>score = 0.01</code> → Almost unused — likely not important.</li>
+        </ul>
+      </p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Overfitting: Why Deep Trees Fail</h3>
+
+      <p><strong>What is overfitting?</strong> The model learns the training data too well, including its noise and quirks. It fails on new data.</p>
+
+      <p><strong>Decision trees and overfitting:</strong> Trees are particularly prone because they can grow infinitely deep and capture arbitrarily complex patterns.</p>
+
+      <p><strong>Example:</strong></p>
+      <div class="code-block"><code>// Overfitted tree: very deep, learns noise
+system1 = dt.tabular.train(rows, {maxDepth: 20, minSamples: 1});
+train_acc1 = 0.99;  // Perfect on training data!
+test_acc1 = 0.65;   // Terrible on new data. Learned noise.
+
+// Well-tuned tree: stopped early
+system2 = dt.tabular.train(rows, {maxDepth: 5, minSamples: 10});
+train_acc2 = 0.82;  // Good but not perfect on training
+test_acc2 = 0.80;   // Also good on new data. Learned patterns.</code></div>
+
+      <p><strong>How to prevent it:</strong>
+        <ul>
+          <li><strong>Reduce maxDepth:</strong> Shallow trees can't memorize noise.</li>
+          <li><strong>Increase minSamples:</strong> Require more samples per leaf to make a split. Noise doesn't repeat consistently.</li>
+          <li><strong>Use cross-validation:</strong> Detect if your tree is overfitting by comparing train vs. test accuracy.</li>
+        </ul>
+      </p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Classification vs. Regression: Two Different Tasks</h3>
+
+      <p><strong>Classification:</strong> Predict a category or label.</p>
+      <div class="code-block"><code>rows = [
+    {features: {...}, target: "spam"},
+    {features: {...}, target: "legitimate"},
+    ...
+];
+// Target is one of a discrete set: "spam" or "legitimate"
+// Metric: accuracy (how many did we get right?)</code></div>
+
+      <p><strong>Regression:</strong> Predict a numeric value.</p>
+      <div class="code-block"><code>rows = [
+    {features: {...}, target: 45.5},
+    {features: {...}, target: 62.3},
+    ...
+];
+// Target is a continuous number
+// Metric: MAE or RMSE (how far off were we on average?)</code></div>
+
+      <p><strong>How the framework detects which:</strong> It looks at your targets. If they're all numbers, it's regression. Otherwise, classification.</p>
+
+      <p><strong>Why it matters:</strong> Different metrics, different optimization. The configuration and interpretation change slightly.</p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Text Tokenization & Bag-of-Words</h3>
+
+      <p><strong>What happens when you train text:</strong></p>
+
+      <div class="code-block"><code>// Input
+rows = [
+    {text: "Great product, highly recommend!", label: "positive"},
+    {text: "Terrible quality, don't buy", label: "negative"},
+    ...
+];
+
+// Step 1: Tokenize
+// "Great product, highly recommend!" → ["Great", "product", "highly", "recommend"]
+// Words are extracted (punctuation removed, case-insensitive)
+
+// Step 2: Build vocabulary
+// Collect all unique words from all training texts
+// Select top 500 by frequency
+
+// Step 3: Convert to features
+// Each text becomes a 500-dim binary vector:
+// feature[i] = 1 if word i is present, else 0
+// "Great product" → [1, 1, 0, 0, ..., 0]  (Great and product present)
+
+// Step 4: Train tree on these features
+// Tree learns rules like: if "great" present and "terrible" absent → positive</code></div>
+
+      <p><strong>Why it works:</strong> Words are strong signals. A tree can learn to split on "scam"–present vs. absent, then on presence of money-related words, etc.</p>
+
+      <p><strong>Limitation:</strong> Word order is lost. "This is good" and "This good is" both become the same feature vector.</p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Stream Defaults & Partial Predictions</h3>
+
+      <p><strong>What are stream defaults?</strong> When you train a multi-stream system, each stream learns a default value: the mean (numeric) or most common value (categorical).</p>
+
+      <div class="code-block"><code>system = dt.streams.train(
+    ["temp", "humidity", "rain"],
+    observations
+);
+
+// During training, the system computes:
+// defaults.temp = average temperature across all observations
+// defaults.humidity = average humidity
+// defaults.rain = average rain_chance</code></div>
+
+      <p><strong>Why:</strong> When you predict with missing values, the system needs something to put in for inputs you don't know. It uses the average from training.</p>
+
+      <div class="code-block"><code>// You know temp but not humidity
+result = dt.streams.predict(system, {temp: 25}, "rain");
+// Internally: humidity is filled with its training mean
+// i.e., {temp: 25, humidity: 72.5} (if that was the average)</code></div>
+
+      <p><strong>Why it matters:</strong> Predictions are only as good as their inputs. Missing values → less confident predictions. Use support to gauge this.</p>
+
+      <!-- ───────────────────────────────── -->
+      <h3>Information Gain & Tree Splits</h3>
+
+      <p><strong>The question every split answers:</strong> "Which feature and which threshold make the best cut?"</p>
+
+      <p><strong>How the tree decides:</strong> It measures "impurity" before and after the split. Impurity is roughness — how mixed the classes are.</p>
+
+      <p><strong>Before split:</strong> 50 samples, 30 class A, 20 class B → impure (mixed)</p>
+      <p><strong>After split on feature X:</strong> Left: 40 samples, 35 class A, 5 class B (pure!); Right: 10 samples, 5 class A, 5 class B (very mixed)</p>
+
+      <p><strong>Information gain:</strong> How much did we reduce impurity? Big reduction = good split. Small reduction = bad split.</p>
+
+      <p><strong>The tree picks the highest-gain split.</strong></p>
+
+      <p><strong>Why it matters:</strong> You don't need to understand the math, but know that <code>minGain</code> lets you filter out weak splits:</p>
+      <div class="code-block"><code>// Only accept splits that improve at least this much
+{minGain: 0.0001}  // Very permissive, many splits
+{minGain: 0.01}    // More selective, only strong splits</code></div>
+
+    </section>
+
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+
+    <div class="footer">
+      <p>Decision Tree Framework • Beginner-friendly • ns language</p>
+      <p>Modules: tabular, text, vectors, streams, evaluate, tree, utils</p>
+      <p>Import as: <code>dt = import("./des-tree.ns");</code></p>
+    </div>
+  </div>
+</body>
+</html>

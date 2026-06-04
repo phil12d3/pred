@@ -1,0 +1,40 @@
+[test]
+tabular_classification_predicts_label_and_support = func(t) {
+    dt = import("./des-tree.ns");
+
+    rows = [
+        {features: {age: 22, income: 24, debt: 3}, target: "low"},
+        {features: {age: 28, income: 36, debt: 5}, target: "low"},
+        {features: {age: 35, income: 48, debt: 6}, target: "medium"},
+        {features: {age: 42, income: 62, debt: 8}, target: "medium"},
+        {features: {age: 51, income: 78, debt: 10}, target: "high"},
+        {features: {age: 57, income: 92, debt: 12}, target: "high"}
+    ];
+
+    model = dt.tabular.train(rows, {maxDepth: 5, minSamples: 1, minGain: 0.00001});
+    result = dt.tabular.predict(model, {age: 54, income: 85, debt: 11});
+
+    t.equal(result.kind, "classification", "tabular model reports classification kind");
+    t.truthy(defined(result.value), "tabular prediction returns a class label");
+    t.truthy(result.support > 0, "tabular prediction returns positive support");
+    t.truthy(defined(result.probabilities), "tabular classification includes probabilities");
+};
+
+[test]
+tabular_regression_predicts_numeric = func(t) {
+    dt = import("./des-tree.ns");
+
+    rows = [
+        {features: {x: 1, y: 2}, target: 5},
+        {features: {x: 2, y: 1}, target: 6},
+        {features: {x: 3, y: 2}, target: 8},
+        {features: {x: 4, y: 3}, target: 10},
+        {features: {x: 5, y: 4}, target: 12}
+    ];
+
+    model = dt.tabular.train(rows, {maxDepth: 4, minSamples: 1});
+    result = dt.tabular.predict(model, {x: 3.5, y: 2.5});
+
+    t.equal(result.kind, "regression", "tabular model reports regression kind");
+    t.truthy(type(result.value).typename == "Number", "tabular regression returns numeric value");
+};

@@ -1,0 +1,152 @@
+// Evaluation helpers: measure prediction quality for classification and regression.
+
+utils = import("./src/utils.ns");
+
+// ── basic metrics ──────────────────────────────────────────────────────────────
+
+// results: array of { predicted, actual }
+accuracy = func(results) {
+    if (results.count() == 0) return 0;
+    correct = 0;
+    for (i = 0; i < results.count(); i = i + 1) {
+        if (this.utils.keyOf(results[i].predicted) == this.utils.keyOf(results[i].actual)) {
+            correct = correct + 1;
+        }
+    }
+    return correct / results.count();
+}
+
+mae = func(results) {
+    if (results.count() == 0) return 0;
+    total = 0;
+    for (i = 0; i < results.count(); i = i + 1) {
+        total = total + this.utils.abs(
+            this.utils.asNumber(results[i].predicted, 0) -
+            this.utils.asNumber(results[i].actual,    0)
+        );
+    }
+    return total / results.count();
+}
+
+rmse = func(results) {
+    if (results.count() == 0) return 0;
+    total = 0;
+    for (i = 0; i < results.count(); i = i + 1) {
+        d = this.utils.asNumber(results[i].predicted, 0) -
+            this.utils.asNumber(results[i].actual,    0);
+        total = total + d * d;
+    }
+    return total / results.count(); // returns MSE; caller can sqrt if needed
+}
+
+// Confusion matrix as an object: matrix[actual_key][predicted_key] = count
+confusionMatrix = func(results) {
+    matrix = {};
+    for (i = 0; i < results.count(); i = i + 1) {
+        ak = this.utils.keyOf(results[i].actual);
+        pk = this.utils.keyOf(results[i].predicted);
+        if (!defined(matrix[ak])) matrix[ak] = {};
+        if (!defined(matrix[ak][pk])) matrix[ak][pk] = 0;
+        matrix[ak][pk] = matrix[ak][pk] + 1;
+    }
+    return matrix;
+}
+
+// ── data splitting ─────────────────────────────────────────────────────────────
+
+// Split rows into train and test sets.
+// testFraction: e.g. 0.2 means 20% of rows go to test (taken from the end).
+holdout = func(rows, testFraction) {
+    frac = defined(testFraction) ? testFraction : 0.2;
+    split = rows.count() - (rows.count() * frac);
+    trainEnd = 0;
+    // manual floor
+    for (i = 0; i <= rows.count(); i = i + 1) {
+        if (i <= split) trainEnd = i;
+    }
+    train = [];
+    test  = [];
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (i < trainEnd) train.add(rows[i]);
+        else              test.add(rows[i]);
+    }
+    return {train: train, test: test};
+}
+
+// k-fold cross-validation.
+// rows:       array of training rows
+// k:          number of folds (default 5)
+// trainFn:    func(foldTrainRows) → model
+// predictFn:  func(model, row.features) → predicted value (or label)
+// Returns array of per-fold { accuracy, mae, folds } objects depending on task kind.
+kFold = func(rows, k, trainFn, predictFn) {
+    numFolds = defined(k) ? k : 5;
+    foldSize = 0;
+    for (i = 1; i <= rows.count(); i = i + 1) {
+        if (i * numFolds <= rows.count()) foldSize = i;
+    }
+    if (foldSize == 0) foldSize = 1;
+
+    foldResults = [];
+    for (f = 0; f < numFolds; f = f + 1) {
+        start = f * foldSize;
+        end   = start + foldSize;
+        if (end > rows.count()) end = rows.count();
+
+        trainRows = [];
+        testRows  = [];
+        for (i = 0; i < rows.count(); i = i + 1) {
+            if (i >= start && i < end) testRows.add(rows[i]);
+            else                       trainRows.add(rows[i]);
+        }
+        if (trainRows.count() == 0 || testRows.count() == 0) continue;
+
+        model   = trainFn(trainRows);
+        results = [];
+        for (i = 0; i < testRows.count(); i = i + 1) {
+            predicted = predictFn(model, testRows[i].features);
+            results.add({predicted: predicted, actual: testRows[i].target});
+        }
+
+        foldResults.add({
+            fold:     f,
+            accuracy: this.accuracy(results),
+            mae:      this.mae(results),
+            rmse:     this.rmse(results),
+            n:        testRows.count()
+        });
+    }
+    return foldResults;
+}
+
+// Summarize kFold results into overall averages.
+summarizeKFold = func(foldResults) {
+    if (foldResults.count() == 0) return {accuracy: 0, mae: 0, rmse: 0, folds: 0};
+    accTotal  = 0;
+    maeTotal  = 0;
+    rmseTotal = 0;
+    for (i = 0; i < foldResults.count(); i = i + 1) {
+        accTotal  = accTotal  + foldResults[i].accuracy;
+        maeTotal  = maeTotal  + foldResults[i].mae;
+        rmseTotal = rmseTotal + foldResults[i].rmse;
+    }
+    n = foldResults.count();
+    return {
+        accuracy: accTotal  / n,
+        mae:      maeTotal  / n,
+        rmse:     rmseTotal / n,
+        folds:    n
+    };
+}
+
+// Pretty-print a result summary to console.
+report = func(label, results, kind) {
+    printline("=== ", label, " ===");
+    if (kind == "regression") {
+        printline("  MAE  : ", this.mae(results));
+        printline("  MSE  : ", this.rmse(results), "  (RMSE = sqrt of this)");
+    } else {
+        printline("  Accuracy : ", this.accuracy(results));
+    }
+    printline("  Samples  : ", results.count());
+}

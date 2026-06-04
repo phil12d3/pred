@@ -1,0 +1,199 @@
+utils = import("./src/utils.ns");
+
+meanTarget = func(rows) {
+    total = 0;
+    count = 0;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (this.utils.isNumber(rows[i].target)) {
+            total = total + rows[i].target;
+            count = count + 1;
+        }
+    }
+    if (count == 0) return 0;
+    return total / count;
+}
+
+majorityTarget = func(rows) {
+    counts = {};
+    bestKey = "";
+    bestValue = null;
+    bestCount = -1;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        key = this.utils.keyOf(rows[i].target);
+        if (!defined(counts[key])) counts[key] = 0;
+        counts[key] = counts[key] + 1;
+        if (counts[key] > bestCount) {
+            bestCount = counts[key];
+            bestKey = key;
+            bestValue = rows[i].target;
+        }
+    }
+    return {value: bestValue, key: bestKey, count: bestCount};
+}
+
+targetKind = func(rows) {
+    numeric = 0;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (this.utils.isNumber(rows[i].target)) numeric = numeric + 1;
+    }
+    return numeric == rows.count() ? "numeric" : "event";
+}
+
+impurity = func(rows, kind) {
+    if (rows.count() == 0) return 0;
+    if (kind == "numeric") {
+        mean = this.meanTarget(rows);
+        total = 0;
+        for (i = 0; i < rows.count(); i = i + 1) {
+            d = rows[i].target - mean;
+            total = total + d * d;
+        }
+        return total / rows.count();
+    }
+
+    counts = {};
+    maxCount = 0;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        key = this.utils.keyOf(rows[i].target);
+        if (!defined(counts[key])) counts[key] = 0;
+        counts[key] = counts[key] + 1;
+        if (counts[key] > maxCount) maxCount = counts[key];
+    }
+    return 1 - (maxCount / rows.count());
+}
+
+featureNames = func(rows) {
+    names = [];
+    seen = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        foreach(name in rows[i].features.props) {
+            if (defined(seen[name])) continue;
+            seen[name] = true;
+            names.add(name);
+        }
+    }
+    return names;
+}
+
+thresholdsFor = func(rows, feature) {
+    values = [];
+    for (i = 0; i < rows.count(); i = i + 1) {
+        value = this.utils.asNumber(rows[i].features[feature], 0);
+        duplicate = false;
+        for (j = 0; j < values.count(); j = j + 1) {
+            if (values[j] == value) duplicate = true;
+        }
+        if (!duplicate) values.add(value);
+    }
+    values = values.sort(func(ai, av, bi, bv) => av - bv);
+    thresholds = [];
+    for (i = 0; i + 1 < values.count(); i = i + 1) {
+        thresholds.add((values[i] + values[i + 1]) / 2);
+    }
+    return thresholds;
+}
+
+splitRows = func(rows, feature, threshold) {
+    left = [];
+    right = [];
+    for (i = 0; i < rows.count(); i = i + 1) {
+        value = this.utils.asNumber(rows[i].features[feature], 0);
+        if (value <= threshold) left.add(rows[i]);
+        else right.add(rows[i]);
+    }
+    return {left: left, right: right};
+}
+
+bestSplit = func(rows, kind) {
+    base = this.impurity(rows, kind);
+    names = this.featureNames(rows);
+    best = {gain: 0, feature: "", threshold: 0, left: [], right: []};
+
+    for (ni = 0; ni < names.count(); ni = ni + 1) {
+        name = names[ni];
+        thresholds = this.thresholdsFor(rows, name);
+        for (ti = 0; ti < thresholds.count(); ti = ti + 1) {
+            threshold = thresholds[ti];
+            parts = this.splitRows(rows, name, threshold);
+            if (parts.left.count() == 0 || parts.right.count() == 0) continue;
+            weighted = (parts.left.count() * this.impurity(parts.left, kind) + parts.right.count() * this.impurity(parts.right, kind)) / rows.count();
+            gain = base - weighted;
+            if (gain > best.gain) {
+                best = {
+                    gain: gain,
+                    feature: name,
+                    threshold: threshold,
+                    left: parts.left,
+                    right: parts.right
+                };
+            }
+        }
+    }
+    return best;
+}
+
+leaf = func(rows, kind, depth) {
+    prediction = kind == "numeric" ? this.meanTarget(rows) : this.majorityTarget(rows).value;
+    return {
+        leaf: true,
+        depth: depth,
+        samples: rows.count(),
+        prediction: prediction
+    };
+}
+
+trainNode = func(rows, kind, depth, config) {
+    if (rows.count() == 0) return this.leaf(rows, kind, depth);
+    maxDepth = defined(config.maxDepth) ? config.maxDepth : 4;
+    minSamples = defined(config.minSamples) ? config.minSamples : 2;
+    minGain = defined(config.minGain) ? config.minGain : 0.00001;
+    if (depth >= maxDepth || rows.count() <= minSamples) return this.leaf(rows, kind, depth);
+
+    split = this.bestSplit(rows, kind);
+    if (split.gain <= minGain) return this.leaf(rows, kind, depth);
+
+    return {
+        leaf: false,
+        depth: depth,
+        samples: rows.count(),
+        prediction: kind == "numeric" ? this.meanTarget(rows) : this.majorityTarget(rows).value,
+        feature: split.feature,
+        threshold: split.threshold,
+        gain: split.gain,
+        left: this.trainNode(split.left, kind, depth + 1, config),
+        right: this.trainNode(split.right, kind, depth + 1, config)
+    };
+}
+
+train = func(trainingRows, config) {
+    kind = this.targetKind(trainingRows);
+    return {
+        kind: kind,
+        root: this.trainNode(trainingRows, kind, 0, defined(config) ? config : {})
+    };
+}
+
+predictNode = func(node, features, path) {
+    if (node.leaf) {
+        return {
+            value: node.prediction,
+            path: path,
+            samples: node.samples,
+            depth: node.depth
+        };
+    }
+    value = this.utils.asNumber(features[node.feature], 0);
+    direction = value <= node.threshold ? "left" : "right";
+    path.add({
+        feature: node.feature,
+        value: value,
+        threshold: node.threshold,
+        direction: direction,
+        gain: node.gain
+    });
+    return this.predictNode(direction == "left" ? node.left : node.right, features, path);
+}
+
+predict = func(model, features) {
+    return this.predictNode(model.root, features, []);
+}

@@ -1,0 +1,158 @@
+// Multi-stream mutual prediction.
+//
+// Train one decision-tree model per stream, using all other streams as features.
+// At prediction time, supply whatever streams you know; missing ones are filled
+// with training means so prediction still works.
+//
+// Training row shape:
+//   { temp: 22.5, humidity: 68, rain_chance: 0.4, ... }
+// (just a flat object — no "features" wrapper needed here)
+//
+// Usage:
+//   sys = streams.train(streamNames, rows, config);
+//   result = streams.predict(sys, { temp: 25, humidity: 70 });   // predicts rain_chance etc.
+//   result = streams.predictAll(sys, { temp: 25, humidity: 70 }); // predicts all streams
+
+utils   = import("./src/utils.ns");
+tree    = import("./src/tree.ns");
+tabular = import("./src/tabular.ns");
+
+defaultConfig = func() {
+    return {maxDepth: 6, minSamples: 2, minGain: 0.00001};
+}
+
+// ── helpers ────────────────────────────────────────────────────────────────────
+
+// Compute the training mean (numeric) or most-common value (categorical) for a stream.
+streamDefault = func(rows, stream) {
+    numericTotal = 0;
+    numericCount = 0;
+    categoryCounts = {};
+    bestCatValue   = null;
+    bestCatCount   = -1;
+
+    for (i = 0; i < rows.count(); i = i + 1) {
+        v = rows[i][stream];
+        if (this.utils.isNumber(v)) {
+            numericTotal = numericTotal + v;
+            numericCount = numericCount + 1;
+        } else if (defined(v) && v != null) {
+            k = this.utils.keyOf(v);
+            if (!defined(categoryCounts[k])) categoryCounts[k] = {n: 0, value: v};
+            categoryCounts[k].n = categoryCounts[k].n + 1;
+            if (categoryCounts[k].n > bestCatCount) {
+                bestCatCount = categoryCounts[k].n;
+                bestCatValue = v;
+            }
+        }
+    }
+
+    if (numericCount > 0) return numericTotal / numericCount;
+    if (bestCatValue != null) return bestCatValue;
+    return 0;
+}
+
+// Build feature+target rows for a single target stream.
+buildTrainingRows = func(streamNames, target, rawRows) {
+    rows = [];
+    for (i = 0; i < rawRows.count(); i = i + 1) {
+        row      = rawRows[i];
+        features = {};
+        for (si = 0; si < streamNames.count(); si = si + 1) {
+            s = streamNames[si];
+            if (s == target) continue;
+            features[s] = defined(row[s]) ? row[s] : 0;
+        }
+        rows.add({features: features, target: row[target]});
+    }
+    return rows;
+}
+
+// ── public API ─────────────────────────────────────────────────────────────────
+
+// Train one model per stream.
+// streamNames: array of stream name strings, e.g. ["temp", "humidity", "rain_chance"]
+// rows:        array of flat observation objects, e.g. [{temp:22, humidity:68, rain_chance:0.4}, ...]
+// config:      optional { maxDepth, minSamples, minGain }
+train = func(streamNames, rows, config) {
+    cfg     = defined(config) ? config : this.defaultConfig();
+    models  = {};
+    defaults = {};
+
+    for (si = 0; si < streamNames.count(); si = si + 1) {
+        target      = streamNames[si];
+        trainingRows = this.buildTrainingRows(streamNames, target, rows);
+        models[target]   = this.tabular.train(trainingRows, cfg);
+        defaults[target] = this.streamDefault(rows, target);
+    }
+
+    return {
+        streamNames: this.utils.copyArray(streamNames),
+        models:      models,
+        defaults:    defaults,
+        config:      cfg
+    };
+}
+
+// Fill in any missing streams using training defaults so prediction is always possible.
+fillDefaults = func(system, knownValues) {
+    filled = {};
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        s = system.streamNames[si];
+        if (defined(knownValues[s]) && knownValues[s] != null) {
+            filled[s] = knownValues[s];
+        } else {
+            filled[s] = system.defaults[s];
+        }
+    }
+    return filled;
+}
+
+// Predict a specific target stream from the provided (possibly partial) observation.
+// knownValues: flat object with whatever streams you have; missing ones use training defaults.
+predict = func(system, knownValues, target) {
+    features = {};
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        s = system.streamNames[si];
+        if (s == target) continue;
+        v = defined(knownValues[s]) ? knownValues[s] : system.defaults[s];
+        features[s] = v;
+    }
+    result = this.tabular.predict(system.models[target], features);
+    return {
+        stream:        target,
+        value:         result.value,
+        support:       result.support,
+        depth:         result.depth,
+        kind:          result.kind,
+        probabilities: result.probabilities,
+        path:          result.path
+    };
+}
+
+// Predict ALL streams from the provided (possibly partial) observation.
+// Streams that are already known in knownValues are still predicted
+// (useful to see how well the model reconstructs a known value).
+predictAll = func(system, knownValues) {
+    results = {};
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        target = system.streamNames[si];
+        results[target] = this.predict(system, knownValues, target);
+    }
+    return results;
+}
+
+// Feature importance for a specific target stream.
+importance = func(system, target) {
+    return this.tabular.importance(system.models[target]);
+}
+
+// Feature importance for all streams — returns { stream: { feature: score } }
+allImportance = func(system) {
+    out = {};
+    for (si = 0; si < system.streamNames.count(); si = si + 1) {
+        s = system.streamNames[si];
+        out[s] = this.importance(system, s);
+    }
+    return out;
+}

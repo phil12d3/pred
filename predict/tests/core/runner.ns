@@ -1,0 +1,26 @@
+// Attribute-driven test runner for ns modules.
+// Loads test modules, finds functions marked with [test], and executes them.
+
+run = func(framework, modulePaths) {
+    t = framework.create();
+
+    runModule = func(path) {
+        module = import(path);
+        names = membersWithAttribute(module, "test");
+        for (i = 0; i < names.count(); i = i + 1) {
+            name = names[i];
+            try {
+                module[name](t);
+            } catch(ex) {
+                t.fail(path + "::" + name + " threw " + (defined(ex.message) ? ex.message : stringify(ex)));
+            }
+        }
+    };
+
+    for (mi = 0; mi < modulePaths.count(); mi = mi + 1) {
+        runModule(modulePaths[mi]);
+    }
+
+    ok = t.summary();
+    if (!ok) exit(1);
+}

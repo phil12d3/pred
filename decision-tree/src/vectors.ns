@@ -1,0 +1,72 @@
+// Vector / embedding input classifier and regressor.
+// Training row shape: { dims: [n0, n1, ...], target: value }
+// Each dimension is mapped to a named feature "dim0", "dim1", etc.
+// Useful for pre-computed embeddings, sensor vectors, or any dense numeric array.
+
+utils = import("./src/utils.ns");
+tree  = import("./src/tree.ns");
+
+defaultConfig = func() {
+    return {maxDepth: 6, minSamples: 2, minGain: 0.00001};
+}
+
+// Map a numeric array to a named feature object.
+dimsToFeatures = func(dims) {
+    features = {};
+    for (i = 0; i < dims.count(); i = i + 1) {
+        features["dim" + i] = this.utils.asNumber(dims[i], 0);
+    }
+    return features;
+}
+
+// Train a model on vector inputs.
+// rows:   array of { dims: [...], target: value }
+// config: { maxDepth, minSamples, minGain }
+train = func(rows, config) {
+    cfg = defined(config) ? config : this.defaultConfig();
+    trainingRows = [];
+    for (i = 0; i < rows.count(); i = i + 1) {
+        trainingRows.add({
+            features: this.dimsToFeatures(rows[i].dims),
+            target:   rows[i].target
+        });
+    }
+    model = this.tree.train(trainingRows, cfg);
+    return {
+        model:  model,
+        config: cfg,
+        kind:   model.kind
+    };
+}
+
+// Predict for a single dimension array.
+predict = func(system, dims) {
+    features = this.dimsToFeatures(dims);
+    result   = this.tree.predict(system.model, features);
+    support  = 0;
+    if (defined(system.model.root.samples) && system.model.root.samples > 0) {
+        support = result.samples / system.model.root.samples;
+    }
+    return {
+        value:         result.value,
+        support:       support,
+        depth:         result.depth,
+        path:          result.path,
+        probabilities: result.probabilities,
+        kind:          system.kind
+    };
+}
+
+// Predict for a list of dimension arrays.
+predictBatch = func(system, dimList) {
+    results = [];
+    for (i = 0; i < dimList.count(); i = i + 1) {
+        results.add(this.predict(system, dimList[i]));
+    }
+    return results;
+}
+
+// Which dimensions drove the splits most?
+dimensionImportance = func(system) {
+    return this.tree.featureImportance(system.model);
+}

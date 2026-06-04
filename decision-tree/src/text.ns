@@ -1,0 +1,161 @@
+// Text classification using a decision tree on bag-of-words features.
+// Training row shape: { text: "...", label: "some category" }
+// The vocabulary is built from training data; each word becomes a binary feature.
+
+utils = import("./src/utils.ns");
+tree  = import("./src/tree.ns");
+
+defaultConfig = func() {
+    return {
+        maxVocab:   500,   // maximum vocabulary size (top words by frequency)
+        minCount:   1,     // minimum document frequency for a word to enter vocabulary
+        maxDepth:   6,
+        minSamples: 2,
+        minGain:    0.00001
+    };
+}
+
+// Tokenize a string into an array of words.
+// Splits on any non-alphanumeric character; keeps only non-empty tokens.
+tokenize = func(text) {
+    words = [];
+    if (!defined(text) || text == null) return words;
+    s = stringify(text);
+    word = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        isAlphaNum = (ch >= "a" && ch <= "z") ||
+                     (ch >= "A" && ch <= "Z") ||
+                     (ch >= "0" && ch <= "9");
+        if (isAlphaNum) {
+            word = word + ch;
+        } else {
+            if (word != "") {
+                words.add(word);
+                word = "";
+            }
+        }
+    }
+    if (word != "") words.add(word);
+    return words;
+}
+
+// Count word frequencies across all training documents.
+buildWordCounts = func(textRows) {
+    counts = {};
+    for (i = 0; i < textRows.count(); i = i + 1) {
+        words = this.tokenize(textRows[i].text);
+        seen  = {};
+        for (j = 0; j < words.count(); j = j + 1) {
+            w = words[j];
+            if (defined(seen[w])) continue;
+            seen[w] = true;
+            if (!defined(counts[w])) counts[w] = 0;
+            counts[w] = counts[w] + 1;
+        }
+    }
+    return counts;
+}
+
+// Select vocabulary: top maxVocab words by document frequency.
+selectVocab = func(wordCounts, config) {
+    // collect entries
+    entries = [];
+    foreach(w in wordCounts.props) {
+        entries.add({word: w, count: wordCounts[w]});
+    }
+    // sort descending by count
+    entries = entries.sort(func(ai, av, bi, bv) => bv.count - av.count);
+    vocab   = [];
+    limit   = defined(config.maxVocab) ? config.maxVocab : 500;
+    minCnt  = defined(config.minCount) ? config.minCount : 1;
+    for (i = 0; i < entries.count() && vocab.count() < limit; i = i + 1) {
+        if (entries[i].count >= minCnt) vocab.add(entries[i].word);
+    }
+    return vocab;
+}
+
+// Convert text to a feature object using the vocabulary.
+// Feature name: "w.<word>", value: 1 if word present, else 0.
+textToFeatures = func(text, vocab) {
+    words   = this.tokenize(text);
+    present = {};
+    for (i = 0; i < words.count(); i = i + 1) present[words[i]] = true;
+    features = {};
+    for (i = 0; i < vocab.count(); i = i + 1) {
+        w = vocab[i];
+        features["w." + w] = defined(present[w]) ? 1 : 0;
+    }
+    return features;
+}
+
+// Train a text classifier.
+// textRows: array of { text: "...", label: "category" }
+// config:   { maxVocab, minCount, maxDepth, minSamples, minGain }
+train = func(textRows, config) {
+    cfg        = defined(config) ? config : this.defaultConfig();
+    wordCounts = this.buildWordCounts(textRows);
+    vocab      = this.selectVocab(wordCounts, cfg);
+
+    rows = [];
+    for (i = 0; i < textRows.count(); i = i + 1) {
+        features = this.textToFeatures(textRows[i].text, vocab);
+        rows.add({features: features, target: textRows[i].label});
+    }
+
+    treeConfig = {
+        maxDepth:   defined(cfg.maxDepth)   ? cfg.maxDepth   : 6,
+        minSamples: defined(cfg.minSamples) ? cfg.minSamples : 2,
+        minGain:    defined(cfg.minGain)    ? cfg.minGain    : 0.00001
+    };
+    model = this.tree.train(rows, treeConfig);
+
+    return {
+        model:      model,
+        vocab:      vocab,
+        config:     cfg,
+        vocabSize:  vocab.count()
+    };
+}
+
+// Classify a single text string.
+classify = func(system, text) {
+    features = this.textToFeatures(text, system.vocab);
+    result   = this.tree.predict(system.model, features);
+    support  = 0;
+    if (defined(system.model.root.samples) && system.model.root.samples > 0) {
+        support = result.samples / system.model.root.samples;
+    }
+    return {
+        label:         result.value,
+        support:       support,
+        depth:         result.depth,
+        probabilities: result.probabilities,
+        path:          result.path
+    };
+}
+
+// Classify a list of strings.
+classifyBatch = func(system, texts) {
+    results = [];
+    for (i = 0; i < texts.count(); i = i + 1) {
+        results.add(this.classify(system, texts[i]));
+    }
+    return results;
+}
+
+// Top words driving splits (by accumulated gain).
+topWords = func(system, n) {
+    importance = this.tree.featureImportance(system.model);
+    entries = [];
+    foreach(f in importance.props) {
+        entries.add({feature: f, score: importance[f]});
+    }
+    entries = entries.sort(func(ai, av, bi, bv) => bv.score - av.score);
+    limit = defined(n) ? n : 10;
+    top = [];
+    for (i = 0; i < entries.count() && i < limit; i = i + 1) {
+        top.add(entries[i]);
+    }
+    return top;
+}

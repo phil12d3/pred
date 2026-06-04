@@ -1,0 +1,75 @@
+predict = import("./predict.ns");
+
+rows = [];
+mode = "idle";
+for (i = 0; i < 12; i = i + 1) {
+    a = i % 8;
+    b = i >= 2 ? ((i - 2) % 8) : 0;
+    if (a > 5) mode = "active";
+    if (a < 2) mode = "idle";
+    rows.add({
+        A: a,
+        B: b,
+        C: mode
+    });
+}
+
+history = predict.history.fromRows(["A", "B", "C"], rows);
+system = predict.streams.train(["A", "B", "C"], rows, {
+    feature: {lags: 1, rolling: 2, pattern: 2},
+    tree: {maxDepth: 2, minSamples: 3}
+});
+
+current = predict.history.window(history, 5);
+forecast = predict.streams.forecast(system, current);
+
+printline("History:");
+printline("idx | A | B | C");
+for (i = 0; i < current.rows.count(); i = i + 1) {
+    row = current.rows[i];
+    printline(i, " | ", row.A, " | ", row.B, " | ", row.C);
+}
+
+printline("");
+printline("Next state forecast:");
+printline("stream | value | support | depth");
+summary = predict.explain.summarizePrediction(forecast.predictions);
+for (i = 0; i < summary.count(); i = i + 1) {
+    item = summary[i];
+    printline(item.stream, " | ", item.value, " | ", forecast.predictions[item.stream].support, " | ", forecast.predictions[item.stream].depth);
+}
+printline("agreement score | ", forecast.consistency.score, " | comparisons | ", forecast.consistency.comparisons);
+
+printline("");
+printline("Cross-check table:");
+printline("source | from | to | target | direct | counterfactual | match");
+for (i = 0; i < forecast.consistency.report.count(); i = i + 1) {
+    item = forecast.consistency.report[i];
+    for (j = 0; j < item.effects.count(); j = j + 1) {
+        effect = item.effects[j];
+        printline(item.source, " | ", item.from, " | ", item.to, " | ", effect.target, " | ", effect.direct, " | ", effect.counterfactual, " | ", effect.matches);
+    }
+}
+
+influence = predict.streams.influence(system, current, {A: 6, B: 9, C: "active"});
+printline("");
+printline("Counterfactual influence:");
+influenceRows = predict.explain.summarizeInfluence(influence);
+for (i = 0; i < influenceRows.count(); i = i + 1) {
+    row = influenceRows[i];
+    printline("- changing ", row.source, " from ", row.from, " to ", row.to, " most affected ", row.strongestTarget, " by ", row.strongestDelta);
+}
+
+printline("");
+printline("Backtest (walk-forward, minTrainSize=4):");
+printline("stream | type | metric | value | folds");
+bt = predict.streams.backtestRun(system, rows, 4, 0);
+for (si = 0; si < ["A", "B", "C"].count(); si = si + 1) {
+    sname = ["A", "B", "C"][si];
+    s = bt.stats[sname];
+    if (s.type == "numeric") {
+        printline(sname, " | numeric | MAE | ", s.mae, " | ", s.folds);
+    } else {
+        printline(sname, " | categorical | accuracy | ", s.accuracy, " | ", s.folds);
+    }
+}

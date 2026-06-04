@@ -1,0 +1,13 @@
+// Decision-tree library — umbrella entry point.
+// Usage in your scripts:
+//   dt = import("path/to/decision-tree/index.ns");
+//   system = dt.tabular.train(rows, config);
+//   result = dt.tabular.predict(system, features);
+
+tabular  = import("./src/tabular.ns");
+streams  = import("./src/streams.ns");
+text     = import("./src/text.ns");
+vectors  = import("./src/vectors.ns");
+evaluate = import("./src/evaluate.ns");
+tree     = import("./src/tree.ns");
+utils    = import("./src/utils.ns");

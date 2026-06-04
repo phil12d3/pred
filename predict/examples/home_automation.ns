@@ -1,0 +1,79 @@
+// Home automation example.
+// Streams: temperature (C), humidity (%), occupancy (yes/no), hvac (heating/cooling/off).
+// The system learns that when temperature drops and occupancy is yes, HVAC switches to heating.
+
+prediction = import("./src/prediction.ns");
+
+rows = [];
+rows.add({temp: 21, humidity: 45, occupancy: "no",  hvac: "off"});
+rows.add({temp: 20, humidity: 46, occupancy: "no",  hvac: "off"});
+rows.add({temp: 19, humidity: 47, occupancy: "yes", hvac: "heating"});
+rows.add({temp: 19, humidity: 48, occupancy: "yes", hvac: "heating"});
+rows.add({temp: 20, humidity: 47, occupancy: "yes", hvac: "heating"});
+rows.add({temp: 21, humidity: 46, occupancy: "yes", hvac: "off"});
+rows.add({temp: 22, humidity: 45, occupancy: "yes", hvac: "off"});
+rows.add({temp: 23, humidity: 44, occupancy: "yes", hvac: "cooling"});
+rows.add({temp: 24, humidity: 43, occupancy: "yes", hvac: "cooling"});
+rows.add({temp: 23, humidity: 44, occupancy: "yes", hvac: "cooling"});
+rows.add({temp: 22, humidity: 45, occupancy: "yes", hvac: "off"});
+rows.add({temp: 21, humidity: 46, occupancy: "no",  hvac: "off"});
+rows.add({temp: 20, humidity: 47, occupancy: "no",  hvac: "off"});
+rows.add({temp: 19, humidity: 48, occupancy: "yes", hvac: "heating"});
+rows.add({temp: 19, humidity: 48, occupancy: "yes", hvac: "heating"});
+
+streamNames = ["temp", "humidity", "occupancy", "hvac"];
+
+history = prediction.history.fromRows(streamNames, rows);
+system = prediction.predictor.train(history, {
+    feature: {lags: 2, rolling: 3, pattern: 3},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+
+current = prediction.history.window(history, 6);
+forecast = prediction.predictor.predictNextState(system, current);
+
+printline("=== Home Automation Predictor ===");
+printline("");
+printline("Recent history:");
+printline("idx | temp | humidity | occupancy | hvac");
+for (i = 0; i < current.rows.count(); i = i + 1) {
+    row = current.rows[i];
+    printline(i, " | ", row.temp, " | ", row.humidity, " | ", row.occupancy, " | ", row.hvac);
+}
+
+printline("");
+printline("Next state forecast:");
+printline("stream | value | support | depth");
+summary = prediction.explain.summarizePrediction(forecast.predictions);
+for (i = 0; i < summary.count(); i = i + 1) {
+    item = summary[i];
+    p = forecast.predictions[item.stream];
+    printline(item.stream, " | ", item.value, " | ", p.support, " | ", p.depth);
+}
+printline("consistency | ", forecast.consistency.score);
+
+printline("");
+printline("Counterfactual: what if occupancy changes to 'no'?");
+influence = prediction.predictor.counterfactualInfluence(system, current, {occupancy: "no"});
+influenceRows = prediction.explain.summarizeInfluence(influence);
+for (i = 0; i < influenceRows.count(); i = i + 1) {
+    row = influenceRows[i];
+    printline("- changing ", row.source, " from ", row.from, " to ", row.to, " most affected ", row.strongestTarget, " by ", row.strongestDelta);
+}
+
+printline("");
+printline("Backtest (walk-forward):");
+printline("stream | type | metric | value | folds");
+bt = prediction.backtest.run(streamNames, rows, {
+    feature: {lags: 2, rolling: 3, pattern: 3},
+    tree: {maxDepth: 3, minSamples: 2}
+}, 5, 0);
+for (si = 0; si < streamNames.count(); si = si + 1) {
+    sname = streamNames[si];
+    s = bt.stats[sname];
+    if (s.type == "numeric") {
+        printline(sname, " | numeric | MAE | ", s.mae, " | ", s.folds);
+    } else {
+        printline(sname, " | categorical | accuracy | ", s.accuracy, " | ", s.folds);
+    }
+}

@@ -1,0 +1,19 @@
+[test]
+text_classifier_predicts_and_exposes_top_words = func(t) {
+    dt = import("./des-tree.ns");
+
+    rows = [
+        {text: "love this product works great", label: "positive"},
+        {text: "excellent quality and fast shipping", label: "positive"},
+        {text: "terrible quality do not buy", label: "negative"},
+        {text: "bad support broken on arrival", label: "negative"}
+    ];
+
+    system = dt.text.train(rows, {maxVocab: 50, maxDepth: 5, minSamples: 1});
+    result = dt.text.classify(system, "great quality and excellent support");
+    top = dt.text.topWords(system, 3);
+
+    t.truthy(defined(result.label), "text classifier returns label");
+    t.truthy(result.support > 0, "text classifier returns support");
+    t.truthy(top.count() > 0, "text classifier returns top discriminating words");
+};

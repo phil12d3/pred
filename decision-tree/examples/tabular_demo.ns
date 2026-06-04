@@ -1,0 +1,86 @@
+// Tabular demo: classification + regression on simple synthetic data.
+//
+// Classification task: predict "risk" level (low / medium / high) from age, income, debt.
+// Regression task:     predict numeric "score" from the same features.
+
+dt = import("./des-tree.ns");
+
+// ── Classification ────────────────────────────────────────────────────────────
+
+classRows = [
+    {features: {age: 22, income: 28000, debt: 12000}, target: "high"},
+    {features: {age: 45, income: 85000, debt: 5000},  target: "low"},
+    {features: {age: 31, income: 42000, debt: 18000}, target: "medium"},
+    {features: {age: 55, income: 95000, debt: 2000},  target: "low"},
+    {features: {age: 28, income: 31000, debt: 20000}, target: "high"},
+    {features: {age: 38, income: 61000, debt: 9000},  target: "medium"},
+    {features: {age: 50, income: 78000, debt: 3000},  target: "low"},
+    {features: {age: 24, income: 26000, debt: 15000}, target: "high"},
+    {features: {age: 34, income: 55000, debt: 11000}, target: "medium"},
+    {features: {age: 60, income: 105000, debt: 1000}, target: "low"},
+    {features: {age: 29, income: 33000, debt: 22000}, target: "high"},
+    {features: {age: 41, income: 68000, debt: 7000},  target: "medium"},
+    {features: {age: 48, income: 90000, debt: 4000},  target: "low"},
+    {features: {age: 26, income: 29000, debt: 17000}, target: "high"},
+    {features: {age: 36, income: 52000, debt: 13000}, target: "medium"}
+];
+
+classSystem = dt.tabular.train(classRows, {maxDepth: 4, minSamples: 2});
+
+printline("=== Classification: Risk Level ===");
+printline("kind : ", classSystem.kind);
+printline("");
+
+testCases = [
+    {age: 27, income: 30000, debt: 19000},
+    {age: 52, income: 88000, debt: 4000},
+    {age: 35, income: 58000, debt: 10000}
+];
+
+for (i = 0; i < testCases.count(); i = i + 1) {
+    tc = testCases[i];
+    r  = dt.tabular.predict(classSystem, tc);
+    printline("age=", tc.age, " income=", tc.income, " debt=", tc.debt,
+              "  → ", r.value, "  support=", r.support, "  depth=", r.depth);
+}
+
+// Evaluate on held-out 20%
+split = dt.evaluate.holdout(classRows, 0.2);
+results = [];
+for (i = 0; i < split.test.count(); i = i + 1) {
+    pred = dt.tabular.predict(classSystem, split.test[i].features);
+    results.add({predicted: pred.value, actual: split.test[i].target});
+}
+printline("");
+dt.evaluate.report("Holdout accuracy", results, "classification");
+
+// Feature importance
+imp = dt.tabular.importance(classSystem);
+printline("");
+printline("Feature importance:");
+foreach(f in imp.props) {
+    printline("  ", f, " : ", imp[f]);
+}
+
+// ── Regression ────────────────────────────────────────────────────────────────
+
+regRows = [];
+for (i = 0; i < 20; i = i + 1) {
+    x = i * 1.5;
+    y = x * 2.3 + (i % 3) * 4 - 5;
+    regRows.add({features: {x: x, group: i % 4}, target: y});
+}
+
+regSystem = dt.tabular.train(regRows, {maxDepth: 5, minSamples: 2});
+
+printline("");
+printline("=== Regression: y = f(x, group) ===");
+printline("kind : ", regSystem.kind);
+
+regSplit = dt.evaluate.holdout(regRows, 0.2);
+regResults = [];
+for (i = 0; i < regSplit.test.count(); i = i + 1) {
+    pred = dt.tabular.predict(regSystem, regSplit.test[i].features);
+    regResults.add({predicted: pred.value, actual: regSplit.test[i].target});
+}
+dt.evaluate.report("Regression holdout", regResults, "regression");
