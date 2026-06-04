@@ -38,6 +38,33 @@ toLowerText = func(text) {
         else if (ch == "X") ch = "x";
         else if (ch == "Y") ch = "y";
         else if (ch == "Z") ch = "z";
+            // Accented Latin characters (Western European scripts).
+            // ns processes strings as UTF-8 bytes, so accented chars are 2-byte
+            // sequences. We combine the current byte with the next to reconstruct
+            // the original character, then fold it to its ASCII base equivalent.
+            else if (i + 1 < s.length) {
+                pair = ch + s[i + 1];
+                if (pair == "À" || pair == "Á" || pair == "Â" || pair == "Ã" ||
+                    pair == "Ä" || pair == "Å" || pair == "à" || pair == "á" ||
+                    pair == "â" || pair == "ã" || pair == "ä" || pair == "å" ||
+                    pair == "Æ" || pair == "æ") { ch = "a"; i = i + 1; }
+                else if (pair == "Ç" || pair == "ç") { ch = "c"; i = i + 1; }
+                else if (pair == "È" || pair == "É" || pair == "Ê" || pair == "Ë" ||
+                         pair == "è" || pair == "é" || pair == "ê" || pair == "ë") { ch = "e"; i = i + 1; }
+                else if (pair == "Ì" || pair == "Í" || pair == "Î" || pair == "Ï" ||
+                         pair == "ì" || pair == "í" || pair == "î" || pair == "ï") { ch = "i"; i = i + 1; }
+                else if (pair == "Ñ" || pair == "ñ") { ch = "n"; i = i + 1; }
+                else if (pair == "Ò" || pair == "Ó" || pair == "Ô" || pair == "Õ" ||
+                         pair == "Ö" || pair == "Ø" || pair == "ò" || pair == "ó" ||
+                         pair == "ô" || pair == "õ" || pair == "ö" || pair == "ø") { ch = "o"; i = i + 1; }
+                else if (pair == "Ù" || pair == "Ú" || pair == "Û" || pair == "Ü" ||
+                         pair == "ù" || pair == "ú" || pair == "û" || pair == "ü") { ch = "u"; i = i + 1; }
+                else if (pair == "Ý" || pair == "Ÿ" || pair == "ý" || pair == "ÿ") { ch = "y"; i = i + 1; }
+                else if (pair == "Œ" || pair == "œ") { ch = "o"; i = i + 1; }
+                else if (pair == "Š" || pair == "š") { ch = "s"; i = i + 1; }
+                else if (pair == "Ž" || pair == "ž") { ch = "z"; i = i + 1; }
+                else if (pair == "ß") { ch = "s"; i = i + 1; }
+            }
         out = out + ch;
     }
     return out;

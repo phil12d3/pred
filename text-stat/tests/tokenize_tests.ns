@@ -1,0 +1,48 @@
+[test]
+accented_french_tokens = func(t) {
+    ts = import("./text-stat.ns");
+
+    toks = ts.tokenize.tokens("Les tritons sont des amphibiens.");
+    t.truthy(toks.count() == 5, "French ASCII sentence tokenizes to 5 words");
+    t.equal(toks[0], "les", "first token lowercased correctly");
+};
+
+[test]
+accent_folding_uppercase = func(t) {
+    ts = import("./text-stat.ns");
+
+    // É folds to e, so "Éléphants" becomes "elephants" as one token
+    toks = ts.tokenize.tokens("Éléphants");
+    t.truthy(toks.count() == 1, "accented word becomes one token after folding");
+    t.equal(toks[0], "elephants", "É and é fold to e, giving elephants");
+};
+
+[test]
+accent_folding_common_chars = func(t) {
+    ts = import("./text-stat.ns");
+
+    toks = ts.tokenize.tokens("café naïve résumé");
+    t.truthy(toks.count() == 3, "three accent-folded words");
+    t.equal(toks[0], "cafe", "é folds to e");
+    t.equal(toks[1], "naive", "i folds from ï");
+    t.equal(toks[2], "resume", "é folds to e");
+};
+
+[test]
+accent_folding_semantic = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from("Les tritons sont des amphibiens. Les grenouilles sont des amphibiens. Les salamandres sont des amphibiens.");
+    rels = ts.semantic.relationships(corpus, "amphibiens", 3);
+    t.equal(defined(rels.hypernyms), true, "French corpus produces relationship map");
+    t.equal(defined(rels.hyponyms), true, "amphibiens relationship result includes hyponyms field");
+    t.equal(defined(rels.peers), true, "amphibiens relationship result includes peers field");
+};
+
+[test]
+accent_folding_toLower_direct = func(t) {
+    ts = import("./text-stat.ns");
+
+    result = ts.tokenize.toLowerText("Éléphants");
+    t.equal(result, "elephants", "toLowerText folds É and é to e");
+};

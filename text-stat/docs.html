@@ -92,6 +92,27 @@
       color: #102a43;
     }
 
+    .diagram {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+
+    .diagram svg {
+      width: 100%;
+      min-width: 760px;
+      height: auto;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+    }
+
+    .diagram text {
+      fill: #102a43;
+      font-size: 12px;
+    }
+
     .prop {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -134,6 +155,7 @@
       <h1>text-stat Complete Documentation</h1>
       <p class="muted">Deep reference guide for every public function in the text-stat module, including return shapes, practical usage advice, and interpretation notes.</p>
       <p class="muted">This document is intentionally detailed. It explains not only what each function returns, but also why you would use it and what to watch out for.</p>
+      <p class="muted"><strong>New:</strong> The <code>semantic</code> namespace provides corpus-driven relationship learning — hypernyms, hyponyms, peers, attributes, behaviors, connectors, clustering, and taxonomy — with no LLMs and no hardcoded word lists.</p>
     </section>
 
     <section class="section">
@@ -146,8 +168,9 @@
           <li>4. tokenize functions (text cleanup and tokenization)</li>
           <li>5. stats functions (analysis and reports)</li>
           <li>6. utility functions (internal helpers)</li>
-          <li>7. End-to-end usage patterns</li>
-          <li>8. Interpretation notes and caveats</li>
+          <li>7. semantic functions (relationship learning)</li>
+          <li>8. End-to-end usage patterns</li>
+          <li>9. Interpretation notes and caveats</li>
         </ul>
       </div>
     </section>
@@ -165,20 +188,22 @@
         <li>Word-form similarity scores</li>
         <li>Stub/prefix groupings for related word families</li>
         <li>A combined report object for dashboards and pipelines</li>
+        <li>Corpus-driven semantic relationships: hypernyms, hyponyms, peers, attributes, behaviors, connectors, clustering, and taxonomy</li>
       </ul>
 
       <div class="note">
-        <strong>Important:</strong> Similarity in this module is spelling/form similarity, not semantic meaning. For example, "analysis" and "analyst" are close by character edits, but "doctor" and "physician" may score low even though they are semantically related.
+        <strong>Important:</strong> The <code>stats</code> similarity function is spelling/form similarity only. For semantic relationships learned from meaning patterns in text, use the <code>semantic</code> namespace instead.
       </div>
     </section>
 
     <section class="section">
       <h2>2) Import and Module Layout</h2>
-      <p>The umbrella import file is text-stat.ns and exposes three namespaces:</p>
+      <p>The umbrella import file is text-stat.ns and exposes four namespaces:</p>
       <ul>
         <li>tokenize</li>
         <li>stats</li>
         <li>utils</li>
+        <li>semantic</li>
       </ul>
 
       <div class="code"><code>ts = import("./text-stat.ns");
@@ -186,12 +211,15 @@
 // Examples:
 words = ts.tokenize.tokens("Alpha beta, beta.");
 report = ts.stats.report(["alpha beta", "beta gamma"]);
+corpus = ts.stats.from("Poodles are dogs. Dogs are animals.");
+rels = ts.semantic.relationships(corpus, "poodles", 5);
 </code></div>
 
       <p>Namespace roles:</p>
       <div class="prop"><span class="name">tokenize.*</span><br>Functions to normalize text and turn it into token arrays.</div>
       <div class="prop"><span class="name">stats.*</span><br>Main analytics API. This is where most users spend their time.</div>
       <div class="prop"><span class="name">utils.*</span><br>Shared helper functions used internally (sorting, numeric helpers).</div>
+      <div class="prop"><span class="name">semantic.*</span><br>Corpus-driven semantic learning. Discovers hypernyms, hyponyms, peers, attributes, behaviors, connectors, clusters, and taxonomy — all from pattern evidence in the text alone.</div>
     </section>
 
     <section class="section">
@@ -209,6 +237,15 @@ report = ts.stats.report(["alpha beta", "beta gamma"]);
       <div class="prop"><span class="name">bigram row</span><br>{ pair: string, count: number }</div>
       <div class="prop"><span class="name">neighbor row</span><br>{ word: string, count: number }</div>
       <div class="prop"><span class="name">stub group row</span><br>{ group: string, total: number, words: [ {word, count}, ... ] }</div>
+
+      <h3>3.3 Semantic Return Shapes</h3>
+      <div class="prop"><span class="name">specificity row</span><br>{ word, specificity, numNeighbors, totalCooc, segmentRatio, balance, connectorLike }</div>
+      <div class="prop"><span class="name">relation row (hypernym/hyponym/peer)</span><br>{ word, score, specificity, overlap, direction }</div>
+      <div class="prop"><span class="name">attribute/behavior row</span><br>{ word, score }</div>
+      <div class="prop"><span class="name">connector row</span><br>{ word, score, hubRatio, segmentRatio, neighborCount }</div>
+      <div class="prop"><span class="name">relationships result</span><br>{ word, hypernyms, hyponyms, peers, attributes, behaviors, connectors, connectorNeighbors }</div>
+      <div class="prop"><span class="name">taxonomy result</span><br>{ generalToSpecific: [ {word, specificity}, ... ], wordCount }</div>
+      <div class="prop"><span class="name">cluster</span><br>An array of word strings grouped by co-occurrence similarity and shared relation type.</div>
 
       <h3>3.3 Full Report Shape</h3>
       <div class="code"><code>{
@@ -400,6 +437,224 @@ printraw(report.groups);</code></div>
     </section>
 
     <section class="section">
+      <h2>7) semantic Functions</h2>
+      <p>The semantic namespace learns relationships directly from corpus structure. No LLMs, no hardcoded word lists, no external resources. All relationship evidence comes from repeated sentence patterns and co-occurrence statistics inside the text you provide.</p>
+
+      <div class="note">
+        <strong>How it works:</strong> The model splits text into sentence-like segments, builds segment-bounded co-occurrence, learns which tokens act as structural bridges (e.g. "are", "can"), extracts directed taxonomy edges from those bridges, and scores each relation type separately. Attributes and behaviors are separated from category relations so they don't pollute hypernym/hyponym output.
+      </div>
+
+      <h3>Semantic Pipeline Diagram</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 980 260" role="img" aria-label="Semantic pipeline flow diagram">
+          <defs>
+            <marker id="arrow1" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#0f766e"></path>
+            </marker>
+          </defs>
+          <rect x="20" y="30" width="110" height="34" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="75" y="52" text-anchor="middle">Raw Text</text>
+          <rect x="160" y="30" width="120" height="34" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="220" y="52" text-anchor="middle">splitSegments</text>
+          <rect x="310" y="30" width="130" height="34" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="375" y="52" text-anchor="middle">tokenize.tokens</text>
+          <rect x="470" y="30" width="160" height="34" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="550" y="52" text-anchor="middle">semanticCoOccurrence</text>
+          <rect x="660" y="30" width="90" height="34" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="705" y="52" text-anchor="middle">termStats</text>
+          <rect x="780" y="30" width="170" height="34" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="865" y="52" text-anchor="middle">connectorEdgeGraph</text>
+
+          <rect x="730" y="120" width="110" height="34" rx="6" fill="#ecfeff" stroke="#0f766e"></rect>
+          <text x="785" y="142" text-anchor="middle">taxonomy</text>
+          <rect x="850" y="120" width="110" height="34" rx="6" fill="#ecfeff" stroke="#0f766e"></rect>
+          <text x="905" y="142" text-anchor="middle">hyper/hypo</text>
+          <rect x="790" y="180" width="150" height="34" rx="6" fill="#fff7ed" stroke="#b45309"></rect>
+          <text x="865" y="202" text-anchor="middle">attributes/behaviors</text>
+
+          <path d="M130 47 L160 47" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow1)"></path>
+          <path d="M280 47 L310 47" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow1)"></path>
+          <path d="M440 47 L470 47" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow1)"></path>
+          <path d="M630 47 L660 47" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow1)"></path>
+          <path d="M750 47 L780 47" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow1)"></path>
+          <path d="M865 64 L785 120" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow1)"></path>
+          <path d="M875 64 L905 120" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow1)"></path>
+          <path d="M885 64 L865 180" stroke="#b45309" stroke-width="2" marker-end="url(#arrow1)"></path>
+        </svg>
+      </div>
+
+      <h3>Relationship Type Diagram (example: dogs)</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 980 290" role="img" aria-label="Relationship map for dogs">
+          <defs>
+            <marker id="arrow2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#0f766e"></path>
+            </marker>
+          </defs>
+          <circle cx="490" cy="145" r="30" fill="#0f766e"></circle>
+          <text x="490" y="149" text-anchor="middle" fill="#ffffff">dogs</text>
+
+          <rect x="450" y="25" width="90" height="30" rx="6" fill="#ecfeff" stroke="#0f766e"></rect>
+          <text x="495" y="45" text-anchor="middle">animals</text>
+
+          <rect x="190" y="120" width="80" height="28" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="230" y="138" text-anchor="middle">poodles</text>
+          <rect x="190" y="155" width="90" height="28" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="235" y="173" text-anchor="middle">bulldogs</text>
+          <rect x="190" y="190" width="80" height="28" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="230" y="208" text-anchor="middle">terriers</text>
+
+          <rect x="650" y="105" width="70" height="28" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="685" y="123" text-anchor="middle">cats</text>
+          <rect x="740" y="105" width="70" height="28" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="775" y="123" text-anchor="middle">birds</text>
+          <rect x="830" y="105" width="70" height="28" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="865" y="123" text-anchor="middle">fish</text>
+
+          <rect x="660" y="165" width="70" height="28" rx="6" fill="#fff7ed" stroke="#b45309"></rect>
+          <text x="695" y="183" text-anchor="middle">loyal</text>
+          <rect x="760" y="165" width="60" height="28" rx="6" fill="#fff7ed" stroke="#b45309"></rect>
+          <text x="790" y="183" text-anchor="middle">run</text>
+
+          <rect x="430" y="245" width="60" height="26" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="460" y="262" text-anchor="middle">are</text>
+          <rect x="500" y="245" width="60" height="26" rx="6" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="530" y="262" text-anchor="middle">can</text>
+
+          <path d="M490 115 L495 55" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow2)"></path>
+          <path d="M270 134 L460 143" stroke="#0f766e" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M280 169 L460 147" stroke="#0f766e" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M270 204 L460 151" stroke="#0f766e" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M520 140 L650 120" stroke="#0f766e" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M520 145 L740 120" stroke="#0f766e" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M520 150 L830 120" stroke="#0f766e" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M520 165 L660 178" stroke="#b45309" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M520 170 L760 178" stroke="#b45309" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M485 175 L465 245" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+          <path d="M500 175 L525 245" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow2)"></path>
+        </svg>
+      </div>
+
+      <h3>Mixed-Corpus Skew Diagram</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 980 280" role="img" aria-label="Mixed-corpus skew illustration">
+          <defs>
+            <marker id="arrow3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#0f766e"></path>
+            </marker>
+          </defs>
+
+          <rect x="30" y="30" width="280" height="180" rx="10" fill="#ecfeff" stroke="#0f766e"></rect>
+          <text x="170" y="52" text-anchor="middle">Animal Domain</text>
+          <text x="70" y="82">dogs</text>
+          <text x="70" y="106">cats</text>
+          <text x="70" y="130">birds</text>
+          <text x="70" y="154">fish</text>
+          <text x="70" y="178">animals</text>
+
+          <rect x="350" y="30" width="280" height="180" rx="10" fill="#fff7ed" stroke="#b45309"></rect>
+          <text x="490" y="52" text-anchor="middle">Space Domain</text>
+          <text x="390" y="82">rockets</text>
+          <text x="390" y="106">stars</text>
+          <text x="390" y="130">planets</text>
+          <text x="390" y="154">earth</text>
+          <text x="390" y="178">astronauts</text>
+
+          <rect x="680" y="70" width="260" height="100" rx="10" fill="#ffffff" stroke="#94a3b8"></rect>
+          <text x="810" y="95" text-anchor="middle">Mixed Corpus Model</text>
+          <text x="700" y="118">- global ranking shifts</text>
+          <text x="700" y="140">- more clusters</text>
+          <text x="700" y="162">- connector balance changes</text>
+
+          <path d="M310 120 L680 120" stroke="#0f766e" stroke-width="2" marker-end="url(#arrow3)"></path>
+          <path d="M630 135 L680 135" stroke="#b45309" stroke-width="2" marker-end="url(#arrow3)"></path>
+        </svg>
+      </div>
+
+      <h3>semantic.specificity(corpus, word)</h3>
+      <p><strong>Purpose:</strong> Score how general or specific a word is relative to the whole corpus.</p>
+      <p><strong>Returns:</strong> A specificity row with <code>specificity</code> as the main signal. Higher score = more general/central. Lower score = more specific/peripheral.</p>
+      <div class="code"><code>corpus = ts.stats.from("Poodles are dogs. Dogs are animals.");
+spec = ts.semantic.specificity(corpus, "animals");
+printline(spec.specificity);  // higher than dogs, dogs higher than poodles</code></div>
+
+      <h3>semantic.hypernyms(corpus, word, limit)</h3>
+      <p><strong>Purpose:</strong> Find parent concepts — words more general than the target that the corpus implies the target belongs to.</p>
+      <p><strong>Default limit:</strong> 5</p>
+      <p><strong>Returns:</strong> Array of relation rows sorted by score descending.</p>
+      <div class="code"><code>hyper = ts.semantic.hypernyms(corpus, "poodles", 3);
+// [{word:"dogs", score:1, ...}]</code></div>
+      <div class="note"><strong>Implementation note:</strong> Uses learned taxonomy edges (e.g. "X are Y" patterns) as primary source. Falls back to specificity-gap scoring when direct edges are absent.</div>
+
+      <h3>semantic.hyponyms(corpus, word, limit)</h3>
+      <p><strong>Purpose:</strong> Find child concepts — specific examples or subcategories the corpus places under the target.</p>
+      <p><strong>Default limit:</strong> 5</p>
+      <div class="code"><code>hypo = ts.semantic.hyponyms(corpus, "dogs", 5);
+// [{word:"poodles",...}, {word:"bulldogs",...}, ...]</code></div>
+
+      <h3>semantic.relationships(corpus, word, limit)</h3>
+      <p><strong>Purpose:</strong> Full relationship map for one word — the main entry point for semantic exploration.</p>
+      <p><strong>Default limit:</strong> 3 per category</p>
+      <p><strong>Returns:</strong> A relationships result object with these fields:</p>
+      <div class="prop"><span class="name">hypernyms</span><br>Parent category concepts. Direct parent/child terms excluded from peers.</div>
+      <div class="prop"><span class="name">hyponyms</span><br>Specific subcategories or examples.</div>
+      <div class="prop"><span class="name">peers</span><br>Sibling-like terms at similar specificity level that share a common parent.</div>
+      <div class="prop"><span class="name">attributes</span><br>Descriptive properties associated with the word via the dominant bridge (e.g. "loyal" for "dogs").</div>
+      <div class="prop"><span class="name">behaviors</span><br>Action-like associations learned from secondary bridge patterns (e.g. "run" for "dogs" via "can").</div>
+      <div class="prop"><span class="name">connectors</span><br>Global bridge token list for this corpus.</div>
+      <div class="prop"><span class="name">connectorNeighbors</span><br>Bridge tokens that appear locally near this specific word.</div>
+      <div class="code"><code>corpus = ts.stats.from(animalText);
+rels = ts.semantic.relationships(corpus, "dogs", 3);
+
+printline(rels.word);             // "dogs"
+printline(rels.hypernyms[0].word);// "animals"
+printline(rels.hyponyms[0].word); // "poodles"
+printline(rels.peers[0].word);    // "cats"
+printline(rels.attributes[0].word); // "loyal"
+printline(rels.behaviors[0].word);  // "run"</code></div>
+
+      <h3>semantic.connectors(corpus, limit)</h3>
+      <p><strong>Purpose:</strong> Return the corpus-derived bridge/function tokens — words that structurally connect concepts across many sentence patterns.</p>
+      <p><strong>Default limit:</strong> 10</p>
+      <p><strong>Returns:</strong> Array of connector rows sorted by score descending.</p>
+      <div class="note"><strong>Interpretation:</strong> A token qualifies as a connector when it has both high hub ratio (connects many different neighbors) and high segment ratio (appears across many sentences). In most English corpora this captures copulas and modal verbs like "are", "is", and "can".</div>
+      <div class="code"><code>conn = ts.semantic.connectors(corpus, 5);
+// [{word:"are", score:0.83, ...}]</code></div>
+
+      <h3>semantic.connectorNeighbors(corpus, word, limit)</h3>
+      <p><strong>Purpose:</strong> Return connector tokens that appear locally near a specific word.</p>
+      <p><strong>Default limit:</strong> 10</p>
+      <div class="code"><code>cn = ts.semantic.connectorNeighbors(corpus, "dogs", 5);
+// [{word:"are", count:4}, {word:"can", count:1}]</code></div>
+
+      <h3>semantic.semanticClusters(corpus)</h3>
+      <p><strong>Purpose:</strong> Group words into clusters based on co-occurrence similarity and shared relation type.</p>
+      <p><strong>Returns:</strong> Array of clusters. Each cluster is an array of word strings.</p>
+      <p><strong>Clustering behavior:</strong> Words are grouped first by relation role (category/attribute/behavior), then by contextual similarity within each role. This prevents action words and descriptor words from bleeding into taxonomy clusters.</p>
+      <div class="code"><code>clusters = ts.semantic.semanticClusters(corpus);
+i = 0;
+while (i < clusters.count()) {
+  printline("Cluster {i+1}: {clusters[i].count()} words");
+  i = i + 1;
+}</code></div>
+
+      <h3>semantic.taxonomy(corpus)</h3>
+      <p><strong>Purpose:</strong> Return all known words sorted from most general to most specific according to the learned taxonomy score.</p>
+      <p><strong>Returns:</strong> { generalToSpecific: [...], wordCount: number }</p>
+      <p>Connector tokens are excluded from the ranking so bridge words do not dominate the top positions.</p>
+      <div class="code"><code>tax = ts.semantic.taxonomy(corpus);
+i = 0;
+while (i < 5 && i < tax.generalToSpecific.count()) {
+  w = tax.generalToSpecific[i];
+  printline("{i+1}. {w.word} ({w.specificity})");
+  i = i + 1;
+}
+// 1. animals (16.58)
+// 2. dogs (10.75)
+// 3. cats (6.58)</code></div>
+    </section>
+
+    <section class="section">
       <h2>6) utils Functions (Reference)</h2>
       <p>These are mostly internal helpers, but documented here for completeness.</p>
 
@@ -413,7 +668,7 @@ printraw(report.groups);</code></div>
     </section>
 
     <section class="section">
-      <h2>7) End-to-End Usage Patterns</h2>
+      <h2>8) End-to-End Usage Patterns</h2>
 
       <h3>Pattern A: Direct convenience API (fastest path)</h3>
       <div class="code"><code>ts = import("./text-stat.ns");
@@ -443,10 +698,38 @@ printraw(rows);   // development inspection
 for (i = 0; i < rows.count(); i = i + 1) {
   printline(rows[i].word, " -> ", rows[i].count);
 }</code></div>
+
+      <h3>Pattern D: Semantic discovery from raw text</h3>
+      <div class="code"><code>ts = import("./text-stat.ns");
+
+text = "
+Poodles are dogs. Bulldogs are dogs. Dogs are animals.
+Cats are animals. Dogs are loyal. Dogs can run.
+";
+
+corpus = ts.stats.from(text);
+
+// What category does "poodles" belong to?
+rels = ts.semantic.relationships(corpus, "poodles", 3);
+printline(rels.hypernyms[0].word);  // "dogs"
+
+// What are the subcategories of "animals"?
+hypo = ts.semantic.hyponyms(corpus, "animals", 5);
+i = 0;
+while (i < hypo.count()) {
+  printline(hypo[i].word);
+  i = i + 1;
+}
+
+// What kind of concept is "dogs"?
+dogRels = ts.semantic.relationships(corpus, "dogs", 3);
+printline(dogRels.hypernyms[0].word);   // "animals"
+printline(dogRels.attributes[0].word);  // "loyal"
+printline(dogRels.behaviors[0].word);   // "run"</code></div>
     </section>
 
     <section class="section">
-      <h2>8) Interpretation Notes and Caveats</h2>
+      <h2>9) Interpretation Notes and Caveats</h2>
 
       <h3>Ties in frequency-based sorting</h3>
       <p>When counts tie, relative ordering may depend on the underlying sort behavior and insertion order. Do not assume a stable deterministic order among equal counts unless you add a tie-breaker rule yourself.</p>
@@ -460,8 +743,27 @@ for (i = 0; i < rows.count(); i = i + 1) {
       <h3>Tokenization is alphanumeric-focused</h3>
       <p>Punctuation is treated as separators and discarded. If you need punctuation-aware behavior (for example hashtags, emails, or programming symbols), you can extend tokenize.tokens logic.</p>
 
+      <h3>Accented Latin characters (French, Spanish, German, etc.)</h3>
+      <p>The tokenizer folds common accented characters to their ASCII base equivalent before tokenizing. For example, <code>é → e</code>, <code>ü → u</code>, <code>ñ → n</code>. This means <code>café</code> is tokenized as <code>cafe</code> and <code>Éléphants</code> as <code>elephants</code>. The trade-off is that accented and unaccented forms are merged, which is usually the desired behavior for frequency and relation analysis.</p>
+      <p>Note: French uses multi-word copulas like <em>sont des</em> ("are") rather than a single bridge word. The semantic module's bridge extractor works on single middle tokens, so French category sentences like "X sont des Y" may not produce clean taxonomy edges unless the corpus has sufficient repetition for the individual tokens to score as connectors.</p>
+
+      <h3>Non-Latin scripts (Japanese, Chinese, Arabic, etc.)</h3>
+      <p>The tokenizer and the ns runtime process strings as UTF-8 bytes. Characters outside the ASCII and Latin Extended ranges (such as CJK ideographs, Hiragana, Katakana, and Arabic) are not decoded to Unicode code points. This means multiple different characters can produce the same byte-level fragment token, making them indistinguishable to the semantic model. Full support for these scripts requires a Unicode code-point-aware runtime.</p>
+
       <h3>Similarity is form-based, not semantic</h3>
-      <p>Normalized Levenshtein similarity measures character edit closeness. It is ideal for typo-like or inflection-like comparisons, but not a substitute for semantic embeddings.</p>
+      <p>Normalized Levenshtein similarity measures character edit closeness. It is ideal for typo-like or inflection-like comparisons, but not a substitute for semantic embeddings or corpus-learned relations.</p>
+
+      <h3>Semantic quality depends on corpus structure</h3>
+      <p>The semantic module learns from repeated structural patterns in the text. A corpus with many consistent category sentences like "X are Y" produces clean taxonomy edges. Narrative or action-heavy text will produce weaker results. More repeated patterns of the same structure reliably improve output quality.</p>
+
+      <h3>Mixing semantic domains</h3>
+      <p>You can mix multiple topics in one corpus. The model will learn cross-domain structure, but global specificity scores and cluster membership will be influenced by whichever domain is more repetitive or structurally dominant. For high-precision taxonomy within a domain, keeping domains separate or roughly balanced by text volume is usually better.</p>
+
+      <h3>Connector detection is threshold-based</h3>
+      <p>A token qualifies as a connector when its hub ratio (how many different neighbors it has) and segment ratio (how many different sentences it appears in) both exceed corpus-relative thresholds. A token like "can" that appears in only a few sentences will show up as a connector neighbor for a specific word, but may not appear in the global connector list unless it appears frequently enough across the full corpus.</p>
+
+      <h3>Peers are sibling-first, not similarity-first</h3>
+      <p>Peers are found by looking for words that share at least one learned parent node in the taxonomy graph, with contextual similarity as a secondary scoring factor. Direct hypernyms and hyponyms are always excluded from the peer list so a parent category is not mistaken for a sibling.</p>
     </section>
 
     <section class="section">
@@ -469,6 +771,7 @@ for (i = 0; i < rows.count(); i = i + 1) {
       <p><strong>tokenize:</strong> normalize, toLowerText, tokens, uniqueTokens, lines</p>
       <p><strong>stats:</strong> from, wordCounts, rankedWords, leadingWords, tailWords, bigrams, bigramsFrom, coOccurrence, neighbors, levenshteinDistance, similarity, prefixGroups, stubsFrom, report</p>
       <p><strong>utils:</strong> isNumber, copyArray, abs, min, max, clamp, sortByNumberDesc</p>
+      <p><strong>semantic:</strong> specificity, hypernyms, hyponyms, relationships, connectors, connectorNeighbors, semanticClusters, taxonomy</p>
       <p class="muted">You can now use this as the canonical docs page for text-stat.</p>
     </section>
   </div>

@@ -30,7 +30,9 @@ splitSegments = func(text) {
 
     for (i = 0; i < s.length; i = i + 1) {
         ch = s[i];
-        boundary = ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == "\n";
+// ASCII sentence endings plus fullwidth/Japanese equivalents.
+            boundary = ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == "\n" ||
+                       ch == "。" || ch == "！" || ch == "？" || ch == "；";
 
         if (boundary) {
             toks = this.tokenize.tokens(current);
