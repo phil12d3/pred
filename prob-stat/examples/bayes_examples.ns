@@ -20,12 +20,14 @@ printline("  P(positive)                 = 0.01098");
 post1 = b.bayesUpdate(0.001, 0.99, 0.01098);
 printline("  Posterior P(disease | +ve)  = ", post1);
 printline("  (A positive result is only ~9% likely true when base rate is very low)");
+printline("  Meaning: the test is good, but most positives are still false alarms because the disease itself is rare.");
 printline("");
 
 // What if tested again and still positive?
 post2 = b.bayesUpdate(post1, 0.99, 0.01098);
 printline("  After a second positive test:");
 printline("  Posterior = ", post2);
+printline("  Meaning: a second independent clue can raise the posterior further, but it still needs to be read as probability, not certainty.");
 printline("");
 
 // Spam filter: email contains word 'free'.
@@ -35,6 +37,7 @@ printline("  Prior P(spam)          = 0.4");
 printline("  P(free | spam)         = 0.8");
 printline("  P(free)                = 0.35");
 printline("  P(spam | 'free')       = ", b.bayesUpdate(0.4, 0.8, 0.35));
+printline("  Meaning: the word 'free' pushes the email toward spam because it appears more often in spam than in normal mail.");
 printline("");
 
 // Drug test: P(user)=0.05, test sensitivity=0.95, P(positive)=0.10
@@ -43,6 +46,7 @@ printline("  Prior P(user)          = 0.05");
 printline("  P(positive | user)     = 0.95");
 printline("  P(positive)            = 0.10");
 printline("  P(user | positive)     = ", b.bayesUpdate(0.05, 0.95, 0.10));
+printline("  Meaning: even a strong test can produce only a moderate posterior when the underlying condition is uncommon.");
 printline("");
 
 // ── sequentialUpdate ─────────────────────────────────────────────────────────
@@ -51,20 +55,21 @@ printline("");
 
 // Server fault diagnosis: prior = 20%, three independent diagnostic checks.
 printline("Server fault diagnosis (prior = 0.2):");
-printline("  Check 1: high CPU temp   P(hi temp | fault)=0.70  P(hi temp)=0.30");
-printline("  Check 2: high error rate P(hi errors| fault)=0.80 P(hi errors)=0.35");
-printline("  Check 3: high disk latency P(hi latency|fault)=0.60 P(hi latency)=0.25");
+printline("  Check 1: high CPU temp   P(hi temp | fault)=0.70  P(hi temp)=0.50");
+printline("  Check 2: high error rate P(hi errors| fault)=0.80 P(hi errors)=0.60");
+printline("  Check 3: high disk latency P(hi latency|fault)=0.60 P(hi latency)=0.55");
 
-steps1 = [{ likelihood: 0.7, evidence: 0.3 }];
-steps2 = [{ likelihood: 0.7, evidence: 0.3 }, { likelihood: 0.8, evidence: 0.35 }];
+steps1 = [{ likelihood: 0.7, evidence: 0.5 }];
+steps2 = [{ likelihood: 0.7, evidence: 0.5 }, { likelihood: 0.8, evidence: 0.6 }];
 steps3 = [
-    { likelihood: 0.7,  evidence: 0.3  },
-    { likelihood: 0.8,  evidence: 0.35 },
-    { likelihood: 0.6,  evidence: 0.25 }
+    { likelihood: 0.7,  evidence: 0.5  },
+    { likelihood: 0.8,  evidence: 0.6 },
+    { likelihood: 0.6,  evidence: 0.55 }
 ];
 printline("  After check 1:     ", b.sequentialUpdate(0.2, steps1));
 printline("  After checks 1+2:  ", b.sequentialUpdate(0.2, steps2));
 printline("  After all 3:       ", b.sequentialUpdate(0.2, steps3));
+printline("  Meaning: each observation shifts the current belief a little more toward fault, but none of the checks alone is decisive.");
 printline("");
 
 // Weather forecast.
@@ -76,6 +81,7 @@ wSteps = [
 printline("  Prior                      = 0.3");
 printline("  After low pressure         = ", b.sequentialUpdate(0.3, [wSteps[0]]));
 printline("  After low pressure+clouds  = ", b.sequentialUpdate(0.3, wSteps));
+printline("  Meaning: weather clues are treated as incremental evidence, so the rain estimate moves as the forecast becomes more convincing.");
 printline("");
 
 // Credit risk: prior P(default)=0.05.
@@ -89,6 +95,7 @@ printline("  Prior                      = 0.05");
 printline("  After late payment         = ", b.sequentialUpdate(0.05, [cSteps[0]]));
 printline("  + high credit utilisation  = ", b.sequentialUpdate(0.05, [cSteps[0], cSteps[1]]));
 printline("  + recent job change        = ", b.sequentialUpdate(0.05, cSteps));
+printline("  Meaning: the model starts with a low default risk, then raises it as more negative credit signals appear.");
 printline("");
 
 // ── posteriorDistribution ─────────────────────────────────────────────────────
@@ -108,6 +115,7 @@ while (i < mr.length) {
     printline("  ", mr[i].name, " posterior = ", mr[i].posterior);
     i = i + 1;
 }
+printline("  Meaning: the model with the biggest posterior is the one best supported by the observed evidence.");
 printline("");
 
 // Differential diagnosis: flu / cold / COVID.
@@ -123,6 +131,7 @@ while (i < dr.length) {
     printline("  ", dr[i].name, " = ", dr[i].posterior);
     i = i + 1;
 }
+printline("  Meaning: these are competing explanations for the same symptoms, and the posteriors show which one is currently most plausible.");
 printline("");
 
 // Biased coin identification.
@@ -138,6 +147,7 @@ while (i < cr.length) {
     printline("  ", cr[i].name, " = ", cr[i].posterior);
     i = i + 1;
 }
+printline("  Meaning: a single observation already nudges the model toward coins that make heads more likely.");
 printline("");
 
 // Root cause analysis for a server outage.
@@ -154,6 +164,7 @@ while (i < rr.length) {
     printline("  ", rr[i].name, " = ", rr[i].posterior);
     i = i + 1;
 }
+printline("  Meaning: the highest posterior points to the root cause that best fits the alerts and service symptoms.");
 printline("");
 
 // ── train + predict: naive Bayes classifier ───────────────────────────────────
@@ -188,6 +199,7 @@ while (ti < testInputs.count()) {
     printline("  Input: ", stringify(testInputs[ti]), "  => ", res[0].label, "  (p=", res[0].probability, ")");
     ti = ti + 1;
 }
+printline("  Meaning: the highest-probability label is the one whose training examples used similar words most often.");
 printline("");
 
 // Topic classifier: sports / tech / food.
@@ -224,6 +236,7 @@ while (ti < topicTests.count()) {
     }
     ti = ti + 1;
 }
+printline("  Meaning: the full probability list is useful when the model is unsure and you want to see the runner-up topics too.");
 printline("");
 
 // Language detector: English / French / Spanish based on common words.
@@ -252,6 +265,7 @@ while (li < langTests.count()) {
     printline("  Input: ", stringify(langTests[li]), "  => ", res[0].label, "  (p=", res[0].probability, ")");
     li = li + 1;
 }
+printline("  Meaning: short phrase detectors work by comparing the observed words with the patterns learned during training.");
 printline("");
 
 printline("Done.");

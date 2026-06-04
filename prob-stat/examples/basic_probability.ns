@@ -21,6 +21,7 @@ printline("  P(tails) = ", pTails);
 printline("  P(not heads) = ", core.complement(pHeads));
 printline("  P(heads AND tails) independent = ", core.joint(pHeads, pTails));
 printline("  P(heads OR tails) = ", core.union(pHeads, pTails));
+printline("  Interpretation: 5 of the 8 flips were heads, so the observed head rate is 62.5%.");
 printline("");
 
 // ── 2. Expected value, variance, and entropy ─────────────────────────────────
@@ -39,6 +40,7 @@ printline("  Expected value = ", ev);
 printline("  Variance       = ", v);
 printline("  Std deviation  = ", sd);
 printline("  Entropy        = ", h, " bits");
+printline("  Interpretation: the die is centered near 3.5, and the entropy says the outcome is still very uncertain before a roll.");
 printline("");
 
 // ── 3. Core table helpers ────────────────────────────────────────────────────
@@ -53,6 +55,7 @@ printline("  count(6) = ", table.counts["6"]);
 printline("  probability(6) = ", core.probability(rolls, 6));
 printline("  expectedValue([1,2,3], [0.2,0.3,0.5]) = ", core.expectedValue([1, 2, 3], [0.2, 0.3, 0.5]));
 printline("  normalize([2, 3, 5]) = ", stringify(core.normalize([2, 3, 5])));
+printline("  Interpretation: count(3)=3 means three of the ten rolls were threes, and normalize turns raw weights into shares that sum to 1.");
 printline("");
 
 // ── 4. Binomial distribution ─────────────────────────────────────────────────
@@ -70,6 +73,7 @@ while (k <= 10) {
 bStats = dist.binomialStats(n, p);
 printline("  mean=", bStats.mean, "  stddev=", bStats.stddev);
 printline("  P(X <= 3) = ", dist.binomialCDF(n, 3, p));
+printline("  Interpretation: this model says about 3 successes is the most typical scale, while P(X <= 3) measures the chance of being at or below that cutoff.");
 printline("");
 
 // ── 5. Poisson distribution ──────────────────────────────────────────────────
@@ -84,6 +88,7 @@ while (k <= 8) {
 }
 printline("  P(X <= 2) = ", dist.poissonCDF(lambda, 2));
 printline("  mean = ", dist.poissonStats(lambda).mean, "  stddev = ", dist.poissonStats(lambda).stddev);
+printline("  Interpretation: lambda=2.5 means we expect about 2.5 events per interval on average, with most probability mass near 2 or 3.");
 printline("");
 
 // ── 6. Normal distribution ───────────────────────────────────────────────────
@@ -96,6 +101,7 @@ printline("  P(height < 160) = ", dist.normalCDF(160, mean, sd));
 printline("  P(160 <= height <= 180) = ", dist.normalBetween(160, 180, mean, sd));
 printline("  P(height > 190) = ", 1 - dist.normalCDF(190, mean, sd));
 printline("  Phi(0) = ", dist.standardNormalCDF(0));
+printline("  Interpretation: the bell curve puts most of the probability near 170, so 160-180 is a common band and 190+ is relatively rare.");
 printline("");
 
 // ── 7. Uniform and geometric distributions ──────────────────────────────────
@@ -104,6 +110,7 @@ printline("Uniform(0, 20) wait time:");
 printline("  PDF at 10 = ", dist.uniformPDF(10, 0, 20));
 printline("  CDF at 5  = ", dist.uniformCDF(5, 0, 20));
 printline("  Mean      = ", dist.uniformStats(0, 20).mean);
+printline("  Interpretation: every point between 0 and 20 is equally likely, so the midpoint 10 is the average but not a special spike.");
 printline("");
 
 printline("Geometric(p=0.4) retry attempts:");
@@ -111,6 +118,7 @@ printline("  P(first success on 1) = ", dist.geometricPMF(1, 0.4));
 printline("  P(first success on 2) = ", dist.geometricPMF(2, 0.4));
 printline("  P(within 3 tries)     = ", dist.geometricCDF(3, 0.4));
 printline("  Expected tries        = ", dist.geometricStats(0.4).mean);
+printline("  Interpretation: this model measures how many attempts it usually takes before the first success appears.");
 printline("");
 
 // ── 8. Bayes' theorem ────────────────────────────────────────────────────────
@@ -127,6 +135,7 @@ printline("  Prior P(disease)        = ", prior);
 printline("  P(positive | disease)   = ", likelihood);
 printline("  P(positive)             = ", evidence);
 printline("  Posterior P(disease | positive) = ", posterior);
+printline("  Interpretation: the test result raises the probability of disease, but the low base rate still keeps the posterior far below 50%.");
 printline("");
 
 // ── 9. Naive Bayes spam classifier ───────────────────────────────────────────
