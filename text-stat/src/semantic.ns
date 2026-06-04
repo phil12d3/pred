@@ -645,6 +645,22 @@ relationships = func(corpus, word, limit) {
     hyper = this.hypernyms(corpus, word, lim);
     hypo = this.hyponyms(corpus, word, lim);
 
+    directHyper = {};
+    foreach(h in hyper) directHyper[h.word] = true;
+    directHypo = {};
+    foreach(h in hypo) directHypo[h.word] = true;
+
+    siblingWords = {};
+    if (defined(derived.edgeGraph.categoryEdges[word])) {
+        foreach(parent in derived.edgeGraph.categoryEdges[word].props) {
+            foreach(candidateSibling in derived.edgeGraph.categoryEdges.props) {
+                if (candidateSibling == word) continue;
+                if (!defined(derived.edgeGraph.categoryEdges[candidateSibling][parent])) continue;
+                siblingWords[candidateSibling] = true;
+            }
+        }
+    }
+
     // Keep hypernyms meaningful for presentation: if all are connector-like,
     // return no parent prediction rather than a misleading one.
     nonConnectorHyper = [];
@@ -682,50 +698,69 @@ relationships = func(corpus, word, limit) {
     wordSpec = this.specificityFromDerived(derived, word);
     
     peers = [];
+    peerCandidates = {};
+    siblingSupport = {};
+
+    foreach(candidateSibling in siblingWords.props) {
+        if (defined(directHyper[candidateSibling]) || defined(directHypo[candidateSibling])) continue;
+        if (!defined(derived.profile[candidateSibling])) continue;
+        if (!defined(peerCandidates[candidateSibling])) peerCandidates[candidateSibling] = true;
+        if (!defined(siblingSupport[candidateSibling])) siblingSupport[candidateSibling] = 0;
+        siblingSupport[candidateSibling] = siblingSupport[candidateSibling] + 1;
+    }
+
     if (defined(neighbors)) {
         foreach(n in neighbors.props) {
-            nSpec = this.specificityFromDerived(derived, n);
-            if (nSpec.connectorLike) continue;
-            connectorPenalty = nSpec.connectorLike ? 0.2 : 1;
-            diff = this.abs(nSpec.specificity - wordSpec.specificity);
-
-            sim = this.contextSimilarity(cooc, word, n);
-            // Peer score balances similar genericity and contextual overlap.
-            peerScore = sim * this.safeDiv(1, 1 + diff) * connectorPenalty;
-            if (peerScore > 0) {
-                skipPeer = false;
-                ai = 0;
-                while (ai < attributes.count()) {
-                    if (attributes[ai].word == n) skipPeer = true;
-                    ai = ai + 1;
-                }
-                bi = 0;
-                while (bi < behaviors.count()) {
-                    if (behaviors[bi].word == n) skipPeer = true;
-                    bi = bi + 1;
-                }
-                if (skipPeer) continue;
-                peers.add({
-                    word: n,
-                    specificity: nSpec.specificity,
-                    similarity: sim,
-                    score: peerScore,
-                    adjacency: neighbors[n]
-                });
-            }
+            if (!defined(peerCandidates[n])) peerCandidates[n] = true;
         }
-        
-        peers = peers.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
-        
-        result = [];
-        i = 0;
-        minLim = this.min(lim, peers.count());
-        while (i < minLim) {
-            result.add(peers[i]);
-            i = i + 1;
-        }
-        peers = result;
     }
+
+    foreach(n in peerCandidates.props) {
+        if (defined(directHyper[n]) || defined(directHypo[n])) continue;
+        nSpec = this.specificityFromDerived(derived, n);
+        if (nSpec.connectorLike) continue;
+
+        diff = this.abs(nSpec.specificity - wordSpec.specificity);
+        sim = defined(neighbors) && defined(neighbors[n]) ? this.contextSimilarity(cooc, word, n) : 0;
+        siblingBonus = defined(siblingSupport[n]) ? (1 + siblingSupport[n]) : 1;
+        coocBonus = defined(neighbors) && defined(neighbors[n]) ? 1 : 0.35;
+
+        // Peer score balances similar genericity, contextual overlap, and shared parentage.
+        peerScore = (sim * 1.5 + coocBonus) * this.safeDiv(1, 1 + diff) * siblingBonus;
+        if (peerScore <= 0) continue;
+
+        skipPeer = false;
+        ai = 0;
+        while (ai < attributes.count()) {
+            if (attributes[ai].word == n) skipPeer = true;
+            ai = ai + 1;
+        }
+        bi = 0;
+        while (bi < behaviors.count()) {
+            if (behaviors[bi].word == n) skipPeer = true;
+            bi = bi + 1;
+        }
+        if (skipPeer) continue;
+
+        peers.add({
+            word: n,
+            specificity: nSpec.specificity,
+            similarity: sim,
+            score: peerScore,
+            adjacency: defined(neighbors) && defined(neighbors[n]) ? neighbors[n] : 0
+        });
+    }
+
+    peers = peers.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+
+    result = [];
+    i = 0;
+    minLim = this.min(lim, peers.count());
+    while (i < minLim) {
+        result.add(peers[i]);
+        i = i + 1;
+    }
+    peers = result;
     
     return {
         word: word,
@@ -741,26 +776,72 @@ relationships = func(corpus, word, limit) {
 
 // Find semantic clusters based on shared neighbors
 semanticClusters = func(corpus) {
-    cooc = this.semanticCoOccurrence(corpus, 2);
+    derived = this.termStats(corpus);
+    derived.edgeGraph = this.connectorEdgeGraph(corpus, derived);
+    cooc = derived.cooc;
+
+    attributeWords = {};
+    behaviorWords = {};
+    categoryWords = {};
+
+    foreach(child in derived.edgeGraph.categoryEdges.props) {
+        categoryWords[child] = true;
+        foreach(parent in derived.edgeGraph.categoryEdges[child].props) {
+            categoryWords[parent] = true;
+        }
+    }
+
+    foreach(subject in derived.edgeGraph.attributeEdges.props) {
+        foreach(target in derived.edgeGraph.attributeEdges[subject].props) {
+            attributeWords[target] = true;
+        }
+    }
+
+    foreach(subject in derived.edgeGraph.behaviorEdges.props) {
+        foreach(target in derived.edgeGraph.behaviorEdges[subject].props) {
+            behaviorWords[target] = true;
+        }
+    }
+
+    roleOf = func(w) {
+        isCategory = defined(categoryWords[w]);
+        isAttribute = defined(attributeWords[w]);
+        isBehavior = defined(behaviorWords[w]);
+
+        if (isCategory) return "category";
+        if (isAttribute && !isBehavior) return "attribute";
+        if (isBehavior && !isAttribute) return "behavior";
+        return "mixed";
+    };
+
     clusters = [];
     processed = {};
     
     foreach(word1 in cooc.props) {
         if (processed[word1]) continue;
+        spec1 = this.specificityFromDerived(derived, word1);
+        if (spec1.connectorLike) continue;
         
         cluster = [word1];
         processed[word1] = true;
+        role1 = roleOf(word1);
         
         neighbors1 = cooc[word1];
         
         foreach(word2 in cooc.props) {
             if (word2 == word1 || processed[word2]) continue;
+            spec2 = this.specificityFromDerived(derived, word2);
+            if (spec2.connectorLike) continue;
+
+            role2 = roleOf(word2);
+            if (role1 != role2) continue;
             
             neighbors2 = cooc[word2];
 
             sim = this.contextSimilarity(cooc, word1, word2);
             // Similarity threshold is generic and corpus-agnostic.
-            if (sim >= 0.25) {
+            threshold = (role1 == "category") ? 0.25 : 0.12;
+            if (sim >= threshold) {
                 cluster.add(word2);
                 processed[word2] = true;
             }
