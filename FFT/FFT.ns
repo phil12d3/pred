@@ -1,0 +1,4 @@
+// FFT umbrella module
+// Fast Fourier transform utilities for real and complex sequences.
+
+core = import("./src/core.ns");

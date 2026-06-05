@@ -1,0 +1,20 @@
+fft = import("./FFT.ns");
+
+a = fft.core.complex(2, 3);
+b = fft.core.complex(4, -1);
+
+sum = fft.core.add(a, b);
+diff = fft.core.sub(a, b);
+product = fft.core.mul(a, b);
+conj = fft.core.conjugate(a);
+
+printline("=== Complex Arithmetic Example ===");
+printline("a = ", stringify(a));
+printline("b = ", stringify(b));
+printline("");
+printline("a + b = ", stringify(sum));
+printline("a - b = ", stringify(diff));
+printline("a * b = ", stringify(product));
+printline("conjugate(a) = ", stringify(conj));
+printline("magnitude(a) = ", fft.core.magnitude(a));
+printline("phase(a) = ", fft.core.phase(a));

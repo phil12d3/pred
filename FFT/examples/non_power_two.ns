@@ -1,0 +1,10 @@
+fft = import("./FFT.ns");
+
+signal = [1, 2, 3, 4, 5];
+bins = fft.core.fftReal(signal);
+
+printline("=== Non Power Of Two Example ===");
+printline("length=", signal.count(), " uses DFT fallback");
+for (i = 0; i < bins.count(); i = i + 1) {
+    printline("  bin=", i, " re=", bins[i].re, " im=", bins[i].im, " mag=", fft.core.magnitude(bins[i]));
+}

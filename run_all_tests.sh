@@ -86,6 +86,13 @@ echo "== Running embed tests =="
 )
 
 echo
+echo "== Running FFT tests =="
+(
+  cd "$ROOT_DIR/FFT"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
 echo "== Running prob-stat tests =="
 (
   cd "$ROOT_DIR/prob-stat"

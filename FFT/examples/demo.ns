@@ -1,0 +1,16 @@
+fft = import("./FFT.ns");
+
+signal = [0, 1, 0, -1, 0, 1, 0, -1];
+spec = fft.core.spectrum(signal);
+dominant = fft.core.dominantBin(signal);
+
+printline("=== FFT Demo ===");
+printline("signal length=", signal.count());
+printline("dominant bin=", dominant.index, " magnitude=", dominant.magnitude);
+
+printline("");
+printline("Spectrum:");
+for (i = 0; i < spec.count(); i = i + 1) {
+    row = spec[i];
+    printline("  bin=", row.index, " re=", row.re, " im=", row.im, " mag=", row.magnitude);
+}

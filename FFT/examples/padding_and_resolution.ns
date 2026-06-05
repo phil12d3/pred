@@ -1,0 +1,22 @@
+fft = import("./FFT.ns");
+
+signal = [1, 2, 3, 4, 5];
+targetSize = fft.core.nextPowerOfTwo(signal.count());
+padded = fft.core.padReal(signal, targetSize);
+rawBins = fft.core.fftReal(signal);
+paddedBins = fft.core.fftReal(padded);
+
+printline("=== Padding And Resolution Example ===");
+printline("raw length=", signal.count(), " padded length=", padded.count(), " target=", targetSize);
+
+printline("");
+printline("Original bins:");
+for (i = 0; i < rawBins.count(); i = i + 1) {
+    printline("  bin=", i, " re=", rawBins[i].re, " im=", rawBins[i].im, " mag=", fft.core.magnitude(rawBins[i]));
+}
+
+printline("");
+printline("Padded bins:");
+for (i = 0; i < paddedBins.count(); i = i + 1) {
+    printline("  bin=", i, " re=", paddedBins[i].re, " im=", paddedBins[i].im, " mag=", fft.core.magnitude(paddedBins[i]));
+}

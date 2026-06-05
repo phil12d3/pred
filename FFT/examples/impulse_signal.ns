@@ -1,0 +1,17 @@
+fft = import("./FFT.ns");
+
+signal = [1, 0, 0, 0, 0, 0, 0, 0];
+bins = fft.core.fftReal(signal);
+reconstructed = fft.core.ifftReal(bins);
+
+printline("=== Impulse Signal Example ===");
+printline("Bins:");
+for (i = 0; i < bins.count(); i = i + 1) {
+    printline("  ", i, " => re=", bins[i].re, " im=", bins[i].im);
+}
+
+printline("");
+printline("Reconstructed:");
+for (i = 0; i < reconstructed.count(); i = i + 1) {
+    printline("  ", i, " => ", reconstructed[i]);
+}

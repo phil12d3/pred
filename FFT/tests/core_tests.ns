@@ -1,0 +1,74 @@
+[test]
+complex_arithmetic_works = func(t) {
+    fft = import("./FFT.ns").core;
+    a = fft.complex(2, 3);
+    b = fft.complex(4, -1);
+    product = fft.mul(a, b);
+
+    t.equal(product.re, 11, "complex multiplication real part matches");
+    t.equal(product.im, 10, "complex multiplication imaginary part matches");
+};
+
+[test]
+power_of_two_detection_is_reasonable = func(t) {
+    fft = import("./FFT.ns").core;
+    t.truthy(fft.isPowerOfTwo(8), "8 is power of two");
+    t.truthy(!fft.isPowerOfTwo(6), "6 is not power of two");
+    t.equal(fft.nextPowerOfTwo(6), 8, "next power of two after 6 is 8");
+};
+
+[test]
+fft_of_impulse_is_flat = func(t) {
+    fft = import("./FFT.ns").core;
+    bins = fft.fftReal([1, 0, 0, 0]);
+
+    t.equal(bins.count(), 4, "fft returns one bin per input sample");
+    i = 0;
+    while (i < bins.count()) {
+        t.equal(bins[i].re, 1, "impulse real bin stays at 1");
+        t.equal(bins[i].im, 0, "impulse imaginary bin stays at 0");
+        i = i + 1;
+    }
+};
+
+[test]
+ifft_reconstructs_original_real_signal = func(t) {
+    fft = import("./FFT.ns").core;
+    signal = [0, 1, 0, -1, 0, 1, 0, -1];
+    reconstructed = fft.ifftReal(fft.fftReal(signal));
+
+    i = 0;
+    while (i < signal.count()) {
+        diff = reconstructed[i] - signal[i];
+        if (diff < 0) diff = 0 - diff;
+        t.truthy(diff <= 0.0001, "ifft reconstructs original sample " + stringify(i));
+        i = i + 1;
+    }
+};
+
+[test]
+dft_fallback_handles_non_power_of_two_lengths = func(t) {
+    fft = import("./FFT.ns").core;
+    signal = [1, 2, 3, 4, 5];
+    bins = fft.fftReal(signal);
+    reconstructed = fft.ifftReal(bins);
+
+    t.equal(bins.count(), 5, "non-power-of-two fft keeps original length");
+    i = 0;
+    while (i < signal.count()) {
+        diff = reconstructed[i] - signal[i];
+        if (diff < 0) diff = 0 - diff;
+        t.truthy(diff <= 0.0001, "dft fallback reconstructs sample " + stringify(i));
+        i = i + 1;
+    }
+};
+
+[test]
+dominant_bin_finds_simple_periodic_pattern = func(t) {
+    fft = import("./FFT.ns").core;
+    signal = [0, 1, 0, -1, 0, 1, 0, -1];
+    dominant = fft.dominantBin(signal);
+
+    t.truthy(dominant.index == 2 || dominant.index == 6, "dominant bin matches expected periodic component");
+    t.truthy(dominant.magnitude > 0, "dominant bin has positive magnitude");
+};

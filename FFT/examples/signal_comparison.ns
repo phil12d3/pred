@@ -1,0 +1,27 @@
+fft = import("./FFT.ns");
+
+signalA = [0, 1, 0, -1, 0, 1, 0, -1];
+signalB = [1, 1, 1, 1, 0, 0, 0, 0];
+
+specA = fft.core.spectrum(signalA);
+specB = fft.core.spectrum(signalB);
+domA = fft.core.dominantBin(signalA);
+domB = fft.core.dominantBin(signalB);
+
+printline("=== Signal Comparison Example ===");
+printline("A dominant bin=", domA.index, " magnitude=", domA.magnitude);
+printline("B dominant bin=", domB.index, " magnitude=", domB.magnitude);
+
+printline("");
+printline("Signal A spectrum:");
+for (i = 0; i < specA.count(); i = i + 1) {
+    row = specA[i];
+    printline("  bin=", row.index, " power=", row.power, " mag=", row.magnitude);
+}
+
+printline("");
+printline("Signal B spectrum:");
+for (i = 0; i < specB.count(); i = i + 1) {
+    row = specB[i];
+    printline("  bin=", row.index, " power=", row.power, " mag=", row.magnitude);
+}

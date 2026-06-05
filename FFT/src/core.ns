@@ -1,0 +1,198 @@
+// core.ns — FFT operations and complex-number helpers.
+
+pi = 3.141592653589793;
+
+complex = func(re, im) {
+    return {re: re, im: im};
+};
+
+copyComplex = func(value) {
+    if (!defined(value) || value == null) return this.complex(0, 0);
+    re = defined(value.re) ? value.re : 0;
+    im = defined(value.im) ? value.im : 0;
+    return this.complex(re, im);
+};
+
+fromReal = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(this.complex(values[i], 0));
+    return out;
+};
+
+add = func(a, b) {
+    return this.complex(a.re + b.re, a.im + b.im);
+};
+
+sub = func(a, b) {
+    return this.complex(a.re - b.re, a.im - b.im);
+};
+
+mul = func(a, b) {
+    return this.complex(
+        (a.re * b.re) - (a.im * b.im),
+        (a.re * b.im) + (a.im * b.re)
+    );
+};
+
+scale = func(a, factor) {
+    return this.complex(a.re * factor, a.im * factor);
+};
+
+conjugate = func(a) {
+    return this.complex(a.re, 0 - a.im);
+};
+
+magnitude = func(a) {
+    return sqrt((a.re * a.re) + (a.im * a.im));
+};
+
+atan2Value = func(y, x) {
+    if (x > 0) return atan(y / x);
+    if (x < 0 && y >= 0) return atan(y / x) + this.pi;
+    if (x < 0 && y < 0) return atan(y / x) - this.pi;
+    if (x == 0 && y > 0) return this.pi / 2;
+    if (x == 0 && y < 0) return 0 - (this.pi / 2);
+    return 0;
+};
+
+phase = func(a) {
+    return this.atan2Value(a.im, a.re);
+};
+
+isPowerOfTwo = func(n) {
+    if (!defined(n) || n < 1) return false;
+    value = n;
+    while (value > 1) {
+        if ((value % 2) != 0) return false;
+        value = value / 2;
+    }
+    return true;
+};
+
+nextPowerOfTwo = func(n) {
+    if (!defined(n) || n <= 1) return 1;
+    value = 1;
+    while (value < n) value = value * 2;
+    return value;
+};
+
+padReal = func(values, size) {
+    out = [];
+    target = defined(size) ? size : this.nextPowerOfTwo(values.count());
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    while (out.count() < target) out.add(0);
+    return out;
+};
+
+twiddle = func(k, n, inverse) {
+    sign = inverse ? 1 : -1;
+    angle = sign * 2 * this.pi * k / n;
+    return this.complex(cos(angle), sin(angle));
+};
+
+dftComplex = func(values, inverse) {
+    n = defined(values) ? values.count() : 0;
+    out = [];
+    if (n == 0) return out;
+
+    for (k = 0; k < n; k = k + 1) {
+        sum = this.complex(0, 0);
+        for (t = 0; t < n; t = t + 1) {
+            factor = this.twiddle(k * t, n, inverse);
+            term = this.mul(values[t], factor);
+            sum = this.add(sum, term);
+        }
+        if (inverse) sum = this.scale(sum, 1 / n);
+        out.add(sum);
+    }
+    return out;
+};
+
+fftComplex = func(values) {
+    n = defined(values) ? values.count() : 0;
+    if (n == 0) return [];
+    if (n == 1) return [this.copyComplex(values[0])];
+    if (!this.isPowerOfTwo(n)) return this.dftComplex(values, false);
+
+    evens = [];
+    odds = [];
+    for (i = 0; i < n; i = i + 1) {
+        if ((i % 2) == 0) evens.add(values[i]);
+        else odds.add(values[i]);
+    }
+
+    evenFft = this.fftComplex(evens);
+    oddFft = this.fftComplex(odds);
+    out = [];
+    half = n / 2;
+    for (k = 0; k < half; k = k + 1) {
+        tw = this.twiddle(k, n, false);
+        oddTerm = this.mul(tw, oddFft[k]);
+        out.add(this.add(evenFft[k], oddTerm));
+    }
+    for (k = 0; k < half; k = k + 1) {
+        tw = this.twiddle(k, n, false);
+        oddTerm = this.mul(tw, oddFft[k]);
+        out.add(this.sub(evenFft[k], oddTerm));
+    }
+    return out;
+};
+
+ifftComplex = func(values) {
+    n = defined(values) ? values.count() : 0;
+    if (n == 0) return [];
+    if (!this.isPowerOfTwo(n)) return this.dftComplex(values, true);
+
+    conjugated = [];
+    for (i = 0; i < n; i = i + 1) conjugated.add(this.conjugate(values[i]));
+    transformed = this.fftComplex(conjugated);
+    out = [];
+    for (i = 0; i < transformed.count(); i = i + 1) {
+        out.add(this.scale(this.conjugate(transformed[i]), 1 / n));
+    }
+    return out;
+};
+
+fftReal = func(values) {
+    return this.fftComplex(this.fromReal(values));
+};
+
+ifftReal = func(values) {
+    complexRows = this.ifftComplex(values);
+    out = [];
+    for (i = 0; i < complexRows.count(); i = i + 1) out.add(complexRows[i].re);
+    return out;
+};
+
+magnitudes = func(values) {
+    out = [];
+    for (i = 0; i < values.count(); i = i + 1) out.add(this.magnitude(values[i]));
+    return out;
+};
+
+spectrum = func(values) {
+    bins = this.fftReal(values);
+    out = [];
+    for (i = 0; i < bins.count(); i = i + 1) {
+        mag = this.magnitude(bins[i]);
+        out.add({
+            index: i,
+            re: bins[i].re,
+            im: bins[i].im,
+            magnitude: mag,
+            power: mag * mag
+        });
+    }
+    return out;
+};
+
+dominantBin = func(values) {
+    spec = this.spectrum(values);
+    best = null;
+    for (i = 0; i < spec.count(); i = i + 1) {
+        row = spec[i];
+        if (best == null || row.magnitude > best.magnitude) best = row;
+    }
+    return best;
+};

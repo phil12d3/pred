@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FFT Documentation</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #17212b;
+      --muted: #52606d;
+      --line: #d8e1ea;
+      --accent: #0f766e;
+      --accent2: #b45309;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+      --max: 1080px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 28px 16px 48px;
+      background: linear-gradient(180deg, #fbfcff 0%, #f3f5f9 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      margin-bottom: 14px;
+    }
+    .hero { background: radial-gradient(circle at 0% 0%, #e6f8f5 0%, #ffffff 60%); }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; }
+    h1 { font-size: 2.2rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin-top: 12px; margin-bottom: 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin-top: 18px; margin-bottom: 8px; color: var(--accent); }
+    .muted { color: var(--muted); }
+    .code {
+      background: #f8fafc;
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      white-space: pre;
+      display: block;
+      font-family: "Courier New", Courier, monospace;
+      color: #102a43;
+      font-size: 0.92rem;
+    }
+    .prop {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      margin: 8px 0;
+      background: #fffdfa;
+    }
+    .prop .name {
+      color: var(--accent);
+      font-family: "Courier New", Courier, monospace;
+      font-weight: bold;
+    }
+    .note {
+      border-left: 4px solid var(--accent2);
+      background: #fff7ed;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    ul { margin: 8px 0 8px 22px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>FFT Documentation</h1>
+      <p class="muted">Reference for the standalone FFT module for ns. This module covers complex-number helpers, radix-2 fast Fourier transforms, inverse transforms, and spectrum inspection for real signals.</p>
+      <p class="muted">The emphasis is on direct, inspectable outputs. You give the module numbers, it gives you explicit complex bins, magnitudes, powers, and reconstructed samples without hiding the intermediate shapes.</p>
+    </section>
+
+    <section class="section">
+      <h2>1) What FFT Is For</h2>
+      <p>The FFT module turns time-domain sequences into frequency-domain bins. This is useful when you want to inspect periodic structure, measure spectral energy, or reconstruct a signal after a transform.</p>
+      <ul>
+        <li>Use <code>fftReal()</code> when your samples are ordinary real numbers.</li>
+        <li>Use <code>fftComplex()</code> when your input is already complex.</li>
+        <li>Use <code>ifftComplex()</code> or <code>ifftReal()</code> to reconstruct the input domain.</li>
+        <li>Use <code>spectrum()</code> and <code>dominantBin()</code> for quick inspection.</li>
+      </ul>
+      <p>Typical use cases:</p>
+      <ul>
+        <li>Check whether a repeating pattern exists in a short signal.</li>
+        <li>Compare how concentrated two signals are in the frequency domain.</li>
+        <li>Pad a short signal before transforming it, then inspect how the bin layout changes.</li>
+        <li>Round-trip a transform to verify reconstruction quality.</li>
+      </ul>
+      <div class="note"><strong>Implementation note:</strong> power-of-two lengths use a recursive Cooley-Tukey FFT. Other lengths fall back to a direct DFT so the API still works for arbitrary input sizes.</div>
+    </section>
+
+    <section class="section">
+      <h2>2) Import And Layout</h2>
+      <div class="code"><code>fft = import("./FFT.ns");
+
+signal = [0, 1, 0, -1, 0, 1, 0, -1];
+bins = fft.core.fftReal(signal);
+printline(bins[0].re);</code></div>
+
+      <div class="prop"><span class="name">FFT.ns</span><br>Umbrella import that exposes the <code>core</code> namespace.</div>
+      <div class="prop"><span class="name">core.*</span><br>Complex-number helpers, FFT functions, inverse transforms, and spectrum utilities.</div>
+      <div class="note"><strong>Module style:</strong> the public surface is intentionally small. Most workflows can be expressed with <code>fftReal()</code>, <code>ifftReal()</code>, <code>spectrum()</code>, and <code>dominantBin()</code>, while the complex helpers are there when you want to inspect or manipulate bins directly.</div>
+    </section>
+
+    <section class="section">
+      <h2>3) Data Shapes</h2>
+      <div class="prop"><span class="name">complex row</span><br>{ re: number, im: number }</div>
+      <div class="prop"><span class="name">spectrum row</span><br>{ index: number, re: number, im: number, magnitude: number, power: number }</div>
+      <div class="code"><code>// Example complex row:
+{ re: 0, im: -4 }
+
+// Example spectrum row:
+{
+  index: 2,
+  re: 0,
+  im: -4,
+  magnitude: 4,
+  power: 16
+}</code></div>
+    </section>
+
+    <section class="section">
+      <h2>4) Core Functions</h2>
+
+      <h3>core.complex(re, im)</h3>
+      <p>Create a complex value.</p>
+      <div class="code"><code>z = fft.core.complex(3, -2);</code></div>
+
+      <h3>core.add(a, b), core.sub(a, b), core.mul(a, b), core.scale(a, factor), core.conjugate(a)</h3>
+      <p>Basic complex arithmetic helpers. These are useful when you want to work with bins directly.</p>
+      <div class="code"><code>a = fft.core.complex(2, 3);
+b = fft.core.complex(4, -1);
+product = fft.core.mul(a, b);
+// { re: 11, im: 10 }</code></div>
+
+      <h3>core.magnitude(a) and core.phase(a)</h3>
+      <p>Return the Euclidean magnitude and polar phase of a complex value.</p>
+      <p><strong>Interpretation:</strong> magnitude tells you how much energy is in a bin, while phase tells you its angular orientation. Most quick inspection workflows care about magnitude first.</p>
+
+      <h3>core.isPowerOfTwo(n) and core.nextPowerOfTwo(n)</h3>
+      <p>Utility functions for sequence sizing. These are useful when you want to explicitly pad a signal before transforming it.</p>
+      <div class="code"><code>fft.core.isPowerOfTwo(8);   // true
+fft.core.isPowerOfTwo(6);   // false
+fft.core.nextPowerOfTwo(6); // 8</code></div>
+
+      <h3>core.padReal(values, size)</h3>
+      <p>Pad a real-valued sequence with trailing zeros up to a requested size, or to the next power of two when size is omitted.</p>
+      <div class="code"><code>signal = [1, 2, 3, 4, 5];
+padded = fft.core.padReal(signal);
+// [1, 2, 3, 4, 5, 0, 0, 0]</code></div>
+      <div class="note"><strong>Why pad?</strong> Padding does not add new information, but it lets you use the radix-2 FFT path and gives you a denser bin layout to inspect.</div>
+
+      <h3>core.fromReal(values)</h3>
+      <p>Convert a list of real numbers into complex rows with zero imaginary part.</p>
+      <div class="code"><code>rows = fft.core.fromReal([3, 1]);
+// [{re:3, im:0}, {re:1, im:0}]</code></div>
+
+      <h3>core.fftComplex(values)</h3>
+      <p>Compute the forward Fourier transform of a complex sequence.</p>
+      <p>Power-of-two lengths use FFT. Non-power-of-two lengths use DFT fallback.</p>
+      <div class="note"><strong>Performance note:</strong> power-of-two sizes are the fast path. Arbitrary lengths still work, but they use the direct DFT implementation and are much more expensive for large inputs.</div>
+
+      <h3>core.fftReal(values)</h3>
+      <p>Convenience wrapper for real-valued sequences.</p>
+      <div class="code"><code>bins = fft.core.fftReal([1, 0, 0, 0]);
+for (i = 0; i < bins.count(); i = i + 1) {
+  printline(i, " => re=", bins[i].re, " im=", bins[i].im);
+}</code></div>
+
+      <h3>core.ifftComplex(values)</h3>
+      <p>Compute the inverse transform and return complex rows.</p>
+      <p><strong>Use it when:</strong> your bins are complex and you want the full complex-valued reconstructed signal, not just the real part.</p>
+
+      <h3>core.ifftReal(values)</h3>
+      <p>Inverse transform for signals that were originally real. Returns the real part of each reconstructed sample.</p>
+      <div class="code"><code>signal = [0, 1, 0, -1, 0, 1, 0, -1];
+reconstructed = fft.core.ifftReal(fft.core.fftReal(signal));</code></div>
+      <div class="note"><strong>Practical expectation:</strong> reconstructed values should be very close to the originals, but tiny floating-point residues are normal.</div>
+
+      <h3>core.magnitudes(values)</h3>
+      <p>Map a list of complex bins to a list of magnitudes only.</p>
+      <div class="code"><code>mags = fft.core.magnitudes(fft.core.fftReal([1, 0, 0, 0]));</code></div>
+
+      <h3>core.spectrum(values)</h3>
+      <p>Compute a real-signal transform and return rich spectrum rows for each bin.</p>
+      <div class="code"><code>spec = fft.core.spectrum([0, 1, 0, -1, 0, 1, 0, -1]);
+for (i = 0; i < spec.count(); i = i + 1) {
+  printline(spec[i].index, " => ", spec[i].magnitude);
+}</code></div>
+      <p><strong>When spectrum() is better than fftReal():</strong> use it when you want a report-like structure with index, magnitude, and power already attached instead of manually deriving those from complex bins.</p>
+
+      <h3>core.dominantBin(values)</h3>
+      <p>Return the spectrum row with the largest magnitude.</p>
+      <div class="note"><strong>Interpretation note:</strong> for many real periodic signals, you will often see mirrored peaks at symmetric bins. <code>dominantBin()</code> returns one of them, not both.</div>
+      <div class="code"><code>dominant = fft.core.dominantBin([0, 1, 0, -1, 0, 1, 0, -1]);
+printline(dominant.index, " ", dominant.magnitude);</code></div>
+    </section>
+
+    <section class="section">
+      <h2>5) End-To-End Patterns</h2>
+
+      <h3>Impulse Response</h3>
+      <div class="code"><code>signal = [1, 0, 0, 0];
+bins = fft.core.fftReal(signal);
+// Every bin should be {re:1, im:0}</code></div>
+
+      <h3>Simple Periodic Signal</h3>
+      <div class="code"><code>signal = [0, 1, 0, -1, 0, 1, 0, -1];
+dominant = fft.core.dominantBin(signal);
+printline("bin=", dominant.index, " mag=", dominant.magnitude);</code></div>
+
+      <h3>Reconstruction</h3>
+      <div class="code"><code>signal = [1, 2, 3, 4, 5];
+reconstructed = fft.core.ifftReal(fft.core.fftReal(signal));</code></div>
+
+      <h3>Padding Before Transforming</h3>
+      <div class="code"><code>signal = [1, 2, 3, 4, 5];
+padded = fft.core.padReal(signal);
+spec = fft.core.spectrum(padded);</code></div>
+
+      <h3>Comparing Two Signals</h3>
+      <div class="code"><code>a = [0, 1, 0, -1, 0, 1, 0, -1];
+b = [1, 1, 1, 1, 0, 0, 0, 0];
+
+domA = fft.core.dominantBin(a);
+domB = fft.core.dominantBin(b);
+printline("A => ", domA.index, " / ", domA.magnitude);
+printline("B => ", domB.index, " / ", domB.magnitude);</code></div>
+
+      <h3>Inspecting Complex Bins Directly</h3>
+      <div class="code"><code>bins = fft.core.fftReal([0, 1, 0, -1]);
+for (i = 0; i < bins.count(); i = i + 1) {
+  phase = fft.core.phase(bins[i]);
+  printline(i, " re=", bins[i].re, " im=", bins[i].im, " phase=", phase);
+}</code></div>
+    </section>
+
+    <section class="section">
+      <h2>6) Interpretation Notes</h2>
+      <ul>
+        <li>The output bins are ordered by frequency index, not by magnitude. If you want the strongest frequency component, use <code>dominantBin()</code> or sort the spectrum yourself.</li>
+        <li>Real-valued signals often produce mirrored frequency components. This is expected and not a bug.</li>
+        <li>Very small non-zero values such as <code>2.44929e-16</code> are normal floating-point artifacts.</li>
+        <li>Padding with zeros changes the transform resolution and layout, but does not create new signal content.</li>
+        <li>For non-power-of-two input lengths, the module keeps the API behavior identical, but uses the slower DFT fallback internally.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>7) Example Scripts</h2>
+      <p>The <code>examples</code> folder now covers several different workflows:</p>
+      <ul>
+        <li><code>demo.ns</code>: periodic signal and dominant bin inspection</li>
+        <li><code>impulse_signal.ns</code>: impulse response and exact-style reconstruction</li>
+        <li><code>non_power_two.ns</code>: DFT fallback on arbitrary lengths</li>
+        <li><code>complex_arithmetic.ns</code>: direct complex-number operations and phase inspection</li>
+        <li><code>padding_and_resolution.ns</code>: zero padding and spectrum layout comparison</li>
+        <li><code>signal_comparison.ns</code>: compare different signals by dominant bins and energy layout</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>
