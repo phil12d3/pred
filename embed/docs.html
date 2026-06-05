@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>embed Documentation</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --ink: #17212b;
+      --muted: #52606d;
+      --line: #d9e2ec;
+      --accent: #0f766e;
+      --accent2: #b45309;
+      --accent3: #1d4ed8;
+      --code-bg: #f8fafc;
+      --soft: #f7fbfb;
+      --radius: 12px;
+      --max: 1160px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfcfd 0%, #eef4f6 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+
+    body { padding: 28px 16px 48px; }
+
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background:
+        linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)),
+        var(--panel);
+    }
+
+    .section {
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      letter-spacing: 0;
+    }
+
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 {
+      font-size: 1.52rem;
+      margin: 26px 0 12px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    h3 { font-size: 1.14rem; margin: 18px 0 8px; color: var(--accent); }
+    h4 { font-size: 1rem; margin: 12px 0 6px; color: var(--accent3); }
+
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+
+    code {
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.94em;
+    }
+
+    .muted { color: var(--muted); }
+
+    .toc {
+      columns: 2;
+      gap: 24px;
+    }
+
+    .code, .note, .prop, .shape, .concept {
+      border-radius: 9px;
+      margin: 10px 0 14px;
+    }
+
+    .code {
+      background: var(--code-bg);
+      border-left: 4px solid var(--accent);
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .code code {
+      display: block;
+      white-space: pre;
+      color: #102a43;
+      font-size: 0.92rem;
+    }
+
+    .note {
+      border-left: 4px solid var(--accent2);
+      background: #fff7ed;
+      padding: 11px 12px;
+    }
+
+    .concept {
+      border-left: 4px solid var(--accent3);
+      background: #eff6ff;
+      padding: 11px 12px;
+    }
+
+    .prop, .shape {
+      border: 1px solid var(--line);
+      background: #fffdfa;
+      padding: 11px;
+    }
+
+    .shape { background: var(--soft); }
+
+    .name {
+      color: var(--accent);
+      font-family: "Courier New", Courier, monospace;
+      font-weight: bold;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 900px) {
+      .toc { columns: 1; }
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 1.9rem; }
+      body { padding: 16px 10px 36px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>embed Complete Documentation</h1>
+      <p class="muted">Beginner-friendly reference for the embedding module: what embeddings are, how the module represents them, how each function works, what you pass in, and what you get back.</p>
+      <p class="muted">This page is intentionally expanded. It explains the ideas behind the API as well as the mechanics, so you can use the module without already knowing vector search or machine learning terminology.</p>
+    </section>
+
+    <section class="section">
+      <h2>Table of Contents</h2>
+      <div class="toc">
+        <ul>
+          <li>1. What the embed module is for</li>
+          <li>2. Beginner concepts and terminology</li>
+          <li>3. Importing the module</li>
+          <li>4. The embedding object shape</li>
+          <li>5. Choosing dimensions</li>
+          <li>6. Which namespace should I use?</li>
+          <li>7. Core functions</li>
+          <li>8. Learning functions</li>
+          <li>9. Distance and similarity functions</li>
+          <li>10. Operations for combining embeddings</li>
+          <li>11. Utility functions</li>
+          <li>12. Text embedding walkthrough</li>
+          <li>13. Common workflows</li>
+          <li>14. Interpreting results and avoiding mistakes</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>1) What the embed Module Is For</h2>
+      <p>The embed module creates and works with numeric representations of things. Those things can be words, documents, data series, observations, user records, or any other item you can describe with numbers or counts.</p>
+      <p>The module does not use a neural network. It uses statistical patterns, vector math, and matrix operations. That makes the system inspectable: an embedding is just an object with a list of numbers, and every function returns ordinary data.</p>
+
+      <p>You can use the module to:</p>
+      <ul>
+        <li>Create empty, zero, random, or learned embeddings.</li>
+        <li>Normalize embeddings so they can be compared fairly.</li>
+        <li>Measure how similar or different two embeddings are.</li>
+        <li>Find the closest matches to a query embedding.</li>
+        <li>Average, merge, interpolate, expand, project, rotate, or orthogonalize embeddings.</li>
+        <li>Cluster a group of embeddings or compare two populations.</li>
+      </ul>
+
+      <div class="note">
+        <strong>Important:</strong> an embedding is only as meaningful as the data used to build it. If every item is generated from exactly the same input, every item will look identical. For text terms, use term-specific context data such as co-occurrence, not one shared frequency map for every word.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>2) Beginner Concepts and Terminology</h2>
+
+      <div class="concept">
+        <strong>Embedding:</strong> a list of numbers that represents an item. For example, the word "apple" might become a 12-number vector. Similar items should end up with similar vectors.
+      </div>
+
+      <div class="concept">
+        <strong>Vector:</strong> another name for a list of numbers. In this module, an embedding's <code>values</code> field is the vector.
+      </div>
+
+      <div class="concept">
+        <strong>Dimension:</strong> one position in the vector. A 4-dimensional embedding has four numeric values. A 12-dimensional embedding has twelve numeric values.
+      </div>
+
+      <div class="concept">
+        <strong>Magnitude:</strong> the length of a vector. A large magnitude means the numbers are collectively large. Many comparison methods are easier to interpret after embeddings are normalized to magnitude 1.
+      </div>
+
+      <div class="concept">
+        <strong>Normalization:</strong> rescaling values so embeddings can be compared fairly. L2 normalization changes a vector so its magnitude is 1, while keeping its direction.
+      </div>
+
+      <div class="concept">
+        <strong>Cosine similarity:</strong> a score based on direction. If two normalized embeddings point in the same direction, cosine is close to 1. If they point in unrelated directions, it is closer to 0. If they point opposite ways, it can be negative.
+      </div>
+
+      <div class="concept">
+        <strong>Distance:</strong> a measure of how far apart two embeddings are. Small distance means close. Large distance means different. Similarity and distance move in opposite directions.
+      </div>
+
+      <div class="concept">
+        <strong>Co-occurrence:</strong> when two terms appear near each other. In text embeddings, "apple" appearing near "fruit" and "sweet" gives the module context for what "apple" is related to.
+      </div>
+
+      <div class="concept">
+        <strong>Positional encoding:</strong> extra vector information that says where an item appears in a sequence. Without it, the same token embedding looks identical at position 0 and position 5. With it, the content can stay recognizable while the position becomes distinguishable.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>3) Importing the Module</h2>
+      <p>The main import file is <code>embed.ns</code>. It exposes five namespaces: <code>core</code>, <code>learn</code>, <code>distance</code>, <code>ops</code>, and <code>utils</code>.</p>
+
+      <div class="code"><code>embed = import("./embed.ns");
+
+// Create an embedding.
+item = embed.core.create(4, "item_a");
+
+// Learn an embedding from data.
+learned = embed.learn.fromFrequencies({"red": 3, "blue": 1}, 8);
+
+// Compare embeddings.
+score = embed.distance.similarity(item, learned, "cosine");</code></div>
+
+      <div class="note">
+        <strong>Runtime note:</strong> in the current NS runtime, functions with default-like behavior still need the full argument list in many places. Use <code>null</code> for optional arguments when needed, for example <code>embed.core.create(8, null)</code> or <code>embed.learn.fromCoOccurrence(cooc, "apple", 12, null)</code>.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>4) The Embedding Object Shape</h2>
+      <p>Most functions either accept or return an embedding object. It has four fields:</p>
+
+      <div class="code"><code>{
+  dims: 4,
+  values: [0.5, 0.2, 0.1, 0.8],
+  id: "example_embedding",
+  metadata: {
+    label: "apple"
+  }
+}</code></div>
+
+      <table>
+        <tr><th>Field</th><th>Meaning</th><th>Beginner explanation</th></tr>
+        <tr><td><code>dims</code></td><td>Number of dimensions.</td><td>This should match the number of items in <code>values</code>.</td></tr>
+        <tr><td><code>values</code></td><td>Array of numbers.</td><td>This is the actual vector. It is what math functions compare and transform.</td></tr>
+        <tr><td><code>id</code></td><td>Identifier string.</td><td>A human or program-friendly name for the embedding.</td></tr>
+        <tr><td><code>metadata</code></td><td>Object of extra fields.</td><td>Use this to store labels, source terms, frequencies, classes, or other non-vector information.</td></tr>
+      </table>
+
+      <p>Most functions return a new embedding-like object instead of changing the old one directly. In practice, assign the result back to a variable:</p>
+      <div class="code"><code>emb = embed.core.create(4, "demo");
+emb = embed.core.set(emb, 0, 1);
+emb = embed.core.normalize(emb);</code></div>
+    </section>
+
+    <section class="section">
+      <h2>5) Choosing Dimensions</h2>
+      <p>The number of dimensions controls how much room the embedding has to store patterns. More dimensions can represent more detail, but they also make vectors larger and may be harder to inspect.</p>
+      <ul>
+        <li><strong>4 to 8 dimensions:</strong> useful for tiny examples, tests, and easy printing.</li>
+        <li><strong>12 to 32 dimensions:</strong> practical for small text or numeric demos.</li>
+        <li><strong>64 or more dimensions:</strong> useful when you have more terms, more contexts, or more complex data.</li>
+      </ul>
+      <p>Dimensions are not named. Dimension 0 does not automatically mean "fruitness" or "temperature". The meaning emerges from the construction method and the data. If you need named, explainable fields, use ordinary feature objects instead of embeddings.</p>
+    </section>
+
+    <section class="section">
+      <h2>6) Which Namespace Should I Use?</h2>
+      <p>The module is split into namespaces so you can find the right tool quickly. If you are new to embeddings, this section is the practical map.</p>
+
+      <table>
+        <tr><th>Question</th><th>Use this namespace</th><th>Typical functions</th></tr>
+        <tr><td>I need to create or inspect one embedding.</td><td><code>embed.core</code></td><td><code>create</code>, <code>set</code>, <code>normalize</code>, <code>stats</code></td></tr>
+        <tr><td>I need to make embeddings from data.</td><td><code>embed.learn</code></td><td><code>fromFrequencies</code>, <code>fromCoOccurrence</code>, <code>learn</code></td></tr>
+        <tr><td>I need to compare two embeddings.</td><td><code>embed.distance</code></td><td><code>similarity</code>, <code>euclideanDistance</code>, <code>cosineSimilarity</code></td></tr>
+        <tr><td>I need to combine, reshape, or position embeddings.</td><td><code>embed.ops</code></td><td><code>average</code>, <code>merge</code>, <code>interpolate</code>, <code>project</code>, <code>positionalEncoding</code></td></tr>
+        <tr><td>I need to work with many embeddings at once.</td><td><code>embed.utils</code></td><td><code>cluster</code>, <code>diversity</code>, <code>createIndex</code>, <code>comparePopulations</code></td></tr>
+      </table>
+
+      <p>A common full workflow uses all five namespaces:</p>
+      <div class="code"><code>// 1. Learn vectors from data.
+apple = embed.learn.fromCoOccurrence(cooc, "apple", 12, null);
+banana = embed.learn.fromCoOccurrence(cooc, "banana", 12, null);
+
+// 2. Attach labels.
+apple = embed.core.withMetadata(apple, "term", "apple");
+banana = embed.core.withMetadata(banana, "term", "banana");
+
+// 3. Compare them.
+score = embed.distance.similarity(apple, banana, "cosine");
+
+// 4. Search a collection.
+matches = embed.distance.findMostSimilar(apple, [apple, banana], 2, "cosine");
+
+// 5. Group a collection.
+clusters = embed.utils.cluster([apple, banana], 0.4, "cosine");</code></div>
+    </section>
+
+    <section class="section">
+      <h2>7) Core Functions</h2>
+      <p>The <code>embed.core</code> namespace contains basic embedding construction, inspection, and editing functions.</p>
+
+      <div class="prop"><span class="name">create(dimensions, seedId)</span><br>
+        <strong>Purpose:</strong> Create a zero-filled embedding with the requested number of dimensions.<br>
+        <strong>Pass in:</strong> <code>dimensions</code> as a number, and <code>seedId</code> as a string or <code>null</code>.<br>
+        <strong>Returns:</strong> an embedding with <code>values</code> filled with zeros.<br>
+        <strong>Use when:</strong> you want to manually set values one dimension at a time.</div>
+      <div class="code"><code>emb = embed.core.create(4, "manual");
+// values are [0, 0, 0, 0]</code></div>
+
+      <div class="prop"><span class="name">set(embedding, index, value)</span><br>
+        <strong>Purpose:</strong> Return a copy of an embedding with one dimension changed.<br>
+        <strong>Pass in:</strong> an embedding, a zero-based index, and the new number.<br>
+        <strong>Returns:</strong> an embedding with the updated value. Invalid indexes return the original embedding.<br>
+        <strong>Use when:</strong> building vectors manually or adjusting one dimension.</div>
+
+      <div class="prop"><span class="name">at(embedding, index)</span><br>
+        <strong>Purpose:</strong> Read one dimension from an embedding.<br>
+        <strong>Pass in:</strong> an embedding and a zero-based index.<br>
+        <strong>Returns:</strong> the number at that index, or <code>0</code> if the index is out of bounds.</div>
+
+      <div class="prop"><span class="name">magnitude(embedding)</span><br>
+        <strong>Purpose:</strong> Compute the vector length, also called the L2 norm.<br>
+        <strong>Pass in:</strong> an embedding.<br>
+        <strong>Returns:</strong> a number. A zero embedding has magnitude <code>0</code>. A normalized embedding usually has magnitude close to <code>1</code>.</div>
+
+      <div class="prop"><span class="name">normalize(embedding)</span><br>
+        <strong>Purpose:</strong> Scale an embedding so its magnitude is 1.<br>
+        <strong>Pass in:</strong> an embedding with non-zero values.<br>
+        <strong>Returns:</strong> a normalized embedding with the same dimensions, id, and metadata.<br>
+        <strong>Use when:</strong> comparing direction with cosine similarity. Avoid normalizing all-zero vectors.</div>
+
+      <div class="prop"><span class="name">rescaleNorm(embedding)</span><br>
+        <strong>Purpose:</strong> Rescale the smallest value to <code>-1</code> and the largest value to <code>1</code>.<br>
+        <strong>Pass in:</strong> an embedding.<br>
+        <strong>Returns:</strong> an embedding whose values are spread across the <code>[-1, 1]</code> range. If all values are equal, it returns zeros.</div>
+
+      <div class="prop"><span class="name">clamp(embedding)</span><br>
+        <strong>Purpose:</strong> Limit each value so it cannot go below <code>-1</code> or above <code>1</code>.<br>
+        <strong>Pass in:</strong> an embedding.<br>
+        <strong>Returns:</strong> an embedding with the same shape and clipped values.<br>
+        <strong>Example:</strong> <code>2.5</code> becomes <code>1</code>, <code>-2.5</code> becomes <code>-1</code>, and <code>0.5</code> stays <code>0.5</code>.</div>
+
+      <div class="prop"><span class="name">stats(embedding)</span><br>
+        <strong>Purpose:</strong> Summarize an embedding's values.<br>
+        <strong>Pass in:</strong> an embedding.<br>
+        <strong>Returns:</strong> <code>{mean, variance, stddev, min, max, count}</code>.<br>
+        <strong>Use when:</strong> debugging whether values are too small, too large, all the same, or spread out.</div>
+
+      <div class="prop"><span class="name">copy(embedding)</span><br>
+        <strong>Purpose:</strong> Duplicate an embedding.<br>
+        <strong>Pass in:</strong> an embedding.<br>
+        <strong>Returns:</strong> a new embedding object with copied values and an id ending in <code>_copy</code>.</div>
+
+      <div class="prop"><span class="name">withMetadata(embedding, key, value)</span><br>
+        <strong>Purpose:</strong> Attach non-vector information to an embedding.<br>
+        <strong>Pass in:</strong> an embedding, a string key, and any value.<br>
+        <strong>Returns:</strong> an embedding with updated <code>metadata</code>.<br>
+        <strong>Use when:</strong> storing labels such as <code>term</code>, <code>frequency</code>, <code>source</code>, or <code>class</code>.</div>
+
+      <div class="prop"><span class="name">zero(dimensions)</span><br>
+        <strong>Purpose:</strong> Create an all-zero embedding.<br>
+        <strong>Pass in:</strong> the number of dimensions.<br>
+        <strong>Returns:</strong> an embedding with id like <code>zero_...</code> and all values set to <code>0</code>.</div>
+
+      <div class="prop"><span class="name">random(dimensions, seedVal)</span><br>
+        <strong>Purpose:</strong> Create a deterministic pseudo-random embedding with values in roughly <code>[-1, 1]</code>.<br>
+        <strong>Pass in:</strong> dimensions and a numeric seed.<br>
+        <strong>Returns:</strong> an embedding with generated values.<br>
+        <strong>Use when:</strong> creating toy examples or initial vectors. Do not treat random embeddings as meaningful until they are learned or transformed.</div>
+
+      <h3>Internal math helpers in core.ns</h3>
+      <p>The source file also contains <code>abs(x)</code>, <code>max(a, b)</code>, <code>min(a, b)</code>, and <code>sqrt(x)</code>. These are small helper functions used to support the module's math. They return ordinary numbers and are not usually the functions you reach for when working with embeddings. In normal application code, prefer the embedding-level functions above.</p>
+    </section>
+
+    <section class="section">
+      <h2>8) Learning Functions</h2>
+      <p>The <code>embed.learn</code> namespace creates embeddings from observed data. This is where raw counts become vectors.</p>
+
+      <div class="prop"><span class="name">fromFrequencies(freqMap, dimensions)</span><br>
+        <strong>Purpose:</strong> Turn a frequency or weight map into one embedding.<br>
+        <strong>Pass in:</strong> an object whose keys are labels and whose values are numbers, plus the number of dimensions.<br>
+        <strong>Returns:</strong> a normalized embedding.<br>
+        <strong>How it works:</strong> it extracts numeric counts, computes statistics such as concentration and spread, then fills dimensions from weighted patterns.<br>
+        <strong>Use when:</strong> one item is described by a distribution of counts. Do not call this with the same frequency map for every term unless you intentionally want identical embeddings.</div>
+      <div class="code"><code>freq = {"red": 5, "sweet": 3, "fruit": 4};
+appleProfile = embed.learn.fromFrequencies(freq, 8);</code></div>
+
+      <h3>How to think about frequency input</h3>
+      <p>A frequency map describes one item. For example, if a product profile has counts for user actions, or a document has counts for themes, that whole map can become one embedding. The keys do not become labels in the returned object; they influence the numeric values.</p>
+      <p>The common mistake is using one global map to create many embeddings. If <code>globalFreq</code> is the same object every time, then <code>fromFrequencies(globalFreq, 12)</code> returns the same vector every time. To create different embeddings, each call needs different input.</p>
+
+      <div class="prop"><span class="name">fromCoOccurrence(cooccMatrix, term, dimensions, maxContextTerms)</span><br>
+        <strong>Purpose:</strong> Build an embedding for one term from the terms that appear near it.<br>
+        <strong>Pass in:</strong> a nested object, the target term string, dimensions, and a context limit or <code>null</code>.<br>
+        <strong>Returns:</strong> a normalized embedding for the target term. If the term is missing or has no context, it returns a zero embedding.<br>
+        <strong>Input shape:</strong> <code>{"apple": {"fruit": 3, "sweet": 2}}</code> means "apple appeared near fruit three times and sweet twice".<br>
+        <strong>How it works:</strong> context terms are projected into sparse dimensions. Shared contexts land in shared dimensions, so terms with overlapping neighborhoods become more similar.</div>
+      <div class="code"><code>cooc = {
+  "apple": {"fruit": 3, "sweet": 2, "pie": 1},
+  "banana": {"fruit": 2, "sweet": 1, "yellow": 3}
+};
+
+apple = embed.learn.fromCoOccurrence(cooc, "apple", 12, null);
+banana = embed.learn.fromCoOccurrence(cooc, "banana", 12, null);</code></div>
+
+      <h3>How to think about co-occurrence input</h3>
+      <p>A co-occurrence matrix describes many terms at once, but each call still asks for one target term. This is the preferred beginner method for text because the data is easy to inspect. You can look at <code>cooc["apple"]</code> and see which contexts shaped the apple embedding.</p>
+      <p>The optional <code>maxContextTerms</code> argument limits how many context terms are used after sorting by count. Passing <code>null</code> lets the function use its default. A small limit focuses on strongest evidence. A larger limit includes more weak context.</p>
+
+      <div class="prop"><span class="name">fromCorpus(corpus, term, dimensions)</span><br>
+        <strong>Purpose:</strong> Generate a corpus-derived embedding for a term by scanning document text.<br>
+        <strong>Pass in:</strong> a corpus shaped like <code>{docs: [...]}</code>, a term string, and dimensions.<br>
+        <strong>Returns:</strong> a normalized embedding with id <code>"corpus_emb"</code> and empty metadata.<br>
+        <strong>Use when:</strong> you have raw documents and want the function to derive term frequency, document coverage, position, and nearby context evidence for you.</div>
+
+      <h3>fromCorpus input shape</h3>
+      <p>The function expects an object with a <code>docs</code> array. Each item in <code>docs</code> is usually a document string. Non-string values are converted with <code>stringify</code>, but plain strings are the intended input.</p>
+      <div class="code"><code>corpus = {
+  docs: [
+    "apple fruit sweet",
+    "banana fruit yellow",
+    "orange citrus juice"
+  ]
+};
+
+apple = embed.learn.fromCorpus(corpus, "apple", 12);</code></div>
+
+      <h3>What fromCorpus currently uses</h3>
+      <p>The implementation now reads the document text and derives several pieces of evidence:</p>
+      <ul>
+        <li><strong>Term frequency:</strong> how many times the target term appears across all documents.</li>
+        <li><strong>Document frequency:</strong> how many documents contain the target term at least once.</li>
+        <li><strong>Average position:</strong> whether the term tends to appear earlier or later in matching documents.</li>
+        <li><strong>Context diversity:</strong> how many distinct nearby words appear around the term.</li>
+        <li><strong>Context density:</strong> how much local context evidence was collected relative to the whole corpus.</li>
+        <li><strong>Nearby context terms:</strong> words within a small window around each target occurrence.</li>
+      </ul>
+      <p>The first few dimensions store summary evidence such as frequency and coverage. Nearby context terms are then projected into dimensions using deterministic text-derived seeds. Terms that appear near similar words should therefore land closer together than terms with unrelated context.</p>
+
+      <div class="note">
+        <strong>Tokenization behavior:</strong> <code>fromCorpus</code> uses a simple built-in tokenizer. It keeps ASCII letters and numbers, splits on punctuation and whitespace, and lowercases ASCII uppercase letters. It is suitable for straightforward English-like tokens. It is not a full Unicode tokenizer.
+      </div>
+
+      <h3>When fromCorpus is useful</h3>
+      <p>Use <code>fromCorpus</code> when you want the embedding module to do the basic text evidence gathering for you. It is a good choice for quick document experiments, small corpora, and situations where you do not want to separately build a co-occurrence matrix.</p>
+      <p>It is also useful when document-level coverage matters. For example, a term appearing once in every document and a term appearing many times in one document can produce different signatures because document frequency and total frequency are separate signals.</p>
+
+      <h3>When to prefer fromCoOccurrence</h3>
+      <p>Prefer <code>fromCoOccurrence</code> when you want full control over context collection. For example, you may want a different window size, sentence-bounded context, weighted context, stop-word filtering, or context from an external parser. <code>fromCorpus</code> uses a built-in local window and simple tokenization; <code>fromCoOccurrence</code> lets you provide exactly the context map you want.</p>
+
+      <h3>Empty corpus behavior</h3>
+      <p>If <code>corpus.docs.count()</code> is <code>0</code>, or if the target term never appears, the function returns a zero embedding. A zero embedding means "no evidence found". It should not be treated as a meaningful semantic vector, and you should usually skip zero embeddings in similarity search.</p>
+
+      <h3>Beginner mental model</h3>
+      <p>Think of <code>fromCorpus</code> as "scan these documents, find this term, summarize how often it appears and what words surround it, then turn that evidence into a vector." It is not an LLM and it does not understand grammar, but it does use real corpus evidence rather than only a synthetic seed.</p>
+
+      <h3>fromCorpus example comparison</h3>
+      <div class="code"><code>corpus = {
+  docs: [
+    "apple fruit red sweet",
+    "apple pie sweet dessert",
+    "engine road wheel car"
+  ]
+};
+
+apple = embed.learn.fromCorpus(corpus, "apple", 12);
+engine = embed.learn.fromCorpus(corpus, "engine", 12);
+
+// Apple and engine occur in different contexts, so their vectors should differ.
+distance = embed.distance.euclideanDistance(apple, engine);</code></div>
+
+      <div class="prop"><span class="name">learn(existingEmbedding, newData, learningRate)</span><br>
+        <strong>Purpose:</strong> Move an existing embedding toward new numeric observations.<br>
+        <strong>Pass in:</strong> an embedding, an array of numbers, and a learning rate from <code>0</code> to <code>1</code>.<br>
+        <strong>Returns:</strong> a normalized embedding with id ending in <code>_learned</code>.<br>
+        <strong>How learning rate works:</strong> <code>0</code> keeps the old vector. <code>1</code> uses the new values as strongly as possible. Values like <code>0.1</code> update slowly; values like <code>0.7</code> update quickly.</div>
+      <div class="code"><code>base = embed.core.create(4, "profile");
+base = embed.core.set(base, 0, 0.2);
+base = embed.core.set(base, 1, 0.2);
+base = embed.core.set(base, 2, 0.2);
+base = embed.core.set(base, 3, 0.2);
+
+updated = embed.learn.learn(base, [0.9, 0.4, 0.1, 0.7], 0.3);</code></div>
+    </section>
+
+    <section class="section">
+      <h2>9) Distance and Similarity Functions</h2>
+      <p>The <code>embed.distance</code> namespace compares embeddings. Some functions return similarity, where higher means closer. Other functions return distance, where lower means closer.</p>
+
+      <div class="note">
+        <strong>Similarity versus distance:</strong> similarity answers "how alike are these?" Distance answers "how far apart are these?" A similarity of <code>1</code> is very close. A distance of <code>0</code> is identical.
+      </div>
+
+      <table>
+        <tr><th>Function</th><th>Pass in</th><th>Returns</th><th>Use when</th></tr>
+        <tr><td><code>cosineSimilarity(emb1, emb2)</code></td><td>Two same-dimension embeddings.</td><td>Raw cosine, usually from <code>-1</code> to <code>1</code>.</td><td>You care about direction or pattern, not magnitude.</td></tr>
+        <tr><td><code>euclideanDistance(emb1, emb2)</code></td><td>Two same-dimension embeddings.</td><td>L2 distance number.</td><td>You want straight-line distance between vectors.</td></tr>
+        <tr><td><code>manhattanDistance(emb1, emb2)</code></td><td>Two same-dimension embeddings.</td><td>Sum of absolute differences.</td><td>You want total per-dimension movement.</td></tr>
+        <tr><td><code>chebyshevDistance(emb1, emb2)</code></td><td>Two same-dimension embeddings.</td><td>Largest single-dimension difference.</td><td>You care about the worst mismatch.</td></tr>
+        <tr><td><code>minkowskiDistance(emb1, emb2, p)</code></td><td>Two embeddings and power <code>p</code>.</td><td>Generalized distance.</td><td>You need a tunable distance metric.</td></tr>
+        <tr><td><code>hammingDistance(emb1, emb2, threshold)</code></td><td>Two embeddings and a difference threshold.</td><td>Count of dimensions that differ by more than the threshold.</td><td>You want to count significant dimension changes.</td></tr>
+        <tr><td><code>wassersteinDistance(emb1, emb2)</code></td><td>Two same-dimension embeddings.</td><td>Average distance between sorted value distributions.</td><td>You care about value distribution more than dimension position.</td></tr>
+      </table>
+
+      <h3>How to read cosine scores</h3>
+      <table>
+        <tr><th>Raw cosine score</th><th>Beginner interpretation</th></tr>
+        <tr><td>Close to <code>1</code></td><td>The vectors point in almost the same direction. They have a very similar pattern.</td></tr>
+        <tr><td>Around <code>0.5</code></td><td>There is some overlap, but it is not a very strong match.</td></tr>
+        <tr><td>Around <code>0</code></td><td>The vectors are mostly unrelated in this embedding space.</td></tr>
+        <tr><td>Below <code>0</code></td><td>The vectors point in opposite directions. This is possible for signed vectors; sparse positive co-occurrence vectors usually produce fewer negative scores.</td></tr>
+      </table>
+
+      <h3>How to choose a metric</h3>
+      <p>Use cosine when you care about pattern similarity. Use Euclidean when you want a literal distance through vector space. Use Manhattan when many small differences should add up. Use Chebyshev when one large mismatch matters more than the total. Use Wasserstein when the order of dimensions matters less than the distribution of values.</p>
+
+      <div class="prop"><span class="name">similarity(emb1, emb2, metric)</span><br>
+        <strong>Purpose:</strong> General wrapper for similarity scoring.<br>
+        <strong>Pass in:</strong> two embeddings and a metric string such as <code>"cosine"</code>, <code>"euclidean"</code>, or <code>"manhattan"</code>.<br>
+        <strong>Returns:</strong> for <code>"cosine"</code>, raw cosine. For distance metrics, <code>1 / (1 + distance)</code>, so closer items get scores nearer <code>1</code>.<br>
+        <strong>Beginner tip:</strong> use <code>"cosine"</code> for normalized learned embeddings and use Euclidean distance when you want a more concrete "how far apart" number.</div>
+
+      <div class="prop"><span class="name">findMostSimilar(queryEmbedding, embeddingList, topK, metric)</span><br>
+        <strong>Purpose:</strong> Find the closest embeddings to a query.<br>
+        <strong>Pass in:</strong> a query embedding, an array of candidate embeddings, the number of results to return, and a metric string.<br>
+        <strong>Returns:</strong> an array of objects shaped like <code>{index, embedding, similarity}</code>, sorted by highest similarity first.<br>
+        <strong>Use when:</strong> implementing nearest-neighbor search, recommendations, or "show me similar items" behavior.</div>
+
+      <div class="code"><code>matches = embed.distance.findMostSimilar(query, allEmbeddings, 5, "cosine");
+
+for (i = 0; i < matches.count(); i = i + 1) {
+  print(matches[i].embedding.metadata.label);
+  print(matches[i].similarity);
+}</code></div>
+    </section>
+
+    <section class="section">
+      <h2>10) Operations for Combining Embeddings</h2>
+      <p>The <code>embed.ops</code> namespace transforms embeddings. These functions usually return normalized embeddings, so the output is ready for comparison.</p>
+
+      <div class="grid">
+        <div class="prop"><span class="name">add(emb1, emb2)</span><br>Adds values dimension by dimension. Requires matching dimensions. Returns a normalized embedding.</div>
+        <div class="prop"><span class="name">subtract(emb1, emb2)</span><br>Subtracts <code>emb2</code> from <code>emb1</code> dimension by dimension. Useful for difference vectors. If the result is all zero, normalization may not be meaningful.</div>
+        <div class="prop"><span class="name">multiply(embedding, scalar)</span><br>Scales every value by a number, then normalizes. Because it normalizes afterward, multiplying by larger numbers changes direction only if signs or zeros are involved.</div>
+        <div class="prop"><span class="name">hadamard(emb1, emb2)</span><br>Multiplies two embeddings dimension by dimension. Useful when you want dimensions to reinforce each other only where both embeddings have strong values.</div>
+        <div class="prop"><span class="name">average(embeddings)</span><br>Averages an array of embeddings. Returns a group summary with the same dimensions as the first embedding.</div>
+        <div class="prop"><span class="name">weightedAverage(embeddings, weights)</span><br>Like average, but each embedding can contribute more or less. If weights are missing or invalid, it falls back to a plain average.</div>
+        <div class="prop"><span class="name">merge(embeddings, targetDims)</span><br>Combines multiple embeddings, then projects the combined values into <code>targetDims</code>. Useful for document embeddings from word embeddings.</div>
+        <div class="prop"><span class="name">interpolate(emb1, emb2, alpha)</span><br>Blends between two embeddings. <code>alpha = 0</code> stays at <code>emb1</code>; <code>alpha = 1</code> reaches <code>emb2</code>; <code>0.5</code> is halfway.</div>
+        <div class="prop"><span class="name">project(embedding, targetDims)</span><br>Reduces dimensions by keeping high-variance dimensions. Use when you need a smaller vector.</div>
+        <div class="prop"><span class="name">expand(embedding, targetDims)</span><br>Increases dimensions by keeping existing values and adding small deterministic noise based on spread. Use when an API requires a larger dimension count.</div>
+        <div class="prop"><span class="name">rotate(embedding, rotationFactor)</span><br>Cyclically shifts values. <code>rotationFactor</code> is clamped from <code>0</code> to <code>1</code>. Useful for synthetic transformations and tests.</div>
+        <div class="prop"><span class="name">positionalEncoding(position, dimensions, maxPosition)</span><br>Creates a standalone position vector. <code>position</code> is the zero-based sequence index, <code>dimensions</code> is the vector size, and <code>maxPosition</code> controls the broad position range. Returns a normalized embedding with metadata containing the position.</div>
+        <div class="prop"><span class="name">addPositionalEncoding(embedding, position, strength)</span><br>Blends position information into an existing embedding. <code>strength</code> ranges from <code>0</code> to <code>1</code>; lower values preserve content more strongly, higher values make position matter more. Returns a normalized embedding with position metadata.</div>
+        <div class="prop"><span class="name">orthogonalize(embedding, referenceEmbedding)</span><br>Removes correlation with a reference embedding. Use when you want to reduce overlap with a known direction or concept.</div>
+      </div>
+
+      <div class="code"><code>// Build a document embedding from word embeddings.
+docEmbeddings = [apple, fruit, sweet];
+document = embed.ops.merge(docEmbeddings, 12);
+
+// Blend two profiles.
+blend = embed.ops.interpolate(profileA, profileB, 0.25);</code></div>
+
+      <h3>When operations can be misleading</h3>
+      <p>Operations are mathematical transformations, not guarantees of meaning. Adding two word embeddings can be useful, but the result is not automatically a perfect phrase embedding. Subtracting two identical embeddings produces a zero vector, which cannot be normalized into a meaningful direction. Interpolation is useful for blending two profiles, but the halfway point is only meaningful if both inputs live in the same embedding space.</p>
+
+      <h3>How positional encoding works in this module</h3>
+      <p>Classic transformer models often use sine and cosine waves for positional encoding. The NS runtime used here does not expose trigonometric functions, so this module uses deterministic multi-period triangle-wave features instead. The purpose is the same: every position gets a stable vector pattern, and nearby or repeated positions can be distinguished.</p>
+      <p>Use <code>positionalEncoding</code> when you want the position vector by itself. Use <code>addPositionalEncoding</code> when you already have a content embedding and want to blend sequence position into it.</p>
+      <div class="code"><code>token = embed.core.create(8, "token");
+// ...set and normalize token...
+
+tokenAt0 = embed.ops.addPositionalEncoding(token, 0, 0.25);
+tokenAt5 = embed.ops.addPositionalEncoding(token, 5, 0.25);
+
+// Same content, different sequence positions.
+sim = embed.distance.similarity(tokenAt0, tokenAt5, "cosine");</code></div>
+      <p>The <code>strength</code> value controls the tradeoff. A value like <code>0.1</code> makes position subtle. A value like <code>0.5</code> makes position much more prominent. For most text-like workflows, start around <code>0.2</code> to <code>0.3</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>11) Utility Functions</h2>
+      <p>The <code>embed.utils</code> namespace contains functions for working with groups of embeddings.</p>
+
+      <div class="prop"><span class="name">normalizeAll(embeddings)</span><br>
+        <strong>Pass in:</strong> an array of embeddings. <strong>Returns:</strong> a new array where each embedding has been normalized and clamped.</div>
+
+      <div class="prop"><span class="name">createIndex(embeddings, keyField)</span><br>
+        <strong>Pass in:</strong> embeddings and a metadata field name, or <code>null</code> to use ids. <strong>Returns:</strong> an object mapping keys to embeddings. Use this for fast lookup by label.</div>
+
+      <div class="prop"><span class="name">approximateNearestNeighbor(queryEmbedding, embeddingList, k, metric)</span><br>
+        <strong>Pass in:</strong> query, candidates, result count, and metric. <strong>Returns:</strong> result objects with <code>{embedding, similarity, index}</code>. This uses inline cosine-style scoring.</div>
+
+      <div class="prop"><span class="name">summarize(embeddings)</span><br>
+        <strong>Pass in:</strong> an array of embeddings. <strong>Returns:</strong> one normalized embedding that summarizes the group using positional weights.</div>
+
+      <div class="prop"><span class="name">diversity(embeddings)</span><br>
+        <strong>Pass in:</strong> an array of embeddings. <strong>Returns:</strong> average pairwise Euclidean distance. Higher means the population is more spread out.</div>
+
+      <div class="prop"><span class="name">cluster(embeddings, maxDist, metric)</span><br>
+        <strong>Pass in:</strong> embeddings, a distance threshold, and a metric string. <strong>Returns:</strong> an array of clusters, where each cluster is an array of embeddings. Lower thresholds make smaller, stricter clusters.</div>
+
+      <div class="prop"><span class="name">centroid(embeddingCluster)</span><br>
+        <strong>Pass in:</strong> one cluster, meaning an array of embeddings. <strong>Returns:</strong> a normalized average embedding representing the center of that cluster.</div>
+
+      <div class="prop"><span class="name">filterBySimilarity(embeddings, queryEmbedding, minSimilarity, metric)</span><br>
+        <strong>Pass in:</strong> embeddings, a query, minimum similarity, and metric. <strong>Returns:</strong> only embeddings whose similarity is at least the threshold.</div>
+
+      <div class="prop"><span class="name">batchTransform(embeddings, transformFunc)</span><br>
+        <strong>Pass in:</strong> embeddings and a function. <strong>Returns:</strong> transformed embeddings. Use this to apply the same operation to many embeddings.</div>
+
+      <div class="prop"><span class="name">toMatrix(embeddings)</span><br>
+        <strong>Pass in:</strong> embeddings. <strong>Returns:</strong> a two-dimensional array of only the numeric values. Useful when a matrix-like API needs rows of numbers.</div>
+
+      <div class="prop"><span class="name">comparePopulations(pop1, pop2)</span><br>
+        <strong>Pass in:</strong> two arrays of embeddings. <strong>Returns:</strong> <code>{similarity, diversity1, diversity2}</code>. Use this to compare two groups rather than two individual items.</div>
+    </section>
+
+    <section class="section">
+      <h2>12) Text Embedding Walkthrough</h2>
+      <p>This walkthrough explains the text embedding process in beginner terms. The important idea is that a word embedding should be built from that word's own context, not from a shared global summary.</p>
+
+      <h3>Step 1: Start with tokenized documents</h3>
+      <p>A token is a cleaned word-like piece of text. In the example below, punctuation has already been removed and every word is lowercase.</p>
+      <div class="code"><code>docs = [
+  ["apple", "fruit", "red", "sweet"],
+  ["banana", "fruit", "yellow", "sweet"],
+  ["engine", "road", "wheel", "car"]
+];</code></div>
+
+      <h3>Step 2: Build a co-occurrence matrix</h3>
+      <p>For each target word, count nearby words. A small window makes local context matter more. In a four-word document, a window of 1 means each word only sees its immediate neighbors. A window of 2 sees a little farther.</p>
+      <div class="code"><code>cooc = {
+  "apple": {"fruit": 1},
+  "fruit": {"apple": 1, "red": 1, "banana": 1, "yellow": 1},
+  "banana": {"fruit": 1},
+  "car": {"wheel": 1}
+};</code></div>
+
+      <h3>Step 3: Learn one embedding per target term</h3>
+      <p>Each term gets a vector based on its own row in the matrix. If two terms share context, their vectors should be closer. If they have unrelated context, they should be farther apart.</p>
+      <div class="code"><code>apple = embed.learn.fromCoOccurrence(cooc, "apple", 12, null);
+banana = embed.learn.fromCoOccurrence(cooc, "banana", 12, null);
+car = embed.learn.fromCoOccurrence(cooc, "car", 12, null);</code></div>
+
+      <h3>Step 4: Compare terms</h3>
+      <p>Now cosine similarity has something meaningful to compare. Apple and banana both connect to fruit, so they should be closer than apple and car.</p>
+      <div class="code"><code>fruitScore = embed.distance.similarity(apple, banana, "cosine");
+vehicleScore = embed.distance.similarity(apple, car, "cosine");</code></div>
+
+      <h3>Step 5: Attach labels for display</h3>
+      <p>The vector itself is just numbers. Store labels in metadata so search results can be printed clearly.</p>
+      <div class="code"><code>apple = embed.core.withMetadata(apple, "term", "apple");
+banana = embed.core.withMetadata(banana, "term", "banana");
+car = embed.core.withMetadata(car, "term", "car");</code></div>
+    </section>
+
+    <section class="section">
+      <h2>13) Common Workflows</h2>
+
+      <h3>Workflow A: Build a manual embedding</h3>
+      <div class="code"><code>embed = import("./embed.ns");
+
+profile = embed.core.create(4, "profile_a");
+profile = embed.core.set(profile, 0, 0.9);
+profile = embed.core.set(profile, 1, 0.4);
+profile = embed.core.set(profile, 2, 0.1);
+profile = embed.core.set(profile, 3, 0.7);
+profile = embed.core.normalize(profile);</code></div>
+
+      <h3>Workflow B: Create text term embeddings from co-occurrence</h3>
+      <p>For text, a good beginner pattern is: tokenize text, build a co-occurrence matrix, then call <code>fromCoOccurrence</code> once per term.</p>
+      <div class="code"><code>cooc = {
+  "apple": {"fruit": 3, "sweet": 2, "pie": 1},
+  "banana": {"fruit": 2, "yellow": 3, "sweet": 1},
+  "car": {"road": 3, "engine": 2, "wheel": 2}
+};
+
+apple = embed.learn.fromCoOccurrence(cooc, "apple", 12, null);
+banana = embed.learn.fromCoOccurrence(cooc, "banana", 12, null);
+car = embed.learn.fromCoOccurrence(cooc, "car", 12, null);
+
+appleBanana = embed.distance.similarity(apple, banana, "cosine");
+appleCar = embed.distance.similarity(apple, car, "cosine");</code></div>
+
+      <h3>Workflow C: Find similar items</h3>
+      <div class="code"><code>items = [apple, banana, car];
+matches = embed.distance.findMostSimilar(apple, items, 3, "cosine");
+
+// matches[0] will usually be apple itself if apple is included in items.
+// For search results, skip the query item when displaying output.</code></div>
+
+      <h3>Workflow D: Build a document embedding from word embeddings</h3>
+      <div class="code"><code>wordEmbeddings = [apple, banana, fruit];
+doc = embed.ops.merge(wordEmbeddings, 12);
+doc = embed.core.withMetadata(doc, "title", "fruit document");</code></div>
+
+      <h3>Workflow E: Combine text meaning with position</h3>
+      <p>Use a text embedding for meaning, then blend positional encoding into it. This lets the same word at different sequence positions become distinguishable while preserving the semantic signal.</p>
+      <div class="code"><code>apple = embed.learn.fromCorpus(corpus, "apple", 64);
+banana = embed.learn.fromCorpus(corpus, "banana", 64);
+car = embed.learn.fromCorpus(corpus, "car", 64);
+
+// Same position: semantic ordering should remain intact.
+appleAt2 = embed.ops.addPositionalEncoding(apple, 2, 0.20);
+bananaAt2 = embed.ops.addPositionalEncoding(banana, 2, 0.20);
+carAt2 = embed.ops.addPositionalEncoding(car, 2, 0.20);
+
+related = embed.distance.similarity(appleAt2, bananaAt2, "cosine");
+unrelated = embed.distance.similarity(appleAt2, carAt2, "cosine");
+
+// Different positions: same content is no longer identical.
+appleAt0 = embed.ops.addPositionalEncoding(apple, 0, 0.20);
+appleAt5 = embed.ops.addPositionalEncoding(apple, 5, 0.20);</code></div>
+      <p>The example file <code>examples/text_with_positions.ns</code> prints these comparisons and checks that related meanings remain closer than unrelated meanings after position is added.</p>
+    </section>
+
+    <section class="section">
+      <h2>14) Interpreting Results and Avoiding Mistakes</h2>
+
+      <h3>Similarity numbers are not universal truth</h3>
+      <p>A similarity score depends on the data, the dimensions, and the construction function. A score of <code>0.80</code> in one corpus does not necessarily mean the same thing as <code>0.80</code> in another corpus.</p>
+
+      <h3>Identical inputs produce identical embeddings</h3>
+      <p>If you call <code>fromFrequencies(theSameMap, 12)</code> for every word, every word receives the same embedding. To create one embedding per term, use term-specific input such as each term's own co-occurrence context.</p>
+
+      <h3>Small corpora can be noisy</h3>
+      <p>With only a few documents, scores can be shaped by accidental context overlap or hash collisions. Treat examples as demonstrations. For more stable semantic behavior, use more repeated context patterns and enough dimensions for the number of distinct contexts.</p>
+
+      <h3>Normalize before comparing direction</h3>
+      <p>Cosine similarity is easiest to interpret when embeddings are normalized. Most learning and ops functions already normalize their outputs. If you manually build vectors with <code>create</code> and <code>set</code>, call <code>normalize</code> before comparing them.</p>
+
+      <h3>Watch for zero vectors</h3>
+      <p>A zero vector has no direction. Some normalization operations cannot normalize a zero matrix. Missing co-occurrence returns a zero embedding to signal "no evidence". Do not treat that as a meaningful semantic vector.</p>
+
+      <h3>Use metadata for display labels</h3>
+      <p>The vector values do not remember what item they came from unless you store it. Use <code>withMetadata</code> to attach labels such as <code>term</code>, <code>documentId</code>, or <code>category</code>.</p>
+
+      <h3>Choose dimensions based on your data</h3>
+      <p>If many unrelated items look too similar, try increasing dimensions or improving the input features. If results are unstable or hard to inspect, try a smaller dimension count while debugging.</p>
+
+      <h3>Use the same construction method for comparable embeddings</h3>
+      <p>Only compare embeddings that live in the same space. An embedding from <code>fromCoOccurrence</code> and an embedding from unrelated manual values may have the same number of dimensions, but the dimensions were created for different reasons. Same shape does not always mean same meaning.</p>
+
+      <h3>Document your thresholds</h3>
+      <p>If you decide that similarity above <code>0.65</code> counts as a match, write down how you chose that threshold. Thresholds should usually be tuned by looking at real examples from your own data.</p>
+
+      <h3>Prefer examples over abstract confidence</h3>
+      <p>When validating an embedding setup, print nearest neighbors for several known terms. If "apple" is near fruit words and "car" is near vehicle words, the setup is learning useful structure. If every item is near every other item, the input is too broad or the vectors are too compressed.</p>
+    </section>
+  </div>
+</body>
+</html>

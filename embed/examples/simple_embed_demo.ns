@@ -1,0 +1,73 @@
+// simple_embed_demo.ns - Basic embedding operations that work with current module
+
+embed = import("./embed.ns");
+
+print("=== Simple Embedding Demo ===\n\n");
+
+// 1. Create basic embeddings
+print("1. Creating and manipulating embeddings...\n");
+emb1 = embed.core.create(4, "word1");
+emb1 = embed.core.set(emb1, 0, 0.9);
+emb1 = embed.core.set(emb1, 1, 0.7);
+emb1 = embed.core.set(emb1, 2, 0.3);
+emb1 = embed.core.set(emb1, 3, 0.1);
+
+print("   Created embedding with ID: ");
+print(emb1.id);
+print("\n   Dimensions: ");
+print(embed.core.at(emb1, 0));
+print(", ");
+print(embed.core.at(emb1, 1));
+print(", ");
+print(embed.core.at(emb1, 2));
+print(", ");
+print(embed.core.at(emb1, 3));
+print("\n");
+
+// 2. Normalize
+print("2. Normalizing embedding...\n");
+emb1norm = embed.core.normalize(emb1);
+mag = embed.core.magnitude(emb1norm);
+print("   Magnitude after normalization: ");
+print(mag);
+print("\n");
+
+// 3. Get statistics
+print("3. Computing statistics...\n");
+st = embed.core.stats(emb1norm);
+print("   Mean: ");
+print(st.mean);
+print(", Min: ");
+print(st.min);
+print(", Max: ");
+print(st.max);
+print("\n");
+
+// 4. Create another embedding and compare
+print("4. Comparing two embeddings...\n");
+emb2 = embed.core.create(4, "word2");
+emb2 = embed.core.set(emb2, 0, 0.8);
+emb2 = embed.core.set(emb2, 1, 0.6);
+emb2 = embed.core.set(emb2, 2, 0.4);
+emb2 = embed.core.set(emb2, 3, 0.2);
+
+emb2norm = embed.core.normalize(emb2);
+
+// Use distance metrics
+sim = embed.distance.cosineSimilarity(emb1norm, emb2norm);
+print("   Cosine similarity: ");
+print(sim);
+print("\n");
+
+dist = embed.distance.euclideanDistance(emb1norm, emb2norm);
+print("   Euclidean distance: ");
+print(dist);
+print("\n");
+
+// 5. Demonstrate metadata
+print("5. Adding metadata...\n");
+emb3 = embed.core.withMetadata(emb1, "type", "semantic");
+emb3 = embed.core.withMetadata(emb3, "model", "custom");
+print("   Added metadata to embedding\n");
+
+print("\n✓ Demo completed successfully!\n");

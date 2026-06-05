@@ -1,0 +1,595 @@
+// ops.ns - Operations for combining and transforming embeddings using native matrices
+// Note: All external module calls are inlined due to NS function scoping limitations.
+
+// Add (element-wise) two embeddings
+add = func(emb1, emb2) {
+    if (emb1.dims != emb2.dims) return emb1;
+    
+    m1 = matrice_fromArray([emb1.values]);
+    m2 = matrice_fromArray([emb2.values]);
+    result_m = m1.add(m2);
+    resultValues = result_m.toArray()[0];
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < emb1.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: emb1.dims, values: clamped, id: emb1.id + "_add_" + emb2.id, metadata: emb1.metadata};
+};
+
+// Subtract (element-wise) two embeddings
+subtract = func(emb1, emb2) {
+    if (emb1.dims != emb2.dims) return emb1;
+    
+    m1 = matrice_fromArray([emb1.values]);
+    m2 = matrice_fromArray([emb2.values]);
+    result_m = m1.subtract(m2);
+    resultValues = result_m.toArray()[0];
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < emb1.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: emb1.dims, values: clamped, id: emb1.id + "_sub_" + emb2.id, metadata: emb1.metadata};
+};
+
+// Scalar multiplication
+multiply = func(embedding, scalar) {
+    m = matrice_fromArray([embedding.values]);
+    result_m = m.scale(scalar);
+    resultValues = result_m.toArray()[0];
+    
+    m2 = matrice_fromArray([resultValues]);
+    mnorm = m2.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < embedding.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: embedding.dims, values: clamped, id: embedding.id + "_mult", metadata: embedding.metadata};
+};
+
+// Hadamard product (element-wise multiplication)
+hadamard = func(emb1, emb2) {
+    if (emb1.dims != emb2.dims) return emb1;
+    
+    m1 = matrice_fromArray([emb1.values]);
+    m2 = matrice_fromArray([emb2.values]);
+    result_m = m1.multiply(m2);
+    resultValues = result_m.toArray()[0];
+    
+    m3 = matrice_fromArray([resultValues]);
+    mnorm = m3.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < emb1.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: emb1.dims, values: clamped, id: emb1.id + "_had_" + emb2.id, metadata: emb1.metadata};
+};
+
+// Average multiple embeddings
+average = func(embeddings) {
+    if (embeddings.count() == 0) {
+        zv = [];
+        i = 0;
+        while (i < 8) {
+            zv.add(0);
+            i = i + 1;
+        }
+        return {dims: 8, values: zv, id: "zero_avg", metadata: {}};
+    }
+    
+    dims = embeddings[0].dims;
+    resultValues = [];
+    for (i = 0; i < dims; i = i + 1) {
+        sum = 0;
+        for (j = 0; j < embeddings.count(); j = j + 1) {
+            sum = sum + embeddings[j].values[i];
+        }
+        resultValues.add(sum / embeddings.count());
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: dims, values: clamped, id: "avg", metadata: {}};
+};
+
+// Weighted average of embeddings
+weightedAverage = func(embeddings, weights) {
+    if (embeddings.count() == 0) {
+        zv = [];
+        i = 0;
+        while (i < 8) {
+            zv.add(0);
+            i = i + 1;
+        }
+        return {dims: 8, values: zv, id: "zero_wavg", metadata: {}};
+    }
+    
+    dims = embeddings[0].dims;
+    totalWeight = 0;
+    if (weights.count() == embeddings.count()) {
+        for (i = 0; i < weights.count(); i = i + 1) {
+            totalWeight = totalWeight + weights[i];
+        }
+    }
+    
+    resultValues = [];
+    if (weights.count() != embeddings.count() || totalWeight == 0) {
+        for (i = 0; i < dims; i = i + 1) {
+            sum = 0;
+            for (j = 0; j < embeddings.count(); j = j + 1) {
+                sum = sum + embeddings[j].values[i];
+            }
+            resultValues.add(sum / embeddings.count());
+        }
+    } else {
+        for (i = 0; i < dims; i = i + 1) {
+            sum = 0;
+            for (j = 0; j < embeddings.count(); j = j + 1) {
+                sum = sum + (embeddings[j].values[i] * weights[j]);
+            }
+            resultValues.add(sum / totalWeight);
+        }
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: dims, values: clamped, id: "wavg", metadata: {}};
+};
+
+// Merge multiple embeddings using concatenation and projection
+merge = func(embeddings, targetDims) {
+    if (embeddings.count() == 0) {
+        zv = [];
+        i = 0;
+        while (i < 8) {
+            zv.add(0);
+            i = i + 1;
+        }
+        return {dims: 8, values: zv, id: "zero_merge", metadata: {}};
+    }
+    
+    td = defined(targetDims) ? targetDims : embeddings[0].dims;
+    if (td < 1) td = 1;
+    
+    allValues = [];
+    for (i = 0; i < embeddings.count(); i = i + 1) {
+        emb = embeddings[i];
+        for (j = 0; j < emb.values.count(); j = j + 1) {
+            allValues.add(emb.values[j]);
+        }
+    }
+    
+    resultValues = [];
+    for (d = 0; d < td; d = d + 1) {
+        dimVal = 0;
+        for (i = 0; i < allValues.count(); i = i + 1) {
+            seed = d * 1000 + i;
+            hashVal = (seed * 1103515245 + 12345) % 2147483648;
+            norm = hashVal / 2147483648;
+            dimVal = dimVal + (allValues[i] * norm);
+        }
+        resultValues.add(dimVal / allValues.count());
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < td) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: td, values: clamped, id: "merged", metadata: {}};
+};
+
+// Interpolate between two embeddings (linear blend)
+interpolate = func(emb1, emb2, alpha) {
+    if (emb1.dims != emb2.dims) return emb1;
+    a = alpha;
+    if (a < 0) a = 0;
+    if (a > 1) a = 1;
+    
+    resultValues = [];
+    for (i = 0; i < emb1.dims; i = i + 1) {
+        resultValues.add((emb1.values[i] * (1 - a)) + (emb2.values[i] * a));
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < emb1.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: emb1.dims, values: clamped, id: emb1.id + "_interp", metadata: emb1.metadata};
+};
+
+// Project embedding to a lower dimension
+project = func(embedding, targetDims) {
+    if (targetDims >= embedding.dims) return embedding;
+    td = targetDims;
+    if (td < 1) td = 1;
+    
+    count = embedding.dims;
+    sum = 0;
+    for (i = 0; i < count; i = i + 1) {
+        sum = sum + embedding.values[i];
+    }
+    mean = sum / count;
+    
+    dimVariance = [];
+    for (i = 0; i < count; i = i + 1) {
+        v = embedding.values[i];
+        variance = (v - mean) * (v - mean);
+        dimVariance.add({index: i, variance: variance});
+    }
+    dimVariance.sort(func(ai, av, bi, bv) => bv.variance - av.variance);
+    
+    resultValues = [];
+    for (i = 0; i < td; i = i + 1) {
+        idx = dimVariance[i].index;
+        resultValues.add(embedding.values[idx]);
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < td) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: td, values: clamped, id: embedding.id + "_proj", metadata: embedding.metadata};
+};
+
+// Expand embedding to higher dimension
+expand = func(embedding, targetDims) {
+    if (targetDims <= embedding.dims) return embedding;
+    td = targetDims;
+    
+    count = embedding.dims;
+    sum = 0;
+    for (i = 0; i < count; i = i + 1) {
+        sum = sum + embedding.values[i];
+    }
+    mean = sum / count;
+    
+    varianceSum = 0;
+    for (i = 0; i < count; i = i + 1) {
+        d = embedding.values[i] - mean;
+        varianceSum = varianceSum + d * d;
+    }
+    
+    stddev = 0;
+    if (varianceSum > 0) {
+        variance = varianceSum / count;
+        guess = variance / 2;
+        iter = 0;
+        while (iter < 20) {
+            next = (guess + variance / guess) / 2;
+            diff = next - guess;
+            if (diff < 0) diff = 0 - diff;
+            if (diff < 0.0001) {
+                stddev = next;
+                iter = 21;
+            }
+            guess = next;
+            iter = iter + 1;
+        }
+        if (stddev == 0) stddev = guess;
+    }
+    
+    resultValues = [];
+    for (i = 0; i < embedding.dims; i = i + 1) {
+        resultValues.add(embedding.values[i]);
+    }
+    for (i = embedding.dims; i < td; i = i + 1) {
+        seed = i * 1103515245 + 12345;
+        noise = ((seed % 2147483648) / 2147483648) * stddev * 0.1;
+        resultValues.add(noise);
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < td) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: td, values: clamped, id: embedding.id + "_exp", metadata: embedding.metadata};
+};
+
+// Rotate embedding in embedding space (cyclic shift)
+rotate = func(embedding, rotationFactor) {
+    factor = defined(rotationFactor) ? rotationFactor : 0.5;
+    if (factor < 0) factor = 0;
+    if (factor > 1) factor = 1;
+    
+    rotateAmount = factor * embedding.dims;
+    intPart = 0;
+    temp = rotateAmount;
+    while (temp >= 1) {
+        temp = temp - 1;
+        intPart = intPart + 1;
+    }
+    offset = intPart % embedding.dims;
+    
+    resultValues = [];
+    for (i = 0; i < embedding.dims; i = i + 1) {
+        newIdx = (i + offset) % embedding.dims;
+        resultValues.add(embedding.values[newIdx]);
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < embedding.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: embedding.dims, values: clamped, id: embedding.id + "_rot", metadata: embedding.metadata};
+};
+
+// Create a standalone positional encoding vector.
+// This uses deterministic triangle-wave features at multiple periods so it does
+// not depend on trig functions being available in the runtime.
+positionalEncoding = func(position, dimensions, maxPosition) {
+    dims = dimensions;
+    if (dims < 1) dims = 1;
+    pos = defined(position) ? position : 0;
+    if (pos < 0) pos = 0;
+    maxPos = defined(maxPosition) ? maxPosition : 1000;
+    if (maxPos < 1) maxPos = 1;
+    
+    values = [];
+    for (d = 0; d < dims; d = d + 1) {
+        period = 2 + ((d + 1) * 2);
+        if (period > maxPos) period = maxPos + d + 2;
+        phase = pos % period;
+        half = period / 2;
+        tri = 0;
+        if (phase <= half) {
+            tri = phase / half;
+        } else {
+            tri = (period - phase) / half;
+        }
+        value = (tri * 2) - 1;
+        
+        // Alternate signs and taper later dimensions slightly so nearby
+        // positions are distinct without overwhelming content vectors.
+        if (d % 2 == 1) value = 0 - value;
+        taper = 1 / (1 + (d / dims));
+        values.add(value * taper);
+    }
+    
+    m = matrice_fromArray([values]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    for (i = 0; i < dims; i = i + 1) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+    }
+    
+    return {dims: dims, values: clamped, id: "pos_" + stringify(pos), metadata: {position: pos}};
+};
+
+// Blend a positional encoding into an existing embedding.
+addPositionalEncoding = func(embedding, position, strength) {
+    pos = defined(position) ? position : 0;
+    if (pos < 0) pos = 0;
+    amount = defined(strength) ? strength : 0.25;
+    if (amount < 0) amount = 0;
+    if (amount > 1) amount = 1;
+    
+    posValues = [];
+    for (d = 0; d < embedding.dims; d = d + 1) {
+        period = 2 + ((d + 1) * 2);
+        phase = pos % period;
+        half = period / 2;
+        tri = 0;
+        if (phase <= half) {
+            tri = phase / half;
+        } else {
+            tri = (period - phase) / half;
+        }
+        value = (tri * 2) - 1;
+        if (d % 2 == 1) value = 0 - value;
+        taper = 1 / (1 + (d / embedding.dims));
+        posValues.add(value * taper);
+    }
+    
+    pm = matrice_fromArray([posValues]);
+    pmnorm = pm.normalize();
+    posNorm = pmnorm.toArray()[0];
+    
+    resultValues = [];
+    for (i = 0; i < embedding.dims; i = i + 1) {
+        resultValues.add((embedding.values[i] * (1 - amount)) + (posNorm[i] * amount));
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < embedding.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    
+    newMeta = embedding.metadata;
+    newMeta.position = pos;
+    newMeta.positionStrength = amount;
+    return {dims: embedding.dims, values: clamped, id: embedding.id + "_pos", metadata: newMeta};
+};
+
+// Orthogonalize embedding relative to another (remove correlation)
+orthogonalize = func(embedding, referenceEmbedding) {
+    if (embedding.dims != referenceEmbedding.dims) return embedding;
+    
+    // Inline cosine similarity
+    dot = 0;
+    norm1sum = 0;
+    norm2sum = 0;
+    for (i = 0; i < embedding.dims; i = i + 1) {
+        a = embedding.values[i];
+        b = referenceEmbedding.values[i];
+        dot = dot + a * b;
+        norm1sum = norm1sum + a * a;
+        norm2sum = norm2sum + b * b;
+    }
+    
+    corr = 0;
+    if (norm1sum > 0 && norm2sum > 0) {
+        n1 = norm1sum;
+        g1 = n1 / 2;
+        for (iter = 0; iter < 20; iter = iter + 1) {
+            nx = (g1 + n1 / g1) / 2;
+            d = nx - g1;
+            if (d < 0) d = 0 - d;
+            g1 = nx;
+            if (d < 0.0001) iter = 21;
+        }
+        mag1 = g1;
+        
+        n2 = norm2sum;
+        g2 = n2 / 2;
+        for (iter = 0; iter < 20; iter = iter + 1) {
+            nx = (g2 + n2 / g2) / 2;
+            d = nx - g2;
+            if (d < 0) d = 0 - d;
+            g2 = nx;
+            if (d < 0.0001) iter = 21;
+        }
+        mag2 = g2;
+        
+        if (mag1 > 0 && mag2 > 0) {
+            corr = dot / (mag1 * mag2);
+        }
+    }
+    
+    resultValues = [];
+    for (i = 0; i < embedding.dims; i = i + 1) {
+        resultValues.add(embedding.values[i] - (corr * referenceEmbedding.values[i]));
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < embedding.dims) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    return {dims: embedding.dims, values: clamped, id: embedding.id + "_orth", metadata: embedding.metadata};
+};

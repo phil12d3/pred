@@ -1,0 +1,92 @@
+// text_with_positions.ns - Combine text embeddings with positional encoding
+
+embed = import("./embed.ns");
+
+print("=== Text Embeddings + Positional Encoding ===\n");
+
+corpus = {
+    docs: [
+        "apple fruit orchard sweet snack",
+        "apple pie orchard dessert cinnamon",
+        "banana fruit tropical sweet snack",
+        "banana smoothie tropical breakfast",
+        "orange citrus fruit juice vitamin",
+        "orange juice citrus breakfast",
+        "car engine garage road",
+        "car driver garage wheel",
+        "truck engine highway cargo",
+        "truck road diesel cargo"
+    ]
+};
+
+dims = 64;
+strength = 0.20;
+
+apple = embed.learn.fromCorpus(corpus, "apple", dims);
+banana = embed.learn.fromCorpus(corpus, "banana", dims);
+car = embed.learn.fromCorpus(corpus, "car", dims);
+
+print("Base semantic embeddings:\n");
+print("  apple magnitude: {embed.core.magnitude(apple)}\n");
+print("  banana magnitude: {embed.core.magnitude(banana)}\n");
+print("  car magnitude: {embed.core.magnitude(car)}\n");
+
+baseRelated = embed.distance.similarity(apple, banana, "cosine");
+baseUnrelated = embed.distance.similarity(apple, car, "cosine");
+
+print("\nBefore positional encoding:\n");
+print("  apple vs banana: {baseRelated * 100}%\n");
+print("  apple vs car:    {baseUnrelated * 100}%\n");
+print("  semantic margin: {(baseRelated - baseUnrelated) * 100}%\n");
+
+// Apply the same position to all terms. This should preserve the meaning order:
+// apple should still be closer to banana than to car.
+appleAt2 = embed.ops.addPositionalEncoding(apple, 2, strength);
+bananaAt2 = embed.ops.addPositionalEncoding(banana, 2, strength);
+carAt2 = embed.ops.addPositionalEncoding(car, 2, strength);
+
+posRelated = embed.distance.similarity(appleAt2, bananaAt2, "cosine");
+posUnrelated = embed.distance.similarity(appleAt2, carAt2, "cosine");
+
+print("\nAfter adding the same position (position 2, strength {strength}):\n");
+print("  apple@2 vs banana@2: {posRelated * 100}%\n");
+print("  apple@2 vs car@2:    {posUnrelated * 100}%\n");
+print("  semantic margin:     {(posRelated - posUnrelated) * 100}%\n");
+
+if (posRelated > posUnrelated) {
+    print("  PASS: related meanings remain closer than unrelated meanings.\n");
+} else {
+    print("  FAIL: positional encoding overwhelmed semantic meaning.\n");
+}
+
+// Apply different positions to the same content. This proves position has an
+// effect while the content remains recognizable.
+appleAt0 = embed.ops.addPositionalEncoding(apple, 0, strength);
+appleAt5 = embed.ops.addPositionalEncoding(apple, 5, strength);
+
+sameWordDifferentPos = embed.distance.similarity(appleAt0, appleAt5, "cosine");
+sameWordBase = embed.distance.similarity(appleAt0, apple, "cosine");
+
+print("\nSame meaning at different positions:\n");
+print("  apple@0 vs apple@5: {sameWordDifferentPos * 100}%\n");
+print("  apple@0 vs base apple: {sameWordBase * 100}%\n");
+print("  distance apple@0 -> apple@5: {embed.distance.euclideanDistance(appleAt0, appleAt5)}\n");
+
+if (sameWordBase > posRelated && sameWordDifferentPos < 1) {
+    print("  PASS: content is still recognizable, and positions are distinguishable.\n");
+} else {
+    print("  CHECK: review strength; content/position balance may need tuning.\n");
+}
+
+print("\nStrength comparison:\n");
+for (i = 1; i <= 4; i = i + 1) {
+    s = i * 0.10;
+    a = embed.ops.addPositionalEncoding(apple, 2, s);
+    b = embed.ops.addPositionalEncoding(banana, 2, s);
+    c = embed.ops.addPositionalEncoding(car, 2, s);
+    rel = embed.distance.similarity(a, b, "cosine");
+    unrel = embed.distance.similarity(a, c, "cosine");
+    print("  strength {s}: related={rel * 100}%, unrelated={unrel * 100}%, margin={(rel - unrel) * 100}%\n");
+}
+
+print("\n=== Text + Position Example Complete ===\n");

@@ -1,0 +1,8 @@
+// embed.ns - Main embedding module
+// Exports all embedding submodules for use by examples and applications
+
+core = import("./src/core.ns");
+learn = import("./src/learn.ns");
+distance = import("./src/distance.ns");
+ops = import("./src/ops.ns");
+utils = import("./src/utils.ns");

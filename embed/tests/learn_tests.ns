@@ -1,0 +1,182 @@
+[test]
+learning_from_frequencies = func(t) {
+    embed = import("./embed.ns");
+
+    freqMap = {
+        "word1": 100,
+        "word2": 50,
+        "word3": 25,
+        "word4": 10
+    };
+
+    emb = embed.learn.fromFrequencies(freqMap, 8);
+    mag = embed.core.magnitude(emb);
+    diff = mag - 1;
+    if (diff < 0) diff = 0 - diff;
+
+    t.equal(emb.dims, 8, "frequency embedding has requested dimensions");
+    t.truthy(diff <= 0.01, "frequency embedding is normalized");
+};
+
+[test]
+learning_from_cooccurrence = func(t) {
+    embed = import("./embed.ns");
+
+    cooc = {
+        "word1": {
+            "context1": 10,
+            "context2": 8,
+            "context3": 5
+        },
+        "word2": {
+            "context1": 6,
+            "context2": 4
+        }
+    };
+
+    emb = embed.learn.fromCoOccurrence(cooc, "word1", 6, null);
+    mag = embed.core.magnitude(emb);
+    diff = mag - 1;
+    if (diff < 0) diff = 0 - diff;
+
+    t.equal(emb.dims, 6, "co-occurrence embedding has requested dimensions");
+    t.truthy(diff <= 0.01, "co-occurrence embedding is normalized");
+};
+
+[test]
+cooccurrence_terms_with_different_contexts_are_not_identical = func(t) {
+    embed = import("./embed.ns");
+
+    cooc = {
+        "apple": {
+            "fruit": 6,
+            "sweet": 3,
+            "pie": 2,
+            "red": 1
+        },
+        "healthy": {
+            "nutrition": 1,
+            "diet": 1,
+            "wellness": 4,
+            "fitness": 7
+        }
+    };
+
+    apple = embed.learn.fromCoOccurrence(cooc, "apple", 12, null);
+    healthy = embed.learn.fromCoOccurrence(cooc, "healthy", 12, null);
+    distance = embed.distance.euclideanDistance(apple, healthy);
+    similarity = embed.distance.similarity(apple, healthy, "cosine");
+
+    t.truthy(distance > 0.0001, "different co-occurrence contexts produce different vectors");
+    t.truthy(similarity < 1, "different co-occurrence contexts are not 100 percent similar");
+};
+
+[test]
+learning_from_missing_cooccurrence = func(t) {
+    embed = import("./embed.ns");
+
+    cooc = { "word1": { "context": 5 } };
+    emb = embed.learn.fromCoOccurrence(cooc, "missing", 8, null);
+
+    t.equal(emb.dims, 8, "missing co-occurrence term returns requested dimensions");
+};
+
+[test]
+learning_from_corpus_uses_document_evidence = func(t) {
+    embed = import("./embed.ns");
+
+    corpus = {
+        docs: [
+            "apple fruit red sweet",
+            "apple pie sweet dessert",
+            "engine road wheel car"
+        ]
+    };
+
+    apple = embed.learn.fromCorpus(corpus, "apple", 12);
+    engine = embed.learn.fromCorpus(corpus, "engine", 12);
+    mag = embed.core.magnitude(apple);
+    dist = embed.distance.euclideanDistance(apple, engine);
+
+    t.equal(apple.dims, 12, "corpus embedding has requested dimensions");
+    t.truthy(mag > 0.99 && mag < 1.01, "corpus embedding is normalized when evidence exists");
+    t.truthy(dist > 0.0001, "different corpus contexts produce different corpus embeddings");
+};
+
+[test]
+learning_from_corpus_handles_missing_and_empty_terms = func(t) {
+    embed = import("./embed.ns");
+
+    corpus = { docs: ["apple fruit sweet"] };
+    missing = embed.learn.fromCorpus(corpus, "engine", 8);
+    missingMag = embed.core.magnitude(missing);
+
+    empty = embed.learn.fromCorpus({docs: []}, "apple", 8);
+    emptyMag = embed.core.magnitude(empty);
+
+    t.equal(missing.dims, 8, "missing corpus term returns requested dimensions");
+    t.equal(missingMag, 0, "missing corpus term returns zero vector");
+    t.equal(empty.dims, 8, "empty corpus returns requested dimensions");
+    t.equal(emptyMag, 0, "empty corpus returns zero vector");
+};
+
+[test]
+learning_from_corpus_matches_uppercase_input = func(t) {
+    embed = import("./embed.ns");
+
+    corpus = { docs: ["Apple fruit sweet", "APPLE pie dessert"] };
+    apple = embed.learn.fromCorpus(corpus, "apple", 8);
+    mag = embed.core.magnitude(apple);
+
+    t.truthy(mag > 0.99 && mag < 1.01, "corpus token matching is case insensitive for ASCII terms");
+};
+
+[test]
+incremental_learning = func(t) {
+    embed = import("./embed.ns");
+
+    baseEmb = embed.core.create(8, null);
+    for (i = 0; i < 8; i = i + 1) {
+        baseEmb = embed.core.set(baseEmb, i, 0.1);
+    }
+
+    newData = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2];
+    learned = embed.learn.learn(baseEmb, newData, 0.5);
+    mag = embed.core.magnitude(learned);
+    sim = embed.distance.similarity(baseEmb, learned, "cosine");
+    diff = mag - 1;
+    if (diff < 0) diff = 0 - diff;
+
+    t.equal(learned.dims, 8, "learned embedding keeps dimensions");
+    t.truthy(diff <= 0.01, "learned embedding is normalized");
+    t.truthy(sim < 1, "learned embedding differs from base");
+};
+
+[test]
+learning_rate_effects = func(t) {
+    embed = import("./embed.ns");
+
+    baseEmb = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        baseEmb = embed.core.set(baseEmb, i, 0.2);
+    }
+
+    newData = [1, 0.7, 0.3, 0.1];
+    lowLr = embed.learn.learn(baseEmb, newData, 0.1);
+    highLr = embed.learn.learn(baseEmb, newData, 0.9);
+
+    simLow = embed.distance.similarity(baseEmb, lowLr, "cosine");
+    simHigh = embed.distance.similarity(baseEmb, highLr, "cosine");
+
+    t.truthy(simHigh < simLow, "higher learning rate results in larger change");
+};
+
+[test]
+dimension_consistency_across_learning = func(t) {
+    embed = import("./embed.ns");
+
+    for (dims = 4; dims <= 16; dims = dims + 2) {
+        emb = embed.learn.fromFrequencies({"a": 10, "b": 5}, dims);
+        t.equal(emb.dims, dims, "frequency learning respects requested dimensions");
+    }
+};

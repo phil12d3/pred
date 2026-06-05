@@ -1,0 +1,199 @@
+[test]
+basic_binary_operations = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, i + 1);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    added = embed.ops.add(emb1, emb2);
+    subtracted = embed.ops.subtract(emb1, emb2);
+    hadamard = embed.ops.hadamard(emb1, emb2);
+
+    t.equal(added.dims, 4, "addition result has expected dimensions");
+    t.equal(subtracted.dims, 4, "subtraction result has expected dimensions");
+    t.equal(hadamard.dims, 4, "hadamard result has expected dimensions");
+};
+
+[test]
+scalar_multiplication_normalizes = func(t) {
+    embed = import("./embed.ns");
+
+    emb = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) emb = embed.core.set(emb, i, 1);
+    emb = embed.core.normalize(emb);
+
+    result = embed.ops.multiply(emb, 2);
+    mag = embed.core.magnitude(result);
+    diff = mag - 1;
+    if (diff < 0) diff = 0 - diff;
+
+    t.equal(result.dims, 4, "multiplication result has expected dimensions");
+    t.truthy(diff < 0.01, "multiplication result is normalized");
+};
+
+[test]
+averaging_operations = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, i + 1);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    avg = embed.ops.average([emb1, emb2]);
+    weighted = embed.ops.weightedAverage([emb1, emb2], [0.7, 0.3]);
+
+    t.equal(avg.dims, 4, "average result has expected dimensions");
+    t.equal(weighted.dims, 4, "weighted average result has expected dimensions");
+};
+
+[test]
+merge_and_dimension_transforms = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, i + 1);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    merged = embed.ops.merge([emb1, emb2], 4);
+    expanded = embed.ops.expand(emb1, 8);
+    projected = embed.ops.project(expanded, 4);
+
+    t.equal(merged.dims, 4, "merge result has expected dimensions");
+    t.equal(expanded.dims, 8, "expansion result has target dimensions");
+    t.equal(projected.dims, 4, "projection result has target dimensions");
+};
+
+[test]
+embedding_interpolation = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, i + 1);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    result0 = embed.ops.interpolate(emb1, emb2, 0.0);
+    result100 = embed.ops.interpolate(emb1, emb2, 1.0);
+    sim0 = embed.distance.similarity(result0, emb1, "cosine");
+    sim100 = embed.distance.similarity(result100, emb2, "cosine");
+
+    t.truthy(sim0 > 0.9, "0 percent interpolation stays close to first embedding");
+    t.truthy(sim100 > 0.9, "100 percent interpolation stays close to second embedding");
+};
+
+[test]
+rotation_and_orthogonalization = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, i + 1);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    rotated = embed.ops.rotate(emb1, 0.5);
+    orthogonal = embed.ops.orthogonalize(emb1, emb2);
+
+    t.equal(rotated.dims, 4, "rotation result has expected dimensions");
+    t.equal(orthogonal.dims, 4, "orthogonalization result has expected dimensions");
+};
+
+[test]
+positional_encoding_creates_distinct_normalized_vectors = func(t) {
+    embed = import("./embed.ns");
+
+    pos0 = embed.ops.positionalEncoding(0, 8, 100);
+    pos3 = embed.ops.positionalEncoding(3, 8, 100);
+    mag0 = embed.core.magnitude(pos0);
+    mag3 = embed.core.magnitude(pos3);
+    dist = embed.distance.euclideanDistance(pos0, pos3);
+
+    t.equal(pos0.dims, 8, "positional encoding has requested dimensions");
+    t.truthy(mag0 > 0.99 && mag0 < 1.01, "position zero encoding is normalized");
+    t.truthy(mag3 > 0.99 && mag3 < 1.01, "position three encoding is normalized");
+    t.truthy(dist > 0.0001, "different positions produce different encodings");
+};
+
+[test]
+add_positional_encoding_preserves_content_shape = func(t) {
+    embed = import("./embed.ns");
+
+    emb = embed.core.create(8, "token");
+    for (i = 0; i < 8; i = i + 1) {
+        emb = embed.core.set(emb, i, i + 1);
+    }
+    emb = embed.core.normalize(emb);
+
+    at0 = embed.ops.addPositionalEncoding(emb, 0, 0.25);
+    at5 = embed.ops.addPositionalEncoding(emb, 5, 0.25);
+    mag = embed.core.magnitude(at0);
+    dist = embed.distance.euclideanDistance(at0, at5);
+
+    t.equal(at0.dims, 8, "position-encoded embedding preserves dimensions");
+    t.truthy(mag > 0.99 && mag < 1.01, "position-encoded embedding is normalized");
+    t.truthy(dist > 0.0001, "same content at different positions differs");
+    t.equal(at5.metadata.position, 5, "position metadata is recorded");
+};
+
+[test]
+positional_encoding_preserves_text_similarity_order = func(t) {
+    embed = import("./embed.ns");
+
+    corpus = {
+        docs: [
+            "apple fruit orchard sweet snack",
+            "apple pie orchard dessert cinnamon",
+            "banana fruit tropical sweet snack",
+            "banana smoothie tropical breakfast",
+            "car engine garage road",
+            "car driver garage wheel"
+        ]
+    };
+
+    apple = embed.learn.fromCorpus(corpus, "apple", 64);
+    banana = embed.learn.fromCorpus(corpus, "banana", 64);
+    car = embed.learn.fromCorpus(corpus, "car", 64);
+
+    baseRelated = embed.distance.similarity(apple, banana, "cosine");
+    baseUnrelated = embed.distance.similarity(apple, car, "cosine");
+
+    appleAt2 = embed.ops.addPositionalEncoding(apple, 2, 0.20);
+    bananaAt2 = embed.ops.addPositionalEncoding(banana, 2, 0.20);
+    carAt2 = embed.ops.addPositionalEncoding(car, 2, 0.20);
+
+    posRelated = embed.distance.similarity(appleAt2, bananaAt2, "cosine");
+    posUnrelated = embed.distance.similarity(appleAt2, carAt2, "cosine");
+
+    appleAt0 = embed.ops.addPositionalEncoding(apple, 0, 0.20);
+    appleAt5 = embed.ops.addPositionalEncoding(apple, 5, 0.20);
+    sameWordDifferentPos = embed.distance.similarity(appleAt0, appleAt5, "cosine");
+    sameWordBase = embed.distance.similarity(appleAt0, apple, "cosine");
+
+    t.truthy(baseRelated > baseUnrelated, "text embeddings make related terms closer before positions");
+    t.truthy(posRelated > posUnrelated, "same-position encoding preserves semantic similarity order");
+    t.truthy(sameWordDifferentPos < 1, "same content at different positions is no longer identical");
+    t.truthy(sameWordBase > posRelated, "position-encoded content remains close to its base meaning");
+};

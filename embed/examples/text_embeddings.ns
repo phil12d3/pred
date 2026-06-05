@@ -1,0 +1,170 @@
+// text_embeddings.ns - Real-world example: semantic embeddings from text
+
+embed = import("./embed.ns");
+
+print("=== Text-Based Semantic Embeddings ===\n");
+
+// Sample documents, already tokenized so the example has no external dependency.
+docTokens = [
+    ["apple", "fruit", "red", "sweet", "delicious", "nutrition", "healthy"],
+    ["banana", "yellow", "tropical", "sweet", "peel", "nutrition", "potassium"],
+    ["orange", "citrus", "fruit", "vitamin", "skin", "health", "juice"],
+    ["cherry", "small", "red", "fruit", "summer", "jam", "preserve"],
+    ["grape", "purple", "sweet", "wine", "raisin", "cluster"],
+    ["apple", "pie", "dessert", "baked", "cinnamon", "sugar", "delicious"],
+    ["banana", "bread", "muffin", "breakfast", "bake"],
+    ["orange", "juice", "breakfast", "vitamin", "morning", "drink"],
+    ["fruit", "salad", "summer", "fresh", "harvest", "bowl"],
+    ["healthy", "nutrition", "diet", "wellness", "lifestyle", "fitness"]
+];
+
+print("Processing {docTokens.count()} documents...\n");
+
+keyTerms = ["apple", "banana", "orange", "cherry", "grape", "fruit", 
+            "healthy", "nutrition", "sweet", "vitamin", "juice", "salad"];
+
+// 1. Build term frequency and co-occurrence maps for key terms.
+windowSize = 2;
+termFreq = {};
+cooccMatrix = {};
+for (i = 0; i < keyTerms.count(); i = i + 1) {
+    termFreq[keyTerms[i]] = 0;
+    cooccMatrix[keyTerms[i]] = {};
+}
+
+for (d = 0; d < docTokens.count(); d = d + 1) {
+    words = docTokens[d];
+    for (i = 0; i < words.count(); i = i + 1) {
+        term = words[i];
+        if (defined(termFreq[term])) {
+            termFreq[term] = termFreq[term] + 1;
+            
+            start = i - windowSize;
+            if (start < 0) start = 0;
+            end = i + windowSize;
+            if (end > words.count() - 1) end = words.count() - 1;
+            
+            for (j = start; j <= end; j = j + 1) {
+                if (i == j) continue;
+                context = words[j];
+                if (!defined(cooccMatrix[term][context])) cooccMatrix[term][context] = 0;
+                cooccMatrix[term][context] = cooccMatrix[term][context] + 1;
+            }
+        }
+    }
+}
+
+print("Found {termFreq.props.count()} unique terms\n");
+
+// 2. Create embeddings for each unique term
+print("Creating 12-dimensional embeddings for key terms...\n");
+embeddings = {};
+
+for (i = 0; i < keyTerms.count(); i = i + 1) {
+    term = keyTerms[i];
+    if (defined(termFreq[term])) {
+        // Create a term-specific embedding from its document contexts.
+        emb = embed.learn.fromCoOccurrence(cooccMatrix, term, 12, null);
+        emb = embed.core.withMetadata(emb, "term", term);
+        emb = embed.core.withMetadata(emb, "frequency", termFreq[term]);
+        embeddings[term] = emb;
+    }
+}
+
+// 3. Find semantic relationships
+print("\nSemantic Relationships:\n");
+
+targetTerm = "apple";
+if (defined(embeddings[targetTerm])) {
+    targetEmb = embeddings[targetTerm];
+    
+    // Build list for search
+    embList = [];
+    foreach(term in embeddings.props) {
+        embList.add(embeddings[term]);
+    }
+    
+    // Find most similar
+    similar = embed.distance.findMostSimilar(targetEmb, embList, 20, "cosine");
+    
+    print("Terms most similar to '{targetTerm}':\n");
+    for (i = 0; i < similar.count(); i = i + 1) {
+        idx = similar[i].index;
+        sim = similar[i].similarity;
+        embeddingObj = similar[i].embedding;
+        termName = embeddingObj.metadata.term;
+        print("  {i + 1}. {termName} (similarity: {sim * 100}%)\n");
+    }
+}
+
+// 4. Group related terms
+print("\nGrouping related terms...\n");
+embeddingArray = [];
+foreach(term in embeddings.props) {
+    embeddingArray.add(embeddings[term]);
+}
+
+clusters = embed.utils.cluster(embeddingArray, 0.4, "cosine");
+print("Found {clusters.count()} semantic clusters\n");
+
+// 5. Merge embeddings for document-level representation
+print("\nDocument-level representation:\n");
+
+// Predefined document words
+docWords = [
+    ["apple", "fruit", "red", "sweet"],
+    ["banana", "yellow", "tropical", "sweet"],
+    ["orange", "citrus", "vitamin", "juice"]
+];
+
+for (d = 0; d < docWords.count(); d = d + 1) {
+    words = docWords[d];
+    
+    // Collect embeddings for words in this document
+    docEmbeddings = [];
+    for (i = 0; i < words.count(); i = i + 1) {
+        word = words[i];
+        if (defined(embeddings[word])) {
+            docEmbeddings.add(embeddings[word]);
+        }
+    }
+    
+    if (docEmbeddings.count() > 0) {
+        // Merge word embeddings into document embedding
+        docEmb = embed.ops.merge(docEmbeddings, 12);
+        
+        print("\nDocument {d + 1}: {words.count()} words\n");
+        print("  Document embedding magnitude: {embed.core.magnitude(docEmb)}\n");
+    }
+}
+
+// 6. Semantic distance analysis
+print("\n\nSemantic Distance Analysis:\n");
+print("Distance between term pairs:\n");
+
+pairs = [
+    ["apple", "fruit"],
+    ["apple", "orange"],
+    ["healthy", "nutrition"],
+    ["apple", "healthy"],
+    ["juice", "fruit"]
+];
+
+for (i = 0; i < pairs.count(); i = i + 1) {
+    pair = pairs[i];
+    term1 = pair[0];
+    term2 = pair[1];
+    
+    if (defined(embeddings[term1]) && defined(embeddings[term2])) {
+        emb1 = embeddings[term1];
+        emb2 = embeddings[term2];
+        
+        dist = embed.distance.euclideanDistance(emb1, emb2);
+        sim = embed.distance.similarity(emb1, emb2, "cosine");
+        
+        print("  {term1} ↔ {term2}\n");
+        print("    Distance: {dist}, Similarity: {sim * 100}%\n");
+    }
+}
+
+print("\n=== Analysis Complete ===\n");

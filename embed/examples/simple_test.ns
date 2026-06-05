@@ -1,0 +1,53 @@
+// simple_test.ns - Simple test to verify embedding system works
+
+embed = import("./embed.ns");
+
+print("=== Simple Embedding Test ===\n");
+
+print("1. Creating embedding...\n");
+emb1 = embed.core.create(4, "test1");
+print("   Created 4-dimensional embedding\n");
+
+print("2. Setting values...\n");
+emb1 = embed.core.set(emb1, 0, 0.5);
+emb1 = embed.core.set(emb1, 1, 0.3);
+emb1 = embed.core.set(emb1, 2, 0.7);
+emb1 = embed.core.set(emb1, 3, 0.2);
+print("   Set values: [0.5, 0.3, 0.7, 0.2]\n");
+
+print("3. Normalizing...\n");
+emb1 = embed.core.normalize(emb1);
+mag = embed.core.magnitude(emb1);
+print("   Magnitude after normalization: " + mag + "\n");
+
+print("4. Creating second embedding...\n");
+// Inline random embedding creation (core.random not exported)
+emb2_values = [];
+for (j = 0; j < 4; j = j + 1) {
+    val = 42 + j;
+    val = (val * 1103515245 + 12345) % 2147483648;
+    val = (val / 2147483648) * 2 - 1;
+    emb2_values.add(val);
+}
+emb2 = {dims: 4, values: emb2_values, id: "random_e2", metadata: {}};
+emb2 = embed.core.normalize(emb2);
+print("   Created random embedding\n");
+
+print("5. Computing similarity...\n");
+sim = embed.distance.similarity(emb1, emb2, "cosine");
+print("   Similarity: " + sim + "\n");
+
+print("6. Adding embeddings...\n");
+emb3 = embed.ops.add(emb1, emb2);
+print("   Added embeddings\n");
+
+print("7. Learning from frequencies...\n");
+freq = { "a": 10, "b": 5, "c": 2 };
+emb4 = embed.learn.fromFrequencies(freq, 4);
+print("   Learned embedding from frequencies\n");
+
+print("8. Averaging embeddings...\n");
+avg = embed.ops.average([emb1, emb2]);
+print("   Averaged 2 embeddings\n");
+
+print("\n=== Test Complete - All Operations Successful ===\n");

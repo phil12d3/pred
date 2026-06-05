@@ -1,0 +1,71 @@
+// minimal_test.ns - Verification that embed module loads and works
+
+// Test 1: Create matrice directly
+print("1. Creating matrice directly...\n");
+try {
+    m = matrice_fromArray([[3, 4, 5]]);
+    print("   OK\n");
+} catch(e) {
+    print("   FAIL\n");
+}
+
+// Test 2: Get norm
+print("2. Computing norm...\n");
+try {
+    m = matrice_fromArray([[3, 4, 0]]);
+    n = m.norm();
+    print("   OK\n");
+} catch(e) {
+    print("   FAIL\n");
+}
+
+// Test 3: Normalize
+print("3. Normalizing...\n");
+try {
+    m = matrice_fromArray([[3, 4, 0]]);
+    n = m.normalize();
+    print("   OK\n");
+} catch(e) {
+    print("   FAIL\n");
+}
+
+// Test 4: Import embed module
+print("4. Importing embed module...\n");
+try {
+    embed = import("./embed.ns");
+    print("   OK\n");
+} catch(e) {
+    print("   FAIL\n");
+}
+
+// Test 5: Access core module and create embedding
+print("5. Creating embedding with embed.core.create...\n");
+try {
+    emb = embed.core.create(4, "test_emb");
+    print("   OK: " + emb.dims + " dimensions\n");
+} catch(e) {
+    print("   FAIL\n");
+}
+
+// Test 6: Normalize the embedding
+print("6. Normalizing embedding...\n");
+try {
+    normalized = embed.core.normalize(emb);
+    print("   OK\n");
+} catch(e) {
+    print("   FAIL\n");
+}
+
+// Test 7: Use distance metrics
+print("7. Computing similarity...\n");
+try {
+    emb2 = embed.core.create(4, "test_emb2");
+    emb2.values[0] = 0.5;
+    emb2.values[1] = 0.5;
+    sim = embed.distance.cosineSimilarity(emb, emb2);
+    print("   OK: similarity = " + sim + "\n");
+} catch(e) {
+    print("   FAIL\n");
+}
+
+print("\n✓ Embed module is working!\n");

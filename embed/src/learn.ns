@@ -1,0 +1,566 @@
+// learn.ns - Self-learning embedding generation using statistical techniques
+// Note: All logic is inlined within each function due to NS scoping limitations
+
+// Generate an embedding from a frequency/weight map
+fromFrequencies = func(freqMap, dimensions) {
+    if (dimensions < 1) dimensions = 8;
+    
+    // Extract frequencies into sorted array
+    freqs = [];
+    totalFreq = 0;
+    foreach(key in freqMap.props) {
+        f = freqMap[key];
+        if (defined(f) && type(f).typename == "Number") {
+            freqs.add({key: key, freq: f});
+            totalFreq = totalFreq + f;
+        }
+    }
+    
+    // Create zero embedding if no frequencies
+    if (freqs.count() == 0) {
+        values = [];
+        i = 0;
+        while (i < dimensions) {
+            values.add(0);
+            i = i + 1;
+        }
+        return {
+            dims: dimensions,
+            values: values,
+            id: "zero_freq",
+            metadata: {}
+        };
+    }
+    
+    // Sort by frequency descending
+    freqs.sort(func(ai, av, bi, bv) => bv.freq - av.freq);
+    
+    // Create embedding
+    values = [];
+    i = 0;
+    while (i < dimensions) {
+        values.add(0);
+        i = i + 1;
+    }
+    emb = {
+        dims: dimensions,
+        values: values,
+        id: "freq_emb",
+        metadata: {}
+    };
+    
+    for (d = 0; d < dimensions; d = d + 1) {
+        dimVal = 0;
+        
+        if (d == 0) {
+            // First dimension: entropy-like measure
+            sum = 0;
+            for (i = 0; i < freqs.count(); i = i + 1) {
+                p = freqs[i].freq / totalFreq;
+                if (p > 0) {
+                    sum = sum + (p * p);
+                }
+            }
+            dimVal = 1 - sum;
+        } else if (d == 1) {
+            // Second dimension: skewness
+            topThresh = freqs[0].freq / 2;
+            topCount = 0;
+            for (i = 0; i < freqs.count(); i = i + 1) {
+                if (freqs[i].freq >= topThresh) topCount = topCount + 1;
+            }
+            dimVal = (topCount / freqs.count()) - 0.5;
+        } else if (d < 5) {
+            // Dimensions 2-4: item-specific patterns
+            for (i = 0; i < freqs.count(); i = i + 1) {
+                hashVal_d_i = (d + i) * 1103515245 + 12345;
+                seed = (hashVal_d_i % 2147483648) / 2147483648 * 10000;
+                weight = freqs[i].freq / totalFreq;
+                hashVal_seed_i = (seed + i) * 1103515245 + 12345;
+                hval = (hashVal_seed_i % 2147483648) / 2147483648;
+                contribution = hval * weight;
+                dimVal = dimVal + contribution;
+            }
+            dimVal = dimVal / freqs.count();
+        } else {
+            // Higher dimensions: combination of patterns
+            hashVal_d_1 = (d + 1) * 1103515245 + 12345;
+            hd1 = (hashVal_d_1 % 2147483648) / 2147483648;
+            repeat_count = hd1 * 3;
+            for (i = 0; i < repeat_count; i = i + 1) {
+                idx = (i * 7 + d) % freqs.count();
+                weight = freqs[idx].freq / totalFreq;
+                hashVal_d_idx = (d * 100 + idx) * 1103515245 + 12345;
+                hashValue = (hashVal_d_idx % 2147483648) / 2147483648;
+                dimVal = dimVal + (weight * hashValue);
+            }
+            dimVal = dimVal / repeat_count;
+        }
+        
+        emb.values[d] = dimVal;
+    }
+    
+    // Normalize using matrice
+    m = matrice_fromArray([emb.values]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    emb.values = arr2d[0];
+    
+    // Clamp values
+    clamped = [];
+    i = 0;
+    while (i < emb.dims) {
+        v = emb.values[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    emb.values = clamped;
+    
+    return emb;
+};
+
+// Generate embeddings from co-occurrence data
+fromCoOccurrence = func(cooccMatrix, term, dimensions, maxContextTerms) {
+    if (dimensions < 1) dimensions = 8;
+    contextLimit = defined(maxContextTerms) ? maxContextTerms : dimensions * 2;
+    
+    // Create empty embedding
+    values = [];
+    i = 0;
+    while (i < dimensions) {
+        values.add(0);
+        i = i + 1;
+    }
+    emb = {
+        dims: dimensions,
+        values: values,
+        id: "cooc_emb",
+        metadata: {}
+    };
+    
+    if (!defined(cooccMatrix[term])) {
+        return emb;
+    }
+    
+    contextMap = cooccMatrix[term];
+    
+    // Extract context pairs
+    contextPairs = [];
+    foreach(contextTerm in contextMap.props) {
+        count = contextMap[contextTerm];
+        if (defined(count) && type(count).typename == "Number") {
+            contextPairs.add({term: contextTerm, count: count});
+        }
+    }
+    
+    if (contextPairs.count() == 0) {
+        return emb;
+    }
+    
+    // Sort by count
+    contextPairs.sort(func(ai, av, bi, bv) => bv.count - av.count);
+    
+    totalCtx = 0;
+    for (i = 0; i < contextPairs.count(); i = i + 1) {
+        totalCtx = totalCtx + contextPairs[i].count;
+    }
+    
+    // Project contexts into sparse dimensions. Shared context terms land in the
+    // same dimensions, so cosine reflects actual overlap instead of random sign.
+    for (i = 0; i < contextPairs.count() && i < contextLimit; i = i + 1) {
+        pair = contextPairs[i];
+        weight = pair.count / totalCtx;
+        
+        seed = 0;
+        for (j = 0; j < pair.term.length; j = j + 1) {
+            ch = pair.term[j];
+            charVal = 0;
+            if (ch == "a") charVal = 1;
+            else if (ch == "b") charVal = 2;
+            else if (ch == "c") charVal = 3;
+            else if (ch == "d") charVal = 4;
+            else if (ch == "e") charVal = 5;
+            else if (ch == "f") charVal = 6;
+            else if (ch == "g") charVal = 7;
+            else if (ch == "h") charVal = 8;
+            else if (ch == "i") charVal = 9;
+            else if (ch == "j") charVal = 10;
+            else if (ch == "k") charVal = 11;
+            else if (ch == "l") charVal = 12;
+            else if (ch == "m") charVal = 13;
+            else if (ch == "n") charVal = 14;
+            else if (ch == "o") charVal = 15;
+            else if (ch == "p") charVal = 16;
+            else if (ch == "q") charVal = 17;
+            else if (ch == "r") charVal = 18;
+            else if (ch == "s") charVal = 19;
+            else if (ch == "t") charVal = 20;
+            else if (ch == "u") charVal = 21;
+            else if (ch == "v") charVal = 22;
+            else if (ch == "w") charVal = 23;
+            else if (ch == "x") charVal = 24;
+            else if (ch == "y") charVal = 25;
+            else if (ch == "z") charVal = 26;
+            seed = seed + (charVal * (j + 1));
+        }
+        
+        idx = seed % dimensions;
+        emb.values[idx] = emb.values[idx] + weight;
+        
+        idx2 = ((seed * 7) + pair.term.length) % dimensions;
+        emb.values[idx2] = emb.values[idx2] + (weight * 0.5);
+    }
+    
+    // Normalize and clamp
+    m = matrice_fromArray([emb.values]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    emb.values = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < emb.dims) {
+        v = emb.values[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    emb.values = clamped;
+    
+    return emb;
+};
+
+// Generate embeddings from a corpus
+fromCorpus = func(corpus, term, dimensions) {
+    if (dimensions < 1) dimensions = 8;
+    
+    values = [];
+    i = 0;
+    while (i < dimensions) {
+        values.add(0);
+        i = i + 1;
+    }
+    emb = {
+        dims: dimensions,
+        values: values,
+        id: "corpus_emb",
+        metadata: {}
+    };
+    
+    if (!defined(corpus) || !defined(corpus.docs)) {
+        return emb;
+    }
+    
+    docCount = corpus.docs.count();
+    if (docCount == 0) {
+        return emb;
+    }
+    
+    rawTarget = "";
+    if (defined(term) && type(term).typename == "String") {
+        rawTarget = term;
+    } else {
+        rawTarget = stringify(term);
+    }
+    target = "";
+    for (ti = 0; ti < rawTarget.length; ti = ti + 1) {
+        ch = rawTarget[ti];
+        if (ch == "A") ch = "a";
+        else if (ch == "B") ch = "b";
+        else if (ch == "C") ch = "c";
+        else if (ch == "D") ch = "d";
+        else if (ch == "E") ch = "e";
+        else if (ch == "F") ch = "f";
+        else if (ch == "G") ch = "g";
+        else if (ch == "H") ch = "h";
+        else if (ch == "I") ch = "i";
+        else if (ch == "J") ch = "j";
+        else if (ch == "K") ch = "k";
+        else if (ch == "L") ch = "l";
+        else if (ch == "M") ch = "m";
+        else if (ch == "N") ch = "n";
+        else if (ch == "O") ch = "o";
+        else if (ch == "P") ch = "p";
+        else if (ch == "Q") ch = "q";
+        else if (ch == "R") ch = "r";
+        else if (ch == "S") ch = "s";
+        else if (ch == "T") ch = "t";
+        else if (ch == "U") ch = "u";
+        else if (ch == "V") ch = "v";
+        else if (ch == "W") ch = "w";
+        else if (ch == "X") ch = "x";
+        else if (ch == "Y") ch = "y";
+        else if (ch == "Z") ch = "z";
+        target = target + ch;
+    }
+    windowSize = 2;
+    totalTokens = 0;
+    termCount = 0;
+    docFrequency = 0;
+    positionSum = 0;
+    contextCounts = {};
+    totalContext = 0;
+    
+    for (di = 0; di < docCount; di = di + 1) {
+        docValue = corpus.docs[di];
+        if (defined(docValue) && type(docValue).typename == "String") {
+            doc = docValue;
+        } else {
+            doc = stringify(docValue);
+        }
+        tokens = [];
+        word = "";
+        
+        for (ci = 0; ci < doc.length; ci = ci + 1) {
+            ch = doc[ci];
+            isAlphaNum = (ch >= "a" && ch <= "z") ||
+                         (ch >= "A" && ch <= "Z") ||
+                         (ch >= "0" && ch <= "9");
+            if (isAlphaNum) {
+                if (ch == "A") ch = "a";
+                else if (ch == "B") ch = "b";
+                else if (ch == "C") ch = "c";
+                else if (ch == "D") ch = "d";
+                else if (ch == "E") ch = "e";
+                else if (ch == "F") ch = "f";
+                else if (ch == "G") ch = "g";
+                else if (ch == "H") ch = "h";
+                else if (ch == "I") ch = "i";
+                else if (ch == "J") ch = "j";
+                else if (ch == "K") ch = "k";
+                else if (ch == "L") ch = "l";
+                else if (ch == "M") ch = "m";
+                else if (ch == "N") ch = "n";
+                else if (ch == "O") ch = "o";
+                else if (ch == "P") ch = "p";
+                else if (ch == "Q") ch = "q";
+                else if (ch == "R") ch = "r";
+                else if (ch == "S") ch = "s";
+                else if (ch == "T") ch = "t";
+                else if (ch == "U") ch = "u";
+                else if (ch == "V") ch = "v";
+                else if (ch == "W") ch = "w";
+                else if (ch == "X") ch = "x";
+                else if (ch == "Y") ch = "y";
+                else if (ch == "Z") ch = "z";
+                word = word + ch;
+            } else {
+                if (word != "") {
+                    tokens.add(word);
+                    word = "";
+                }
+            }
+        }
+        if (word != "") tokens.add(word);
+        
+        totalTokens = totalTokens + tokens.count();
+        seenInDoc = false;
+        
+        for (ti = 0; ti < tokens.count(); ti = ti + 1) {
+            tok = tokens[ti];
+            if (tok == target) {
+                termCount = termCount + 1;
+                positionSum = positionSum + ti;
+                seenInDoc = true;
+                
+                start = ti - windowSize;
+                if (start < 0) start = 0;
+                end = ti + windowSize;
+                if (end > tokens.count() - 1) end = tokens.count() - 1;
+                
+                for (cj = start; cj <= end; cj = cj + 1) {
+                    if (cj == ti) continue;
+                    context = tokens[cj];
+                    if (!defined(contextCounts[context])) contextCounts[context] = 0;
+                    contextCounts[context] = contextCounts[context] + 1;
+                    totalContext = totalContext + 1;
+                }
+            }
+        }
+        
+        if (seenInDoc) docFrequency = docFrequency + 1;
+    }
+    
+    if (termCount == 0 || totalTokens == 0) {
+        return emb;
+    }
+    
+    uniqueContext = contextCounts.props.count();
+    avgPosition = positionSum / termCount;
+    avgDocLen = totalTokens / docCount;
+    positionScore = 0;
+    if (avgDocLen > 0) {
+        positionScore = 1 - (avgPosition / avgDocLen);
+        if (positionScore < 0) positionScore = 0;
+        if (positionScore > 1) positionScore = 1;
+    }
+    
+    emb.values[0] = (termCount / totalTokens) * 0.15;
+    if (dimensions > 1) emb.values[1] = (docFrequency / docCount) * 0.15;
+    if (dimensions > 2) emb.values[2] = positionScore * 0.15;
+    if (dimensions > 3) emb.values[3] = (uniqueContext / (uniqueContext + termCount)) * 0.15;
+    if (dimensions > 4) emb.values[4] = (totalContext / (totalContext + totalTokens)) * 0.15;
+    
+    foreach(contextTerm in contextCounts.props) {
+        count = contextCounts[contextTerm];
+        seed = 0;
+        for (j = 0; j < contextTerm.length; j = j + 1) {
+            ch = contextTerm[j];
+            charVal = 0;
+            if (ch == "a") charVal = 1;
+            else if (ch == "b") charVal = 2;
+            else if (ch == "c") charVal = 3;
+            else if (ch == "d") charVal = 4;
+            else if (ch == "e") charVal = 5;
+            else if (ch == "f") charVal = 6;
+            else if (ch == "g") charVal = 7;
+            else if (ch == "h") charVal = 8;
+            else if (ch == "i") charVal = 9;
+            else if (ch == "j") charVal = 10;
+            else if (ch == "k") charVal = 11;
+            else if (ch == "l") charVal = 12;
+            else if (ch == "m") charVal = 13;
+            else if (ch == "n") charVal = 14;
+            else if (ch == "o") charVal = 15;
+            else if (ch == "p") charVal = 16;
+            else if (ch == "q") charVal = 17;
+            else if (ch == "r") charVal = 18;
+            else if (ch == "s") charVal = 19;
+            else if (ch == "t") charVal = 20;
+            else if (ch == "u") charVal = 21;
+            else if (ch == "v") charVal = 22;
+            else if (ch == "w") charVal = 23;
+            else if (ch == "x") charVal = 24;
+            else if (ch == "y") charVal = 25;
+            else if (ch == "z") charVal = 26;
+            seed = seed + (charVal * (j + 1));
+        }
+        
+        weight = count / totalContext;
+        idx = seed % dimensions;
+        emb.values[idx] = emb.values[idx] + weight;
+        idx2 = ((seed * 7) + contextTerm.length) % dimensions;
+        emb.values[idx2] = emb.values[idx2] + (weight * 0.5);
+    }
+    
+    termSeed = 0;
+    for (j = 0; j < target.length; j = j + 1) {
+        ch = target[j];
+        charVal = 0;
+        if (ch == "a") charVal = 1;
+        else if (ch == "b") charVal = 2;
+        else if (ch == "c") charVal = 3;
+        else if (ch == "d") charVal = 4;
+        else if (ch == "e") charVal = 5;
+        else if (ch == "f") charVal = 6;
+        else if (ch == "g") charVal = 7;
+        else if (ch == "h") charVal = 8;
+        else if (ch == "i") charVal = 9;
+        else if (ch == "j") charVal = 10;
+        else if (ch == "k") charVal = 11;
+        else if (ch == "l") charVal = 12;
+        else if (ch == "m") charVal = 13;
+        else if (ch == "n") charVal = 14;
+        else if (ch == "o") charVal = 15;
+        else if (ch == "p") charVal = 16;
+        else if (ch == "q") charVal = 17;
+        else if (ch == "r") charVal = 18;
+        else if (ch == "s") charVal = 19;
+        else if (ch == "t") charVal = 20;
+        else if (ch == "u") charVal = 21;
+        else if (ch == "v") charVal = 22;
+        else if (ch == "w") charVal = 23;
+        else if (ch == "x") charVal = 24;
+        else if (ch == "y") charVal = 25;
+        else if (ch == "z") charVal = 26;
+        termSeed = termSeed + (charVal * (j + 1));
+    }
+    termIdx = termSeed % dimensions;
+    emb.values[termIdx] = emb.values[termIdx] + ((docFrequency / docCount) * 0.1);
+    
+    // Normalize and clamp
+    m = matrice_fromArray([emb.values]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    emb.values = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < emb.dims) {
+        v = emb.values[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    emb.values = clamped;
+    
+    return emb;
+};
+
+// Incrementally learn from new data
+learn = func(existingEmbedding, newData, learningRate) {
+    lr = defined(learningRate) ? learningRate : 0.1;
+    if (lr < 0) lr = 0;
+    if (lr > 1) lr = 1;
+    
+    // Deep copy embedding
+    values = [];
+    i = 0;
+    while (i < existingEmbedding.values.count()) {
+        values.add(existingEmbedding.values[i]);
+        i = i + 1;
+    }
+    learned = {
+        dims: existingEmbedding.dims,
+        values: values,
+        id: existingEmbedding.id + "_learned",
+        metadata: existingEmbedding.metadata
+    };
+    
+    // Analyze new data
+    newValues = [];
+    if (defined(newData) && defined(newData.count)) {
+        for (i = 0; i < newData.count(); i = i + 1) {
+            v = newData[i];
+            if (type(v).typename == "Number") {
+                newValues.add(v);
+            }
+        }
+    }
+    
+    if (newValues.count() == 0) {
+        return learned;
+    }
+    
+    // Update each dimension
+    for (d = 0; d < learned.dims; d = d + 1) {
+        idx = d % newValues.count();
+        newVal = newValues[idx];
+        
+        updated = (learned.values[d] * (1 - lr)) + (newVal * lr);
+        learned.values[d] = updated;
+    }
+    
+    // Normalize and clamp
+    m = matrice_fromArray([learned.values]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    learned.values = arr2d[0];
+    
+    clamped = [];
+    i = 0;
+    while (i < learned.dims) {
+        v = learned.values[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+        i = i + 1;
+    }
+    learned.values = clamped;
+    
+    return learned;
+};

@@ -1,0 +1,143 @@
+// demo.ns - Demonstration of embedding creation and operations
+
+embed = import("./embed.ns");
+
+print("=== Embedding System Demo ===\n");
+
+// 1. Basic embedding creation
+print("1. Creating embeddings...\n");
+emb1 = embed.core.create(8, "emb1");
+emb1 = embed.core.set(emb1, 0, 0.8);
+emb1 = embed.core.set(emb1, 1, 0.6);
+emb1 = embed.core.set(emb1, 2, 0.3);
+emb1 = embed.core.normalize(emb1);
+
+print("Embedding 1 created with 8 dimensions\n");
+print("Magnitude: {embed.core.magnitude(emb1)}\n");
+
+stats1 = embed.core.stats(emb1);
+print("Stats: Mean={stats1.mean}, Stddev={stats1.stddev}\n\n");
+
+// 2. Generate embedding from frequencies
+print("2. Learning from frequency data...\n");
+freqData = {
+    "apple": 45,
+    "banana": 32,
+    "orange": 28,
+    "cherry": 15,
+    "grape": 10
+};
+embFreq = embed.learn.fromFrequencies(freqData, 8);
+print("Learned embedding from word frequencies");
+print("Magnitude: {embed.core.magnitude(embFreq)}\n");
+
+// 3. Combine embeddings
+print("3. Combining embeddings...\n");
+// Create random embedding inline (workaround: core.random not exported)
+emb2_values = [];
+seedNum = 100;
+for (i = 0; i < 8; i = i + 1) {
+    val = seedNum + i;
+    val = (val * 1103515245 + 12345) % 2147483648;
+    val = (val / 2147483648) * 2 - 1;
+    emb2_values.add(val);
+}
+emb2 = {dims: 8, values: emb2_values, id: "random_emb2", metadata: {}};
+emb2 = embed.core.normalize(emb2);
+
+combined = embed.ops.add(emb1, emb2);
+print("Combined embedding through addition");
+print("Similarity to emb1: {embed.distance.similarity(combined, emb1, \"cosine\")}");
+print("Similarity to emb2: {embed.distance.similarity(combined, emb2, \"cosine\")}\n");
+
+// 4. Interpolation (blending)
+print("4. Interpolating between embeddings...\n");
+blended50 = embed.ops.interpolate(emb1, emb2, 0.5);
+blended25 = embed.ops.interpolate(emb1, emb2, 0.25);
+blended75 = embed.ops.interpolate(emb1, emb2, 0.75);
+
+print("Similarity to emb1: 50% blend={embed.distance.similarity(blended50, emb1, \"cosine\")}");
+print("Similarity to emb1: 25% blend={embed.distance.similarity(blended25, emb1, \"cosine\")}");
+print("Similarity to emb1: 75% blend={embed.distance.similarity(blended75, emb1, \"cosine\")}\n");
+
+// 5. Distance metrics
+print("5. Testing distance metrics...\n");
+dist1 = embed.distance.euclideanDistance(emb1, emb2);
+dist2 = embed.distance.manhattanDistance(emb1, emb2);
+dist3 = embed.distance.chebyshevDistance(emb1, emb2);
+
+print("Euclidean distance: {dist1}");
+print("Manhattan distance: {dist2}");
+print("Chebyshev distance: {dist3}\n");
+
+// 6. Averaging multiple embeddings
+print("6. Averaging embeddings...\n");
+embedArray = [emb1, emb2, embFreq];
+averaged = embed.ops.average(embedArray);
+print("Average of 3 embeddings computed");
+print("Normalized magnitude: {embed.core.magnitude(averaged)}\n");
+
+// 7. Merging with dimension change
+print("7. Merging embeddings with dimension reduction...\n");
+merged = embed.ops.merge(embedArray, 4);
+print("Merged 3 8-dim embeddings into 1 4-dim embedding");
+print("Magnitude: {embed.core.magnitude(merged)}\n");
+
+// 8. Expanding dimensions
+print("8. Expanding embedding dimensions...\n");
+expanded = embed.ops.expand(emb1, 12);
+print("Expanded 8-dim embedding to 12-dim");
+print("Original dims: {emb1.dims}, New dims: {expanded.dims}\n");
+
+// 9. Projecting to lower dimensions
+print("9. Projecting to lower dimensions...\n");
+projected = embed.ops.project(expanded, 6);
+print("Projected 12-dim embedding back to 6-dim");
+print("New dims: {projected.dims}\n");
+
+// 10. Batch operations
+print("10. Batch processing...\n");
+embeddings = [];
+for (i = 0; i < 5; i = i + 1) {
+    // Create random embeddings inline (core.random not exported)
+    ev = [];
+    for (j = 0; j < 8; j = j + 1) {
+        val = (10 + i) + j;
+        val = (val * 1103515245 + 12345) % 2147483648;
+        val = (val / 2147483648) * 2 - 1;
+        ev.add(val);
+    }
+    eid = "e" + stringify(i);
+    etmp = {dims: 8, values: ev, id: eid, metadata: {}};
+    e = embed.core.normalize(etmp);
+    embeddings.add(e);
+}
+
+similarity1_2 = embed.distance.similarity(embeddings[0], embeddings[1], "cosine");
+similarity1_5 = embed.distance.similarity(embeddings[0], embeddings[4], "cosine");
+
+print("Created 5 random embeddings");
+print("Similarity(1,2): {similarity1_2}");
+print("Similarity(1,5): {similarity1_5}\n");
+
+// 11. Finding most similar
+print("11. Finding most similar embeddings...\n");
+closest = embed.distance.findMostSimilar(embeddings[0], embeddings, 2, "cosine");
+print("Found 2 most similar to embedding[0]");
+print("Closest similarity: {closest[0].similarity}\n");
+
+// 12. Learning and incremental update
+print("12. Incremental learning...\n");
+baseEmb = embed.core.create(8, "base");
+for (d = 0; d < 8; d = d + 1) {
+    baseEmb = embed.core.set(baseEmb, d, 0.1);
+}
+
+newData = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 0.95, 0.85];
+learned = embed.learn.learn(baseEmb, newData, 0.3);
+
+print("Updated embedding with new data using learning rate 0.3");
+print("Base magnitude: {embed.core.magnitude(baseEmb)}");
+print("Learned magnitude: {embed.core.magnitude(learned)}\n");
+
+print("=== Demo Complete ===");

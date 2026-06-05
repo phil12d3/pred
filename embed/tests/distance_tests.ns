@@ -1,0 +1,159 @@
+[test]
+cosine_similarity = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, 2);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    sim = embed.distance.cosineSimilarity(emb1, emb2);
+    t.truthy(sim > 0.9, "similar vectors have high cosine similarity");
+};
+
+[test]
+euclidean_distance = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    emb3 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, 2);
+    }
+    for (i = 0; i < 2; i = i + 1) emb3 = embed.core.set(emb3, i, 0.1);
+    for (i = 2; i < 4; i = i + 1) emb3 = embed.core.set(emb3, i, 5);
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+    emb3 = embed.core.normalize(emb3);
+
+    dist1 = embed.distance.euclideanDistance(emb1, emb2);
+    dist2 = embed.distance.euclideanDistance(emb1, emb3);
+    t.truthy(dist2 > dist1, "more different vectors have larger distance");
+};
+
+[test]
+manhattan_distance = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, 2);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    dist = embed.distance.manhattanDistance(emb1, emb2);
+    t.truthy(dist >= 0, "manhattan distance is non-negative");
+};
+
+[test]
+chebyshev_distance = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, 2);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    dist = embed.distance.chebyshevDistance(emb1, emb2);
+    t.truthy(dist >= 0, "chebyshev distance is non-negative");
+};
+
+[test]
+wasserstein_distance = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb3 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) emb1 = embed.core.set(emb1, i, 1);
+    for (i = 0; i < 2; i = i + 1) emb3 = embed.core.set(emb3, i, 0.1);
+    for (i = 2; i < 4; i = i + 1) emb3 = embed.core.set(emb3, i, 5);
+    emb1 = embed.core.normalize(emb1);
+    emb3 = embed.core.normalize(emb3);
+
+    dist = embed.distance.wassersteinDistance(emb1, emb3);
+    t.truthy(dist >= 0, "wasserstein distance is non-negative");
+};
+
+[test]
+cosine_similarity_score_range = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, 2);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    sim = embed.distance.similarity(emb1, emb2, "cosine");
+    t.truthy(sim >= -1, "cosine similarity is above lower bound");
+    t.truthy(sim <= 1, "cosine similarity is within upper bound");
+};
+
+[test]
+euclidean_similarity = func(t) {
+    embed = import("./embed.ns");
+
+    emb = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) emb = embed.core.set(emb, i, 1);
+    emb = embed.core.normalize(emb);
+
+    sim = embed.distance.similarity(emb, emb, "euclidean");
+    diff = sim - 1;
+    if (diff < 0) diff = 0 - diff;
+    t.truthy(diff < 0.01, "identical vectors have euclidean similarity close to 1");
+};
+
+[test]
+find_most_similar_embeddings = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    emb3 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, 2);
+    }
+    for (i = 0; i < 2; i = i + 1) emb3 = embed.core.set(emb3, i, 0.1);
+    for (i = 2; i < 4; i = i + 1) emb3 = embed.core.set(emb3, i, 5);
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+    emb3 = embed.core.normalize(emb3);
+
+    results = embed.distance.findMostSimilar(emb1, [emb1, emb2, emb3], 2, "cosine");
+    t.truthy(results.count() >= 1, "findMostSimilar returns matches");
+    t.equal(results[0].index, 0, "first match is the query embedding");
+};
+
+[test]
+hamming_distance = func(t) {
+    embed = import("./embed.ns");
+
+    emb1 = embed.core.create(4, null);
+    emb2 = embed.core.create(4, null);
+    for (i = 0; i < 4; i = i + 1) {
+        emb1 = embed.core.set(emb1, i, 1);
+        emb2 = embed.core.set(emb2, i, 2);
+    }
+    emb1 = embed.core.normalize(emb1);
+    emb2 = embed.core.normalize(emb2);
+
+    dist = embed.distance.hammingDistance(emb1, emb2, 0.2);
+    t.truthy(dist >= 0, "hamming distance is non-negative");
+};

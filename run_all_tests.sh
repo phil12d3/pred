@@ -30,6 +30,13 @@ echo "== Running text-stat tests =="
 )
 
 echo
+echo "== Running embed tests =="
+(
+  cd "$ROOT_DIR/embed"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
 echo "== Running prob-stat tests =="
 (
   cd "$ROOT_DIR/prob-stat"

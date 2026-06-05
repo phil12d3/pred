@@ -1,0 +1,46 @@
+// positional_encoding.ns - Example: adding sequence position to embeddings
+
+embed = import("./embed.ns");
+
+print("=== Positional Encoding Example ===\n");
+
+// A content embedding says "what this item is".
+token = embed.core.create(8, "token");
+for (i = 0; i < 8; i = i + 1) {
+    token = embed.core.set(token, i, i + 1);
+}
+token = embed.core.normalize(token);
+
+print("Base token magnitude: {embed.core.magnitude(token)}\n");
+
+// Positional encodings say "where this item appears".
+pos0 = embed.ops.positionalEncoding(0, 8, 100);
+pos1 = embed.ops.positionalEncoding(1, 8, 100);
+pos5 = embed.ops.positionalEncoding(5, 8, 100);
+
+print("\nStandalone position vectors:\n");
+print("  position 0 magnitude: {embed.core.magnitude(pos0)}\n");
+print("  position 1 magnitude: {embed.core.magnitude(pos1)}\n");
+print("  position 5 magnitude: {embed.core.magnitude(pos5)}\n");
+print("  distance pos0 -> pos5: {embed.distance.euclideanDistance(pos0, pos5)}\n");
+
+// Blend content and position. The content is the same, but positions differ.
+tokenAt0 = embed.ops.addPositionalEncoding(token, 0, 0.25);
+tokenAt1 = embed.ops.addPositionalEncoding(token, 1, 0.25);
+tokenAt5 = embed.ops.addPositionalEncoding(token, 5, 0.25);
+
+print("\nSame content at different positions:\n");
+print("  token@0 magnitude: {embed.core.magnitude(tokenAt0)}\n");
+print("  token@1 magnitude: {embed.core.magnitude(tokenAt1)}\n");
+print("  token@5 magnitude: {embed.core.magnitude(tokenAt5)}\n");
+
+print("\nComparisons:\n");
+print("  token@0 vs token@1 similarity: {embed.distance.similarity(tokenAt0, tokenAt1, \"cosine\") * 100}%\n");
+print("  token@0 vs token@5 similarity: {embed.distance.similarity(tokenAt0, tokenAt5, \"cosine\") * 100}%\n");
+print("  token@0 vs base token similarity: {embed.distance.similarity(tokenAt0, token, \"cosine\") * 100}%\n");
+
+print("\nInterpretation:\n");
+print("  Positional encoding keeps the content recognizable but makes sequence positions distinguishable.\n");
+print("  Increase strength when order matters more; decrease it when content should dominate.\n");
+
+print("\n=== Positional Encoding Complete ===\n");

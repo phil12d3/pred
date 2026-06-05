@@ -1,0 +1,368 @@
+// core.ns - Fundamental embedding operations
+// Note: Functions don't call other functions due to NS scoping limitations
+
+// Helper: absolute value
+abs = func(x) {
+    if (x < 0) {
+        return 0 - x;
+    }
+    return x;
+};
+
+// Helper: maximum
+max = func(a, b) {
+    if (a > b) return a;
+    return b;
+};
+
+// Helper: minimum  
+min = func(a, b) {
+    if (a < b) return a;
+    return b;
+};
+
+// Helper: square root using Newton's method
+sqrt = func(x) {
+    if (x <= 0) {
+        return 0;
+    }
+    guess = x / 2;
+    i = 0;
+    while (i < 50) {
+        nextGuess = (guess + x / guess) / 2;
+        diff = nextGuess - guess;
+        if (diff < 0) diff = 0 - diff;
+        if (diff < 0.0001) {
+            return nextGuess;
+        }
+        guess = nextGuess;
+        i = i + 1;
+    }
+    return guess;
+};
+
+// Create an embedding of specified dimensions
+create = func(dimensions, seedId) {
+    if (dimensions < 1) {
+        dimensions = 1;
+    }
+    if (dimensions > 10000) {
+        dimensions = 10000;
+    }
+    
+    idVal = "";
+    if (defined(seedId)) {
+        idVal = seedId;
+    } else {
+        nowVal = now();
+        idVal = "emb_" + stringify(nowVal);
+    }
+    
+    values = [];
+    i = 0;
+    while (i < dimensions) {
+        values.add(0);
+        i = i + 1;
+    }
+    
+    return {
+        dims: dimensions,
+        values: values,
+        id: idVal,
+        metadata: {}
+    };
+};
+
+// Copy an embedding
+copy = func(embedding) {
+    copyId = embedding.id + "_copy";
+    values = [];
+    i = 0;
+    while (i < embedding.values.count()) {
+        values.add(embedding.values[i]);
+        i = i + 1;
+    }
+    return {
+        dims: embedding.dims,
+        values: values,
+        id: copyId,
+        metadata: embedding.metadata
+    };
+};
+
+// Compute the magnitude (L2 norm) of an embedding
+magnitude = func(embedding) {
+    count = embedding.values.count();
+    if (count == 0) {
+        return 0;
+    }
+    
+    m = matrice_fromArray([embedding.values]);
+    return m.norm();
+};
+
+// Normalize an embedding to unit length (L2 normalization)
+normalize = func(embedding) {
+    count = embedding.values.count();
+    if (count == 0) {
+        return embedding;
+    }
+    
+    m = matrice_fromArray([embedding.values]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    
+    values = [];
+    j = 0;
+    while (j < arr2d[0].count()) {
+        values.add(arr2d[0][j]);
+        j = j + 1;
+    }
+    
+    return {
+        dims: embedding.dims,
+        values: values,
+        id: embedding.id,
+        metadata: embedding.metadata
+    };
+};
+
+// Rescale embedding values to range [-1, 1]
+rescaleNorm = func(embedding) {
+    count = embedding.values.count();
+    if (count == 0) {
+        return embedding;
+    }
+    
+    minVal = embedding.values[0];
+    maxVal = embedding.values[0];
+    
+    i = 1;
+    while (i < count) {
+        v = embedding.values[i];
+        if (v < minVal) {
+            minVal = v;
+        }
+        if (v > maxVal) {
+            maxVal = v;
+        }
+        i = i + 1;
+    }
+    
+    range = maxVal - minVal;
+    newValues = [];
+    
+    if (range == 0) {
+        i = 0;
+        while (i < embedding.dims) {
+            newValues.add(0);
+            i = i + 1;
+        }
+    } else {
+        i = 0;
+        while (i < embedding.dims) {
+            v = embedding.values[i];
+            normalized = (v - minVal) / range;
+            newValues.add((normalized * 2) - 1);
+            i = i + 1;
+        }
+    }
+    
+    return {
+        dims: embedding.dims,
+        values: newValues,
+        id: embedding.id,
+        metadata: embedding.metadata
+    };
+};
+
+// Clamp all values to [-1, 1]
+clamp = func(embedding) {
+    newValues = [];
+    
+    i = 0;
+    while (i < embedding.dims) {
+        v = embedding.values[i];
+        if (v < -1) {
+            v = -1;
+        }
+        if (v > 1) {
+            v = 1;
+        }
+        newValues.add(v);
+        i = i + 1;
+    }
+    
+    return {
+        dims: embedding.dims,
+        values: newValues,
+        id: embedding.id,
+        metadata: embedding.metadata
+    };
+};
+
+// Get statistics about an embedding
+stats = func(embedding) {
+    count = embedding.values.count();
+    if (count == 0) {
+        return {mean: 0, variance: 0, stddev: 0, min: 0, max: 0};
+    }
+    
+    sum = 0;
+    minVal = embedding.values[0];
+    maxVal = embedding.values[0];
+    
+    i = 0;
+    while (i < count) {
+        v = embedding.values[i];
+        sum = sum + v;
+        if (v < minVal) {
+            minVal = v;
+        }
+        if (v > maxVal) {
+            maxVal = v;
+        }
+        i = i + 1;
+    }
+    
+    mean = sum / count;
+    
+    varSum = 0;
+    i = 0;
+    while (i < count) {
+        v = embedding.values[i];
+        diff = v - mean;
+        varSum = varSum + (diff * diff);
+        i = i + 1;
+    }
+    
+    variance = varSum / count;
+    
+    // Inline sqrt for stddev
+    x = variance;
+    if (x <= 0) {
+        stddev = 0;
+    } else {
+        guess = x / 2;
+        j = 0;
+        while (j < 50) {
+            nextGuess = (guess + x / guess) / 2;
+            diff = nextGuess - guess;
+            if (diff < 0) diff = 0 - diff;
+            if (diff < 0.0001) {
+                stddev = nextGuess;
+                j = 51;
+            }
+            guess = nextGuess;
+            j = j + 1;
+        }
+        if (j == 51) {
+            stddev = guess;
+        } else {
+            stddev = guess;
+        }
+    }
+    
+    return {
+        mean: mean,
+        variance: variance,
+        stddev: stddev,
+        min: minVal,
+        max: maxVal,
+        count: count
+    };
+};
+
+// Set metadata on an embedding
+withMetadata = func(embedding, key, value) {
+    newMeta = embedding.metadata;
+    newMeta[key] = value;
+    return {
+        dims: embedding.dims,
+        values: embedding.values,
+        id: embedding.id,
+        metadata: newMeta
+    };
+};
+
+// Get a specific dimension value
+at = func(embedding, index) {
+    if (index < 0) {
+        return 0;
+    }
+    if (index >= embedding.dims) {
+        return 0;
+    }
+    return embedding.values[index];
+};
+
+// Set a specific dimension value
+set = func(embedding, index, value) {
+    if (index < 0) {
+        return embedding;
+    }
+    if (index >= embedding.dims) {
+        return embedding;
+    }
+    
+    newValues = [];
+    i = 0;
+    while (i < embedding.values.count()) {
+        if (i == index) {
+            newValues.add(value);
+        } else {
+            newValues.add(embedding.values[i]);
+        }
+        i = i + 1;
+    }
+    
+    return {
+        dims: embedding.dims,
+        values: newValues,
+        id: embedding.id,
+        metadata: embedding.metadata
+    };
+};
+
+// Create a zero embedding
+zero = func(dimensions) {
+    nowVal = now();
+    zeroId = "zero_" + stringify(nowVal);
+    values = [];
+    i = 0;
+    while (i < dimensions) {
+        values.add(0);
+        i = i + 1;
+    }
+    return {
+        dims: dimensions,
+        values: values,
+        id: zeroId,
+        metadata: {}
+    };
+};
+
+// Create a random embedding with values in [-1, 1]
+random = func(dimensions, seedVal) {
+    seedNum = 42;
+    if (defined(seedVal)) {
+        seedNum = seedVal;
+    }
+    
+    values = [];
+    i = 0;
+    while (i < dimensions) {
+        val = seedNum + i;
+        val = (val * 1103515245 + 12345) % 2147483648;
+        val = (val / 2147483648) * 2 - 1;
+        values.add(val);
+        i = i + 1;
+    }
+    
+    return {
+        dims: dimensions,
+        values: values,
+        id: "random_emb",
+        metadata: {}
+    };
+};

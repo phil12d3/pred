@@ -1,0 +1,143 @@
+// numerical_embeddings.ns - Example: embeddings for numerical/time-series data
+
+embed = import("./embed.ns");
+
+print("=== Numerical Data Embeddings ===\n");
+
+// Sample time series data
+tsData = [
+    {name: "series_A", values: [10, 12, 14, 16, 18, 20, 22, 24, 26, 28]},
+    {name: "series_B", values: [50, 45, 40, 35, 30, 25, 20, 15, 10, 5]},
+    {name: "series_C", values: [15, 15, 16, 16, 17, 17, 18, 18, 19, 19]},
+    {name: "series_D", values: [100, 95, 110, 92, 105, 98, 108, 96, 102, 100]},
+    {name: "series_E", values: [25, 26, 24, 27, 25, 26, 24, 27, 25, 26]}
+];
+
+print("Processing {tsData.count()} time series...\n");
+
+// 1. Create embeddings based on statistical properties
+print("Step 1: Generating embeddings from series statistics\n");
+embeddings = [];
+
+for (i = 0; i < tsData.count(); i = i + 1) {
+    series = tsData[i];
+    values = series.values;
+    
+    // Build frequency-like map from statistical properties
+    freq = {
+        "mean": values[0],  // Simplified: use first value as key weight
+        "trend": values[values.count() - 1] - values[0],
+        "volatility": 0,
+        "count": values.count()
+    };
+    
+    // Calculate volatility (variance)
+    mean = 0;
+    for (j = 0; j < values.count(); j = j + 1) {
+        mean = mean + values[j];
+    }
+    mean = mean / values.count();
+    
+    variance = 0;
+    for (j = 0; j < values.count(); j = j + 1) {
+        diff = values[j] - mean;
+        variance = variance + (diff * diff);
+    }
+    variance = variance / values.count();
+    freq["volatility"] = variance;
+    
+    // Generate embedding
+    emb = embed.learn.fromFrequencies(freq, 8);
+    emb = embed.core.withMetadata(emb, "series_name", series.name);
+    emb = embed.core.withMetadata(emb, "mean", mean);
+    emb = embed.core.withMetadata(emb, "trend", freq["trend"]);
+    
+    embeddings.add(emb);
+    
+    print("  {series.name}: mean={mean}, trend={freq[\"trend\"]}\n");
+}
+
+// 2. Find similar time series
+print("\nStep 2: Finding similar time series\n");
+queryIdx = 0;
+queryEmb = embeddings[queryIdx];
+
+similar = embed.distance.findMostSimilar(queryEmb, embeddings, 3, "cosine");
+
+print("Time series most similar to {tsData[queryIdx].name}:\n");
+for (i = 0; i < similar.count(); i = i + 1) {
+    result = similar[i];
+    idx = result.index;
+    sim = result.similarity;
+    print("  {(i + 1)}. {tsData[idx].name} (similarity: {(sim * 100)}%)\n");
+}
+
+// 3. Clustering time series by behavior
+print("\nStep 3: Clustering by behavioral patterns\n");
+clusters = embed.utils.cluster(embeddings, 0.35, "cosine");
+
+print("Found {clusters.count()} behavioral clusters:\n");
+for (ci = 0; ci < clusters.count(); ci = ci + 1) {
+    cluster = clusters[ci];
+    print("\n  Cluster {(ci + 1)}:\n");
+    
+    for (mi = 0; mi < cluster.count(); mi = mi + 1) {
+        clusterEmb = cluster[mi];
+        seriesName = clusterEmb.metadata.series_name;
+        print("    - {seriesName}\n");
+    }
+    
+    // Get cluster centroid
+    center = embed.utils.centroid(cluster);
+    print("    Cluster characteristics: mean={center.metadata.mean}\n");
+}
+
+// 4. Interpolate between series behaviors
+print("\nStep 4: Interpolating between series behaviors\n");
+if (embeddings.count() >= 2) {
+    emb1 = embeddings[0];
+    emb2 = embeddings[1];
+    
+    print("Blend between {tsData[0].name} and {tsData[1].name}:\n");
+    for (alpha = 0; alpha <= 1; alpha = alpha + 0.25) {
+        blended = embed.ops.interpolate(emb1, emb2, alpha);
+        sim1 = embed.distance.similarity(blended, emb1, "cosine");
+        sim2 = embed.distance.similarity(blended, emb2, "cosine");
+        print("  {(alpha * 100)}%: Similarity to series1={(sim1 * 100)}%, series2={(sim2 * 100)}%\n");
+    }
+}
+
+// 5. Ensemble/average behavior
+print("\nStep 5: Average behavior across all series\n");
+avgEmb = embed.ops.average(embeddings);
+print("Average series characteristics computed");
+
+// Find which series is closest to average
+closest = embed.distance.findMostSimilar(avgEmb, embeddings, 1, "cosine");
+print("\nMost representative series: {tsData[closest[0].index].name}\n");
+
+// 6. Diversity analysis
+print("\nStep 6: Population diversity analysis\n");
+diversity = embed.utils.diversity(embeddings);
+print("Embedding population diversity: {diversity}\n");
+print("(Higher values indicate more diverse behaviors)\n");
+
+// 7. Dimensionality exploration
+print("\nStep 7: Exploring different dimensions\n");
+for (dims = 4; dims <= 16; dims = dims + 4) {
+    emb_low = embed.core.set(embed.core.create(dims, "temp"), 0, 0.5);
+    
+    // Regenerate embeddings at this dimension
+    embTest = embeddings[0];
+    
+    // Project to lower dimension
+    if (dims < embTest.dims) {
+        proj = embed.ops.project(embTest, dims);
+        print("  Projected to {dims}-d: magnitude={embed.core.magnitude(proj)}\n");
+    } else if (dims > embTest.dims) {
+        exp = embed.ops.expand(embTest, dims);
+        print("  Expanded to {dims}-d: magnitude={embed.core.magnitude(exp)}\n");
+    }
+}
+
+print("\n=== Numerical Data Embeddings Analysis Complete ===\n");

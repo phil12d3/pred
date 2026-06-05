@@ -1,0 +1,90 @@
+// corpus_embeddings.ns - Example: learning term embeddings directly from documents
+
+embed = import("./embed.ns");
+
+print("=== Corpus-Based Term Embeddings ===\n");
+
+corpus = {
+    docs: [
+        "apple fruit orchard sweet snack",
+        "apple pie orchard dessert cinnamon",
+        "banana fruit tropical sweet snack",
+        "banana smoothie tropical breakfast",
+        "orange citrus fruit juice vitamin",
+        "orange juice citrus breakfast",
+        "car engine garage road",
+        "car driver garage wheel",
+        "truck engine highway cargo",
+        "truck road diesel cargo",
+        "healthy nutrition diet wellness",
+        "fitness wellness healthy lifestyle"
+    ]
+};
+
+terms = [
+    "apple",
+    "banana",
+    "orange",
+    "fruit",
+    "juice",
+    "car",
+    "engine",
+    "road",
+    "healthy",
+    "missing"
+];
+
+print("Processing {corpus.docs.count()} documents\n");
+print("Creating corpus-derived embeddings for {terms.count()} terms\n\n");
+
+dims = 64;
+embeddings = {};
+embeddingList = [];
+
+for (i = 0; i < terms.count(); i = i + 1) {
+    term = terms[i];
+    emb = embed.learn.fromCorpus(corpus, term, dims);
+    emb = embed.core.withMetadata(emb, "term", term);
+    emb = embed.core.withMetadata(emb, "magnitude", embed.core.magnitude(emb));
+    embeddings[term] = emb;
+    embeddingList.add(emb);
+    
+    print("  {term}: magnitude={embed.core.magnitude(emb)}\n");
+}
+
+print("\nNearest terms to 'apple':\n");
+apple = embeddings["apple"];
+similar = embed.distance.findMostSimilar(apple, embeddingList, terms.count(), "cosine");
+for (i = 0; i < similar.count(); i = i + 1) {
+    termName = similar[i].embedding.metadata.term;
+    sim = similar[i].similarity;
+    print("  {i + 1}. {termName} ({sim * 100}%)\n");
+}
+
+print("\nPair comparisons:\n");
+pairs = [
+    ["apple", "banana"],
+    ["apple", "orange"],
+    ["apple", "car"],
+    ["car", "engine"],
+    ["car", "road"],
+    ["healthy", "fruit"],
+    ["apple", "missing"]
+];
+
+for (i = 0; i < pairs.count(); i = i + 1) {
+    a = pairs[i][0];
+    b = pairs[i][1];
+    embA = embeddings[a];
+    embB = embeddings[b];
+    sim = embed.distance.similarity(embA, embB, "cosine");
+    dist = embed.distance.euclideanDistance(embA, embB);
+    print("  {a} vs {b}: similarity={sim * 100}%, distance={dist}\n");
+}
+
+print("\nMissing-term behavior:\n");
+missing = embeddings["missing"];
+print("  'missing' does not appear in the corpus, so its magnitude is {embed.core.magnitude(missing)}\n");
+print("  A zero magnitude means no corpus evidence was found for that term.\n");
+
+print("\n=== Corpus Example Complete ===\n");
