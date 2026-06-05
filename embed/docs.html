@@ -328,8 +328,8 @@ emb = embed.core.normalize(emb);</code></div>
         <tr><td>I need to create or inspect one embedding.</td><td><code>embed.core</code></td><td><code>create</code>, <code>set</code>, <code>normalize</code>, <code>stats</code></td></tr>
         <tr><td>I need to make embeddings from data.</td><td><code>embed.learn</code></td><td><code>fromFrequencies</code>, <code>fromCoOccurrence</code>, <code>learn</code></td></tr>
         <tr><td>I need to compare two embeddings.</td><td><code>embed.distance</code></td><td><code>similarity</code>, <code>euclideanDistance</code>, <code>cosineSimilarity</code></td></tr>
-        <tr><td>I need to combine, reshape, or position embeddings.</td><td><code>embed.ops</code></td><td><code>average</code>, <code>merge</code>, <code>interpolate</code>, <code>project</code>, <code>positionalEncoding</code></td></tr>
-        <tr><td>I need to work with many embeddings at once.</td><td><code>embed.utils</code></td><td><code>cluster</code>, <code>diversity</code>, <code>createIndex</code>, <code>comparePopulations</code></td></tr>
+        <tr><td>I need to combine, reshape, position, or query relationships between embeddings.</td><td><code>embed.ops</code></td><td><code>average</code>, <code>merge</code>, <code>interpolate</code>, <code>positionalEncoding</code>, <code>analogy</code>, <code>sequenceEmbedding</code></td></tr>
+        <tr><td>I need to work with many embeddings at once.</td><td><code>embed.utils</code></td><td><code>cluster</code>, <code>diversity</code>, <code>createIndex</code>, <code>similarityMatrix</code>, <code>comparePopulations</code></td></tr>
       </table>
 
       <p>A common full workflow uses all five namespaces:</p>
@@ -608,6 +608,13 @@ for (i = 0; i < matches.count(); i = i + 1) {
         <div class="prop"><span class="name">rotate(embedding, rotationFactor)</span><br>Cyclically shifts values. <code>rotationFactor</code> is clamped from <code>0</code> to <code>1</code>. Useful for synthetic transformations and tests.</div>
         <div class="prop"><span class="name">positionalEncoding(position, dimensions, maxPosition)</span><br>Creates a standalone position vector. <code>position</code> is the zero-based sequence index, <code>dimensions</code> is the vector size, and <code>maxPosition</code> controls the broad position range. Returns a normalized embedding with metadata containing the position.</div>
         <div class="prop"><span class="name">addPositionalEncoding(embedding, position, strength)</span><br>Blends position information into an existing embedding. <code>strength</code> ranges from <code>0</code> to <code>1</code>; lower values preserve content more strongly, higher values make position matter more. Returns a normalized embedding with position metadata.</div>
+        <div class="prop"><span class="name">analogy(aEmbedding, bEmbedding, cEmbedding)</span><br>Runs vector arithmetic in the form <code>a - b + c</code>, normalizes the result, and returns a new embedding. Use this as a relationship query: compare the returned vector with known embeddings using nearest-neighbor search. It is exploratory, not symbolic reasoning.</div>
+        <div class="prop"><span class="name">compose(baseEmbedding, additions, removals)</span><br>Builds a flexible query vector from one base embedding, an array of embeddings to add, and an array of embeddings to remove. Returns a normalized embedding. Use this when <code>a - b + c</code> is too narrow.</div>
+        <div class="prop"><span class="name">moveAwayFrom(sourceEmbedding, avoidEmbedding, strength)</span><br>Moves a source embedding away from an unwanted concept by subtracting the avoid vector with a strength value. Returns a normalized embedding. Use this for "similar to this, but less like that" queries.</div>
+        <div class="prop"><span class="name">applyDirection(sourceEmbedding, directionEmbedding, strength)</span><br>Applies a reusable direction to a source embedding. Returns a normalized embedding. Use this after creating a direction with <code>subtract</code>, <code>centroidDirection</code>, or another operation.</div>
+        <div class="prop"><span class="name">centroidDirection(fromGroup, toGroup)</span><br>Computes the direction from the average of one group to the average of another group. Returns a normalized direction embedding. Use this for group-level shifts, such as moving from fruit-like terms toward vehicle-like terms.</div>
+        <div class="prop"><span class="name">contrast(aEmbedding, bEmbedding, candidates, k)</span><br>Builds the difference direction <code>a - b</code>, compares candidate embeddings against that direction, and returns the top <code>k</code> result objects. Use this to ask which candidates most express the contrast between two embeddings.</div>
+        <div class="prop"><span class="name">sequenceEmbedding(embeddings, positionalStrength)</span><br>Summarizes an ordered list of embeddings. Each item is blended with a position signal before the final average, so <code>[apple, banana]</code> can differ from <code>[banana, apple]</code>. Returns a normalized embedding with metadata containing sequence length and position strength.</div>
         <div class="prop"><span class="name">orthogonalize(embedding, referenceEmbedding)</span><br>Removes correlation with a reference embedding. Use when you want to reduce overlap with a known direction or concept.</div>
       </div>
 
@@ -617,6 +624,84 @@ document = embed.ops.merge(docEmbeddings, 12);
 
 // Blend two profiles.
 blend = embed.ops.interpolate(profileA, profileB, 0.25);</code></div>
+
+      <h3>Using embeddings as queries</h3>
+      <p>The <code>analogy</code> function is useful when you want to create a new query vector from a relationship. For example, <code>apple - fruit + engine</code> asks the embedding space for something that keeps some apple-specific direction, removes some fruit-like direction, and adds engine-like direction. The module cannot guarantee a perfect human analogy, but the resulting vector can be searched against known embeddings.</p>
+      <div class="code"><code>query = embed.ops.analogy(apple, fruit, engine);
+matches = embed.distance.findMostSimilar(query, allTerms, 5, "cosine");</code></div>
+      <p>A good way to read analogy output is to compare before and after. First search with the original embedding, then search with the arithmetic query. The before list shows where the original term already lives. The after list shows where the arithmetic moved the query.</p>
+      <div class="code"><code>before = embed.distance.findMostSimilar(apple, allTerms, 4, "cosine");
+
+query = embed.ops.analogy(apple, fruit, engine);
+after = embed.distance.findMostSimilar(query, allTerms, 4, "cosine");
+
+appleToQuery = embed.distance.similarity(apple, query, "cosine");
+engineToQuery = embed.distance.similarity(engine, query, "cosine");</code></div>
+      <p>In beginner terms, the subtraction part is a direction removal. It does not delete the word "fruit" from a sentence. It reduces the vector components that the current embedding space associates with the second input. The addition part then pushes the vector toward the third input. This only works well when the inputs were created by the same learning method, with the same dimensions, from data that contains enough repeated patterns.</p>
+      <h3>Flexible query arithmetic</h3>
+      <p><code>analogy</code> is intentionally specific: it always means <code>a - b + c</code>. The flexible helpers cover related tasks that come up when you want to use embeddings as query-building blocks.</p>
+      <div class="code"><code>// More flexible than analogy:
+query = embed.ops.compose(apple, [engine, road], [fruit]);
+matches = embed.distance.findMostSimilar(query, allTerms, 5, "cosine");
+
+// Similar to apple, but less fruit-like:
+lessFruit = embed.ops.moveAwayFrom(apple, fruit, 0.60);
+
+// Learn a reusable group direction, then apply it:
+vehicleDirection = embed.ops.centroidDirection(
+  [apple, banana, orange],
+  [car, truck, engine]
+);
+directedApple = embed.ops.applyDirection(apple, vehicleDirection, 0.75);
+
+// Find terms aligned with the difference between two concepts:
+contrastMatches = embed.ops.contrast(engine, fruit, allTerms, 3);</code></div>
+      <p>These functions still do vector math, not symbolic reasoning. Their value is that the function names describe the query intent: compose a query, move away from a concept, apply a learned direction, compute a group-to-group direction, or inspect a contrast. That is clearer than scattering manual arithmetic through examples.</p>
+
+      <h3>How each query arithmetic helper changes a vector</h3>
+      <p>All of these helpers expect embeddings from the same embedding space: same dimensions, same construction method, and comparable source data. Most return a new normalized embedding, which means the output is ready for cosine similarity or nearest-neighbor search.</p>
+
+      <div class="prop"><span class="name">analogy(aEmbedding, bEmbedding, cEmbedding)</span><br>
+        <strong>Pass in:</strong> three embeddings with matching dimensions.<br>
+        <strong>Math:</strong> <code>a - b + c</code>.<br>
+        <strong>How it changes the embedding:</strong> starts at <code>a</code>, reduces the direction shared with <code>b</code>, then pushes the result toward <code>c</code>.<br>
+        <strong>Returns:</strong> a normalized query embedding. Search with it using <code>findMostSimilar</code>.</div>
+
+      <div class="prop"><span class="name">compose(baseEmbedding, additions, removals)</span><br>
+        <strong>Pass in:</strong> a base embedding, an array of embeddings to add, and an array of embeddings to remove. Empty arrays are fine.<br>
+        <strong>Math:</strong> <code>base + every addition - every removal</code>.<br>
+        <strong>How it changes the embedding:</strong> keeps the base as the anchor, pulls the vector toward all additions, and pushes it away from all removals.<br>
+        <strong>Returns:</strong> a normalized embedding with metadata recording how many additions and removals were applied.</div>
+
+      <div class="prop"><span class="name">moveAwayFrom(sourceEmbedding, avoidEmbedding, strength)</span><br>
+        <strong>Pass in:</strong> a source embedding, an avoid embedding, and a strength number. If strength is missing, it uses <code>0.5</code>.<br>
+        <strong>Math:</strong> <code>source - avoid * strength</code> before normalization.<br>
+        <strong>How it changes the embedding:</strong> keeps the query related to the source, but reduces alignment with the avoid concept. Higher strength pushes harder away.<br>
+        <strong>Returns:</strong> a normalized embedding with strength metadata.</div>
+
+      <div class="prop"><span class="name">centroidDirection(fromGroup, toGroup)</span><br>
+        <strong>Pass in:</strong> two arrays of embeddings. The first is the source group; the second is the target group.<br>
+        <strong>Math:</strong> <code>average(toGroup) - average(fromGroup)</code>.<br>
+        <strong>How it changes the embedding:</strong> this does not move a single source item by itself. It creates a reusable direction vector that describes how to move from one group center toward another group center.<br>
+        <strong>Returns:</strong> a normalized direction embedding with metadata containing the group counts.</div>
+
+      <div class="prop"><span class="name">applyDirection(sourceEmbedding, directionEmbedding, strength)</span><br>
+        <strong>Pass in:</strong> a source embedding, a direction embedding, and a strength number. If strength is missing, it uses <code>1</code>.<br>
+        <strong>Math:</strong> <code>source + direction * strength</code> before normalization.<br>
+        <strong>How it changes the embedding:</strong> moves the source along a reusable direction. This is useful after <code>centroidDirection</code>, or after creating a direction with <code>subtract</code>.<br>
+        <strong>Returns:</strong> a normalized embedding with strength metadata.</div>
+
+      <div class="prop"><span class="name">contrast(aEmbedding, bEmbedding, candidates, k)</span><br>
+        <strong>Pass in:</strong> two embeddings to define a contrast, a candidate embedding array, and the number of results to return.<br>
+        <strong>Math:</strong> creates the direction <code>a - b</code>, then scores candidates by cosine alignment to that direction.<br>
+        <strong>How it changes the embedding:</strong> it does not return one transformed embedding. Instead, it ranks candidates by how strongly they point in the same direction as the contrast.<br>
+        <strong>Returns:</strong> an array of result objects shaped like <code>{embedding, similarity, index}</code>.</div>
+
+      <h3>Summarizing ordered content</h3>
+      <p>A normal average treats <code>[apple, banana, orange]</code> and <code>[orange, banana, apple]</code> as the same bag of items. <code>sequenceEmbedding</code> keeps a lightweight order signal by adding positional encoding to each item before summarizing. Use it for short sequences, phrase-like comparisons, ordered events, or any situation where order should matter but you still want one vector at the end.</p>
+      <div class="code"><code>phraseA = embed.ops.sequenceEmbedding([apple, banana, orange], 0.20);
+phraseB = embed.ops.sequenceEmbedding([orange, banana, apple], 0.20);
+orderScore = embed.distance.similarity(phraseA, phraseB, "cosine");</code></div>
 
       <h3>When operations can be misleading</h3>
       <p>Operations are mathematical transformations, not guarantees of meaning. Adding two word embeddings can be useful, but the result is not automatically a perfect phrase embedding. Subtracting two identical embeddings produces a zero vector, which cannot be normalized into a meaningful direction. Interpolation is useful for blending two profiles, but the halfway point is only meaningful if both inputs live in the same embedding space.</p>
@@ -663,6 +748,9 @@ sim = embed.distance.similarity(tokenAt0, tokenAt5, "cosine");</code></div>
       <div class="prop"><span class="name">filterBySimilarity(embeddings, queryEmbedding, minSimilarity, metric)</span><br>
         <strong>Pass in:</strong> embeddings, a query, minimum similarity, and metric. <strong>Returns:</strong> only embeddings whose similarity is at least the threshold.</div>
 
+      <div class="prop"><span class="name">similarityMatrix(embeddings, metric)</span><br>
+        <strong>Pass in:</strong> an array of embeddings and a metric string such as <code>"cosine"</code>, <code>"euclidean"</code>, or <code>"manhattan"</code>. <strong>Returns:</strong> a two-dimensional array where <code>matrix[i][j]</code> is the similarity between <code>embeddings[i]</code> and <code>embeddings[j]</code>. Use this to print a comparison table, inspect clusters, spot outliers, or debug whether every vector is accidentally too similar.</div>
+
       <div class="prop"><span class="name">batchTransform(embeddings, transformFunc)</span><br>
         <strong>Pass in:</strong> embeddings and a function. <strong>Returns:</strong> transformed embeddings. Use this to apply the same operation to many embeddings.</div>
 
@@ -671,6 +759,11 @@ sim = embed.distance.similarity(tokenAt0, tokenAt5, "cosine");</code></div>
 
       <div class="prop"><span class="name">comparePopulations(pop1, pop2)</span><br>
         <strong>Pass in:</strong> two arrays of embeddings. <strong>Returns:</strong> <code>{similarity, diversity1, diversity2}</code>. Use this to compare two groups rather than two individual items.</div>
+
+      <div class="code"><code>matrix = embed.utils.similarityMatrix(allTerms, "cosine");
+
+// Read as: similarity between allTerms[0] and allTerms[2].
+score = matrix[0][2];</code></div>
     </section>
 
     <section class="section">
@@ -770,6 +863,27 @@ unrelated = embed.distance.similarity(appleAt2, carAt2, "cosine");
 appleAt0 = embed.ops.addPositionalEncoding(apple, 0, 0.20);
 appleAt5 = embed.ops.addPositionalEncoding(apple, 5, 0.20);</code></div>
       <p>The example file <code>examples/text_with_positions.ns</code> prints these comparisons and checks that related meanings remain closer than unrelated meanings after position is added.</p>
+
+      <h3>Workflow F: Inspect and query a generated embedding set</h3>
+      <p>After you have a list of term embeddings, use <code>similarityMatrix</code> to see the whole comparison landscape, <code>analogy</code> and the flexible query arithmetic helpers to create relationship queries, and <code>sequenceEmbedding</code> to compare ordered sequences. The example file <code>examples/embedding_tools.ns</code> demonstrates these tools together.</p>
+      <div class="code"><code>matrix = embed.utils.similarityMatrix(embeddingList, "cosine");
+
+query = embed.ops.analogy(apple, fruit, engine);
+matches = embed.distance.findMostSimilar(query, embeddingList, 4, "cosine");
+
+composed = embed.ops.compose(apple, [engine, road], [fruit]);
+lessFruit = embed.ops.moveAwayFrom(apple, fruit, 0.60);
+
+vehicleDirection = embed.ops.centroidDirection(
+  [apple, banana, orange],
+  [car, truck, engine]
+);
+directedApple = embed.ops.applyDirection(apple, vehicleDirection, 0.75);
+contrastMatches = embed.ops.contrast(engine, fruit, embeddingList, 3);
+
+fruitSequence = embed.ops.sequenceEmbedding([apple, banana, orange], 0.20);
+vehicleSequence = embed.ops.sequenceEmbedding([car, truck, engine], 0.20);
+sequenceScore = embed.distance.similarity(fruitSequence, vehicleSequence, "cosine");</code></div>
     </section>
 
     <section class="section">

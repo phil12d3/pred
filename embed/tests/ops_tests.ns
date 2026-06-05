@@ -159,6 +159,118 @@ add_positional_encoding_preserves_content_shape = func(t) {
 };
 
 [test]
+analogy_returns_normalized_embedding = func(t) {
+    embed = import("./embed.ns");
+
+    apple = embed.core.create(8, "apple");
+    fruit = embed.core.create(8, "fruit");
+    car = embed.core.create(8, "car");
+    for (i = 0; i < 8; i = i + 1) {
+        apple = embed.core.set(apple, i, i + 1);
+        fruit = embed.core.set(fruit, i, (i + 1) * 2);
+        car = embed.core.set(car, i, 8 - i);
+    }
+    apple = embed.core.normalize(apple);
+    fruit = embed.core.normalize(fruit);
+    car = embed.core.normalize(car);
+
+    result = embed.ops.analogy(apple, fruit, car);
+    mag = embed.core.magnitude(result);
+
+    t.equal(result.dims, 8, "analogy preserves dimensions");
+    t.truthy(mag > 0.99 && mag < 1.01, "analogy result is normalized");
+};
+
+[test]
+sequence_embedding_captures_order_signal = func(t) {
+    embed = import("./embed.ns");
+
+    first = embed.core.create(8, "first");
+    second = embed.core.create(8, "second");
+    for (i = 0; i < 8; i = i + 1) {
+        first = embed.core.set(first, i, i + 1);
+        second = embed.core.set(second, i, 8 - i);
+    }
+    first = embed.core.normalize(first);
+    second = embed.core.normalize(second);
+
+    forward = embed.ops.sequenceEmbedding([first, second], 0.25);
+    reverse = embed.ops.sequenceEmbedding([second, first], 0.25);
+    mag = embed.core.magnitude(forward);
+    dist = embed.distance.euclideanDistance(forward, reverse);
+
+    t.equal(forward.dims, 8, "sequence embedding preserves dimensions");
+    t.truthy(mag > 0.99 && mag < 1.01, "sequence embedding is normalized");
+    t.truthy(dist > 0.0001, "sequence embedding changes when order changes");
+    t.equal(forward.metadata.length, 2, "sequence metadata records length");
+};
+
+[test]
+query_composition_helpers_return_usable_vectors = func(t) {
+    embed = import("./embed.ns");
+
+    base = embed.core.create(8, "base");
+    add = embed.core.create(8, "add");
+    remove = embed.core.create(8, "remove");
+    for (i = 0; i < 8; i = i + 1) {
+        base = embed.core.set(base, i, i + 1);
+        add = embed.core.set(add, i, 8 - i);
+        remove = embed.core.set(remove, i, i == 0 ? 1 : 0);
+    }
+    base = embed.core.normalize(base);
+    add = embed.core.normalize(add);
+    remove = embed.core.normalize(remove);
+
+    composed = embed.ops.compose(base, [add], [remove]);
+    away = embed.ops.moveAwayFrom(base, remove, 0.5);
+    direction = embed.ops.subtract(add, remove);
+    directed = embed.ops.applyDirection(base, direction, 0.5);
+
+    t.equal(composed.dims, 8, "compose preserves dimensions");
+    t.truthy(embed.core.magnitude(composed) > 0.99, "compose returns normalized vector");
+    t.equal(away.dims, 8, "moveAwayFrom preserves dimensions");
+    t.truthy(embed.core.magnitude(away) > 0.99, "moveAwayFrom returns normalized vector");
+    t.equal(directed.dims, 8, "applyDirection preserves dimensions");
+    t.truthy(embed.core.magnitude(directed) > 0.99, "applyDirection returns normalized vector");
+};
+
+[test]
+group_direction_and_contrast_find_aligned_candidates = func(t) {
+    embed = import("./embed.ns");
+
+    fruitA = embed.core.create(6, "fruitA");
+    fruitB = embed.core.create(6, "fruitB");
+    vehicleA = embed.core.create(6, "vehicleA");
+    vehicleB = embed.core.create(6, "vehicleB");
+    neutral = embed.core.create(6, "neutral");
+
+    for (i = 0; i < 6; i = i + 1) {
+        fruitA = embed.core.set(fruitA, i, i < 3 ? 1 : 0);
+        fruitB = embed.core.set(fruitB, i, i < 3 ? 0.8 : 0.1);
+        vehicleA = embed.core.set(vehicleA, i, i >= 3 ? 1 : 0);
+        vehicleB = embed.core.set(vehicleB, i, i >= 3 ? 0.8 : 0.1);
+        neutral = embed.core.set(neutral, i, 0.5);
+    }
+    fruitA = embed.core.normalize(fruitA);
+    fruitB = embed.core.normalize(fruitB);
+    vehicleA = embed.core.normalize(vehicleA);
+    vehicleB = embed.core.normalize(vehicleB);
+    neutral = embed.core.normalize(neutral);
+
+    direction = embed.ops.centroidDirection([fruitA, fruitB], [vehicleA, vehicleB]);
+    moved = embed.ops.applyDirection(fruitA, direction, 0.75);
+    before = embed.distance.similarity(fruitA, vehicleA, "cosine");
+    after = embed.distance.similarity(moved, vehicleA, "cosine");
+    matches = embed.ops.contrast(vehicleA, fruitA, [fruitA, vehicleA, neutral], 2);
+
+    t.equal(direction.dims, 6, "centroidDirection preserves dimensions");
+    t.truthy(embed.core.magnitude(direction) > 0.99, "centroidDirection returns normalized vector");
+    t.truthy(after > before, "applyDirection can move an embedding toward a group direction");
+    t.equal(matches.count(), 2, "contrast returns requested result count");
+    t.equal(matches[0].embedding.id, "vehicleA", "contrast ranks aligned candidate first");
+};
+
+[test]
 positional_encoding_preserves_text_similarity_order = func(t) {
     embed = import("./embed.ns");
 

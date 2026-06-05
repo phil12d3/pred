@@ -1,0 +1,24 @@
+[test]
+similarity_matrix_builds_pairwise_scores = func(t) {
+    embed = import("./embed.ns");
+
+    sameA = embed.core.create(4, "sameA");
+    sameB = embed.core.create(4, "sameB");
+    different = embed.core.create(4, "different");
+    for (i = 0; i < 4; i = i + 1) {
+        sameA = embed.core.set(sameA, i, 1);
+        sameB = embed.core.set(sameB, i, 1);
+        different = embed.core.set(different, i, i == 0 ? 1 : 0);
+    }
+    sameA = embed.core.normalize(sameA);
+    sameB = embed.core.normalize(sameB);
+    different = embed.core.normalize(different);
+
+    matrix = embed.utils.similarityMatrix([sameA, sameB, different], "cosine");
+
+    t.equal(matrix.count(), 3, "matrix has one row per embedding");
+    t.equal(matrix[0].count(), 3, "matrix has one column per embedding");
+    t.truthy(matrix[0][0] > 0.99, "diagonal is self-similar");
+    t.truthy(matrix[0][1] > matrix[0][2], "similar items score above different items");
+    t.truthy(matrix[0][1] == matrix[1][0], "matrix is symmetric for cosine similarity");
+};

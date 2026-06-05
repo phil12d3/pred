@@ -1,0 +1,239 @@
+// embedding_tools.ns - Example: tools for using generated embeddings
+
+embed = import("./embed.ns");
+
+print("=== Embedding Utility Tools ===\n");
+
+printVector = func(label, embedding) {
+    print("    {label}: [");
+    limit = embedding.dims < 6 ? embedding.dims : 6;
+    for (i = 0; i < limit; i = i + 1) {
+        print(embedding.values[i]);
+        if (i < limit - 1) print(", ");
+    }
+    print("]\n");
+};
+
+printDelta = func(label, beforeEmbedding, afterEmbedding) {
+    print("    {label}: [");
+    limit = beforeEmbedding.dims < 6 ? beforeEmbedding.dims : 6;
+    for (i = 0; i < limit; i = i + 1) {
+        delta = afterEmbedding.values[i] - beforeEmbedding.values[i];
+        print(delta);
+        if (i < limit - 1) print(", ");
+    }
+    print("]\n");
+};
+
+corpus = {
+    docs: [
+        "apple fruit orchard sweet snack",
+        "apple pie orchard dessert cinnamon",
+        "banana fruit tropical sweet snack",
+        "banana smoothie tropical breakfast",
+        "orange citrus fruit juice vitamin",
+        "orange juice citrus breakfast",
+        "car engine garage road",
+        "car driver garage wheel",
+        "truck engine highway cargo",
+        "truck road diesel cargo",
+        "healthy nutrition diet wellness",
+        "fitness wellness healthy lifestyle"
+    ]
+};
+
+terms = ["apple", "banana", "orange", "fruit", "car", "truck", "engine", "road", "healthy"];
+columnLabels = ["apple   ", "banana  ", "orange  ", "fruit   ", "car     ", "truck   ", "engine  ", "road    ", "healthy "];
+rowLabels = ["apple   ", "banana  ", "orange  ", "fruit   ", "car     ", "truck   ", "engine  ", "road    ", "healthy "];
+dims = 64;
+embeddings = {};
+embeddingList = [];
+
+print("Generating embeddings from corpus evidence:\n");
+for (i = 0; i < terms.count(); i = i + 1) {
+    term = terms[i];
+    emb = embed.learn.fromCorpus(corpus, term, dims);
+    emb = embed.core.withMetadata(emb, "term", term);
+    embeddings[term] = emb;
+    embeddingList.add(emb);
+    print("  {term}: magnitude={embed.core.magnitude(emb)}\n");
+}
+
+print("\n1. Similarity matrix\n");
+matrix = embed.utils.similarityMatrix(embeddingList, "cosine");
+print("Values are cosine similarity percentages, rounded to whole numbers.\n\n");
+print("term       ");
+for (i = 0; i < columnLabels.count(); i = i + 1) {
+    print("{columnLabels[i]}");
+}
+print("\n");
+print("--------- ");
+for (i = 0; i < columnLabels.count(); i = i + 1) {
+    print("--------");
+}
+print("\n");
+for (row = 0; row < matrix.count(); row = row + 1) {
+    print("{rowLabels[row]} ");
+    for (col = 0; col < matrix[row].count(); col = col + 1) {
+        score = matrix[row][col] * 100;
+        rounded = 0;
+        threshold = 0.5;
+        while (threshold <= score) {
+            rounded = rounded + 1;
+            threshold = threshold + 1;
+        }
+        if (rounded < 10) {
+            print("     {rounded}% ");
+        } else if (rounded < 100) {
+            print("    {rounded}% ");
+        } else {
+            print("   {rounded}% ");
+        }
+    }
+    print("\n");
+}
+
+print("\n2. Analogy-style vector arithmetic\n");
+// This asks: apple minus fruit plus engine. The answer is not symbolic logic;
+// it returns a new vector that can be compared with known term embeddings.
+before = embed.distance.findMostSimilar(embeddings["apple"], embeddingList, 4, "cosine");
+analogy = embed.ops.analogy(embeddings["apple"], embeddings["fruit"], embeddings["engine"]);
+after = embed.distance.findMostSimilar(analogy, embeddingList, 4, "cosine");
+
+print("  Before: nearest terms to plain apple\n");
+for (i = 0; i < before.count(); i = i + 1) {
+    print("    {i + 1}. {before[i].embedding.metadata.term}: {before[i].similarity * 100}%\n");
+}
+
+print("\n  Arithmetic: apple - fruit + engine\n");
+print("    Start with apple, subtract the fruit direction, then add the engine direction.\n");
+print("    The result is a query vector, not a new named word.\n");
+
+print("\n  After: nearest terms to the arithmetic query\n");
+for (i = 0; i < after.count(); i = i + 1) {
+    print("    {i + 1}. {after[i].embedding.metadata.term}: {after[i].similarity * 100}%\n");
+}
+
+appleToQuery = embed.distance.similarity(embeddings["apple"], analogy, "cosine");
+engineToQuery = embed.distance.similarity(embeddings["engine"], analogy, "cosine");
+print("\n  Movement summary:\n");
+print("    query vs apple:  {appleToQuery * 100}%\n");
+print("    query vs engine: {engineToQuery * 100}%\n");
+print("\n  Vector snapshot (first 6 of {dims} dimensions):\n");
+printVector("apple base       ", embeddings["apple"]);
+printVector("fruit removed    ", embeddings["fruit"]);
+printVector("engine added     ", embeddings["engine"]);
+printVector("analogy query    ", analogy);
+printDelta("query - apple    ", embeddings["apple"], analogy);
+
+print("\n3. Flexible query arithmetic\n");
+composed = embed.ops.compose(embeddings["apple"], [embeddings["engine"], embeddings["road"]], [embeddings["fruit"]]);
+composedMatches = embed.distance.findMostSimilar(composed, embeddingList, 3, "cosine");
+print("  compose: apple + engine + road - fruit\n");
+for (i = 0; i < composedMatches.count(); i = i + 1) {
+    print("    {i + 1}. {composedMatches[i].embedding.metadata.term}: {composedMatches[i].similarity * 100}%\n");
+}
+print("  Vector effect:\n");
+printVector("apple base       ", embeddings["apple"]);
+printVector("composed query   ", composed);
+printDelta("composed - apple ", embeddings["apple"], composed);
+
+away = embed.ops.moveAwayFrom(embeddings["apple"], embeddings["fruit"], 0.60);
+awayMatches = embed.distance.findMostSimilar(away, embeddingList, 3, "cosine");
+print("\n  moveAwayFrom: apple away from fruit\n");
+for (i = 0; i < awayMatches.count(); i = i + 1) {
+    print("    {i + 1}. {awayMatches[i].embedding.metadata.term}: {awayMatches[i].similarity * 100}%\n");
+}
+appleFruitBefore = embed.distance.similarity(embeddings["apple"], embeddings["fruit"], "cosine");
+awayFruitAfter = embed.distance.similarity(away, embeddings["fruit"], "cosine");
+print("  Similarity effect:\n");
+print("    apple vs fruit before: {appleFruitBefore * 100}%\n");
+print("    query vs fruit after:  {awayFruitAfter * 100}%\n");
+print("  Vector effect:\n");
+printVector("apple base       ", embeddings["apple"]);
+printVector("away query       ", away);
+printDelta("away - apple     ", embeddings["apple"], away);
+
+vehicleDirection = embed.ops.centroidDirection(
+    [embeddings["apple"], embeddings["banana"], embeddings["orange"]],
+    [embeddings["car"], embeddings["truck"], embeddings["engine"]]
+);
+directedApple = embed.ops.applyDirection(embeddings["apple"], vehicleDirection, 0.75);
+directedMatches = embed.distance.findMostSimilar(directedApple, embeddingList, 3, "cosine");
+print("\n  centroidDirection + applyDirection: move apple toward the vehicle group\n");
+for (i = 0; i < directedMatches.count(); i = i + 1) {
+    print("    {i + 1}. {directedMatches[i].embedding.metadata.term}: {directedMatches[i].similarity * 100}%\n");
+}
+appleEngineBefore = embed.distance.similarity(embeddings["apple"], embeddings["engine"], "cosine");
+directedEngineAfter = embed.distance.similarity(directedApple, embeddings["engine"], "cosine");
+appleCarBefore = embed.distance.similarity(embeddings["apple"], embeddings["car"], "cosine");
+directedCarAfter = embed.distance.similarity(directedApple, embeddings["car"], "cosine");
+print("  Similarity effect:\n");
+print("    apple vs engine before: {appleEngineBefore * 100}%\n");
+print("    query vs engine after:  {directedEngineAfter * 100}%\n");
+print("    apple vs car before:    {appleCarBefore * 100}%\n");
+print("    query vs car after:     {directedCarAfter * 100}%\n");
+print("  Vector effect:\n");
+printVector("vehicle direction", vehicleDirection);
+printVector("directed apple   ", directedApple);
+printDelta("directed - apple ", embeddings["apple"], directedApple);
+
+contrastMatches = embed.ops.contrast(embeddings["engine"], embeddings["fruit"], embeddingList, 3);
+print("\n  contrast: terms aligned with engine - fruit\n");
+for (i = 0; i < contrastMatches.count(); i = i + 1) {
+    print("    {i + 1}. {contrastMatches[i].embedding.metadata.term}: {contrastMatches[i].similarity * 100}%\n");
+}
+contrastDirection = embed.ops.subtract(embeddings["engine"], embeddings["fruit"]);
+print("  Contrast direction vector:\n");
+printVector("engine - fruit   ", contrastDirection);
+print("    Positive candidate scores point more like engine-minus-fruit.\n");
+
+print("\n4. Ordered sequence embeddings\n");
+fruitBag = embed.ops.average([
+    embeddings["apple"],
+    embeddings["banana"],
+    embeddings["orange"]
+]);
+reversedFruitBag = embed.ops.average([
+    embeddings["orange"],
+    embeddings["banana"],
+    embeddings["apple"]
+]);
+fruitSequence = embed.ops.sequenceEmbedding([
+    embeddings["apple"],
+    embeddings["banana"],
+    embeddings["orange"]
+], 0.20);
+
+vehicleSequence = embed.ops.sequenceEmbedding([
+    embeddings["car"],
+    embeddings["truck"],
+    embeddings["engine"]
+], 0.20);
+
+reversedFruitSequence = embed.ops.sequenceEmbedding([
+    embeddings["orange"],
+    embeddings["banana"],
+    embeddings["apple"]
+], 0.20);
+
+fruitToVehicle = embed.distance.similarity(fruitSequence, vehicleSequence, "cosine");
+fruitToReversed = embed.distance.similarity(fruitSequence, reversedFruitSequence, "cosine");
+bagToReversedBag = embed.distance.similarity(fruitBag, reversedFruitBag, "cosine");
+sequenceDistance = embed.distance.euclideanDistance(fruitSequence, reversedFruitSequence);
+
+print("  Orderless average comparison:\n");
+print("    average([apple, banana, orange]) vs reversed average: {bagToReversedBag * 100}%\n");
+print("    This is 100% because a plain average ignores order.\n");
+print("\n  Position-aware sequence comparison:\n");
+print("  fruit sequence vs vehicle sequence: {fruitToVehicle * 100}%\n");
+print("  fruit sequence vs reversed fruit sequence: {fruitToReversed * 100}%\n");
+print("  distance between forward and reversed fruit sequence: {sequenceDistance}\n");
+print("  sequence length metadata: {fruitSequence.metadata.length}\n");
+print("  Vector effect:\n");
+printVector("fruit average    ", fruitBag);
+printVector("fruit sequence   ", fruitSequence);
+printVector("reversed sequence", reversedFruitSequence);
+printDelta("sequence - avg   ", fruitBag, fruitSequence);
+
+print("\n=== Embedding Utility Tools Complete ===\n");

@@ -527,6 +527,331 @@ addPositionalEncoding = func(embedding, position, strength) {
     return {dims: embedding.dims, values: clamped, id: embedding.id + "_pos", metadata: newMeta};
 };
 
+// Analogy-style vector arithmetic: a - b + c.
+// Useful for exploring whether relationships are represented consistently.
+analogy = func(aEmbedding, bEmbedding, cEmbedding) {
+    if (aEmbedding.dims != bEmbedding.dims) return aEmbedding;
+    if (aEmbedding.dims != cEmbedding.dims) return aEmbedding;
+    
+    resultValues = [];
+    for (i = 0; i < aEmbedding.dims; i = i + 1) {
+        resultValues.add(aEmbedding.values[i] - bEmbedding.values[i] + cEmbedding.values[i]);
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    for (i = 0; i < aEmbedding.dims; i = i + 1) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+    }
+    
+    return {dims: aEmbedding.dims, values: clamped, id: "analogy", metadata: {}};
+};
+
+// Summarize an ordered sequence of embeddings.
+// Each item is blended with its position before averaging, so order contributes
+// to the final sequence representation.
+sequenceEmbedding = func(embeddings, positionalStrength) {
+    if (embeddings.count() == 0) {
+        zv = [];
+        for (i = 0; i < 8; i = i + 1) zv.add(0);
+        return {dims: 8, values: zv, id: "zero_sequence", metadata: {}};
+    }
+    
+    dims = embeddings[0].dims;
+    strength = defined(positionalStrength) ? positionalStrength : 0.2;
+    if (strength < 0) strength = 0;
+    if (strength > 1) strength = 1;
+    
+    resultValues = [];
+    for (d = 0; d < dims; d = d + 1) resultValues.add(0);
+    
+    for (itemIndex = 0; itemIndex < embeddings.count(); itemIndex = itemIndex + 1) {
+        emb = embeddings[itemIndex];
+        if (emb.dims != dims) continue;
+        
+        posValues = [];
+        for (d = 0; d < dims; d = d + 1) {
+            period = 2 + ((d + 1) * 2);
+            phase = itemIndex % period;
+            half = period / 2;
+            tri = 0;
+            if (phase <= half) {
+                tri = phase / half;
+            } else {
+                tri = (period - phase) / half;
+            }
+            value = (tri * 2) - 1;
+            if (d % 2 == 1) value = 0 - value;
+            taper = 1 / (1 + (d / dims));
+            posValues.add(value * taper);
+        }
+        
+        pm = matrice_fromArray([posValues]);
+        pmnorm = pm.normalize();
+        posNorm = pmnorm.toArray()[0];
+        
+        sequenceWeight = (itemIndex + 1) / embeddings.count();
+        for (d = 0; d < dims; d = d + 1) {
+            blended = (emb.values[d] * (1 - strength)) + (posNorm[d] * strength);
+            resultValues[d] = resultValues[d] + (blended * sequenceWeight);
+        }
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    for (i = 0; i < dims; i = i + 1) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+    }
+    
+    return {
+        dims: dims,
+        values: clamped,
+        id: "sequence",
+        metadata: {length: embeddings.count(), positionalStrength: strength}
+    };
+};
+
+// Build a query from a base embedding, added concepts, and removed concepts.
+// Equivalent intent: base + additions - removals.
+compose = func(baseEmbedding, additions, removals) {
+    dims = baseEmbedding.dims;
+    resultValues = [];
+    for (i = 0; i < dims; i = i + 1) resultValues.add(baseEmbedding.values[i]);
+    
+    if (defined(additions)) {
+        for (ai = 0; ai < additions.count(); ai = ai + 1) {
+            emb = additions[ai];
+            if (emb.dims != dims) continue;
+            for (d = 0; d < dims; d = d + 1) {
+                resultValues[d] = resultValues[d] + emb.values[d];
+            }
+        }
+    }
+    
+    if (defined(removals)) {
+        for (ri = 0; ri < removals.count(); ri = ri + 1) {
+            emb = removals[ri];
+            if (emb.dims != dims) continue;
+            for (d = 0; d < dims; d = d + 1) {
+                resultValues[d] = resultValues[d] - emb.values[d];
+            }
+        }
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    for (i = 0; i < dims; i = i + 1) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+    }
+    
+    return {
+        dims: dims,
+        values: clamped,
+        id: "composed",
+        metadata: {additions: defined(additions) ? additions.count() : 0, removals: defined(removals) ? removals.count() : 0}
+    };
+};
+
+// Move source away from an avoided concept by a configurable strength.
+moveAwayFrom = func(sourceEmbedding, avoidEmbedding, strength) {
+    if (sourceEmbedding.dims != avoidEmbedding.dims) return sourceEmbedding;
+    
+    amount = defined(strength) ? strength : 0.5;
+    if (amount < 0) amount = 0;
+    
+    resultValues = [];
+    for (i = 0; i < sourceEmbedding.dims; i = i + 1) {
+        resultValues.add(sourceEmbedding.values[i] - (avoidEmbedding.values[i] * amount));
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    for (i = 0; i < sourceEmbedding.dims; i = i + 1) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+    }
+    
+    return {dims: sourceEmbedding.dims, values: clamped, id: sourceEmbedding.id + "_away", metadata: {strength: amount}};
+};
+
+// Apply a reusable direction vector to a source embedding.
+applyDirection = func(sourceEmbedding, directionEmbedding, strength) {
+    if (sourceEmbedding.dims != directionEmbedding.dims) return sourceEmbedding;
+    
+    amount = defined(strength) ? strength : 1;
+    if (amount < 0) amount = 0;
+    
+    resultValues = [];
+    for (i = 0; i < sourceEmbedding.dims; i = i + 1) {
+        resultValues.add(sourceEmbedding.values[i] + (directionEmbedding.values[i] * amount));
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    for (i = 0; i < sourceEmbedding.dims; i = i + 1) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+    }
+    
+    return {dims: sourceEmbedding.dims, values: clamped, id: sourceEmbedding.id + "_directed", metadata: {strength: amount}};
+};
+
+// Learn the direction from one group centroid to another group centroid.
+centroidDirection = func(fromGroup, toGroup) {
+    if (fromGroup.count() == 0 || toGroup.count() == 0) {
+        zv = [];
+        for (i = 0; i < 8; i = i + 1) zv.add(0);
+        return {dims: 8, values: zv, id: "zero_direction", metadata: {}};
+    }
+    
+    dims = fromGroup[0].dims;
+    fromValues = [];
+    toValues = [];
+    for (d = 0; d < dims; d = d + 1) {
+        fromSum = 0;
+        fromCount = 0;
+        for (i = 0; i < fromGroup.count(); i = i + 1) {
+            if (fromGroup[i].dims != dims) continue;
+            fromSum = fromSum + fromGroup[i].values[d];
+            fromCount = fromCount + 1;
+        }
+        toSum = 0;
+        toCount = 0;
+        for (i = 0; i < toGroup.count(); i = i + 1) {
+            if (toGroup[i].dims != dims) continue;
+            toSum = toSum + toGroup[i].values[d];
+            toCount = toCount + 1;
+        }
+        fromValues.add(fromCount > 0 ? fromSum / fromCount : 0);
+        toValues.add(toCount > 0 ? toSum / toCount : 0);
+    }
+    
+    resultValues = [];
+    for (d = 0; d < dims; d = d + 1) {
+        resultValues.add(toValues[d] - fromValues[d]);
+    }
+    
+    m = matrice_fromArray([resultValues]);
+    mnorm = m.normalize();
+    arr2d = mnorm.toArray();
+    normalized = arr2d[0];
+    
+    clamped = [];
+    for (i = 0; i < dims; i = i + 1) {
+        v = normalized[i];
+        if (v < -1) v = -1;
+        if (v > 1) v = 1;
+        clamped.add(v);
+    }
+    
+    return {dims: dims, values: clamped, id: "centroid_direction", metadata: {fromCount: fromGroup.count(), toCount: toGroup.count()}};
+};
+
+// Find candidates aligned with the difference direction a - b.
+contrast = func(aEmbedding, bEmbedding, candidates, k) {
+    if (aEmbedding.dims != bEmbedding.dims) return [];
+    
+    dims = aEmbedding.dims;
+    directionValues = [];
+    for (d = 0; d < dims; d = d + 1) {
+        directionValues.add(aEmbedding.values[d] - bEmbedding.values[d]);
+    }
+    
+    dm = matrice_fromArray([directionValues]);
+    dmnorm = dm.normalize();
+    direction = dmnorm.toArray()[0];
+    
+    results = [];
+    for (i = 0; i < candidates.count(); i = i + 1) {
+        candidate = candidates[i];
+        score = 0;
+        if (candidate.dims == dims) {
+            dot = 0;
+            n1 = 0;
+            n2 = 0;
+            for (d = 0; d < dims; d = d + 1) {
+                a = direction[d];
+                b = candidate.values[d];
+                dot = dot + a * b;
+                n1 = n1 + a * a;
+                n2 = n2 + b * b;
+            }
+            if (n1 > 0 && n2 > 0) {
+                g1 = n1 / 2;
+                for (iter = 0; iter < 15; iter = iter + 1) {
+                    nx = (g1 + n1 / g1) / 2;
+                    df = nx - g1;
+                    if (df < 0) df = 0 - df;
+                    g1 = nx;
+                    if (df < 0.001) iter = 15;
+                }
+                g2 = n2 / 2;
+                for (iter = 0; iter < 15; iter = iter + 1) {
+                    nx = (g2 + n2 / g2) / 2;
+                    df = nx - g2;
+                    if (df < 0) df = 0 - df;
+                    g2 = nx;
+                    if (df < 0.001) iter = 15;
+                }
+                if (g1 > 0 && g2 > 0) score = dot / (g1 * g2);
+            }
+        }
+        results.add({embedding: candidate, similarity: score, index: i});
+    }
+    
+    for (i = 0; i < results.count(); i = i + 1) {
+        best = i;
+        for (j = i + 1; j < results.count(); j = j + 1) {
+            if (results[j].similarity > results[best].similarity) best = j;
+        }
+        if (best != i) {
+            tmp = results[i];
+            results[i] = results[best];
+            results[best] = tmp;
+        }
+    }
+    
+    topK = defined(k) ? k : 1;
+    output = [];
+    for (i = 0; i < topK && i < results.count(); i = i + 1) {
+        output.add(results[i]);
+    }
+    return output;
+};
+
 // Orthogonalize embedding relative to another (remove correlation)
 orthogonalize = func(embedding, referenceEmbedding) {
     if (embedding.dims != referenceEmbedding.dims) return embedding;

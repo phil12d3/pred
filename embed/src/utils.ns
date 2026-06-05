@@ -303,6 +303,84 @@ filterBySimilarity = func(embeddings, queryEmbedding, minSimilarity, metric) {
     return result;
 };
 
+// Build an all-vs-all similarity table for a list of embeddings.
+// Rows and columns follow the input order.
+similarityMatrix = func(embeddings, metric) {
+    method = defined(metric) ? metric : "cosine";
+    matrix = [];
+    
+    for (i = 0; i < embeddings.count(); i = i + 1) {
+        row = [];
+        for (j = 0; j < embeddings.count(); j = j + 1) {
+            sim = 0;
+            if (embeddings[i].dims == embeddings[j].dims) {
+                if (method == "euclidean") {
+                    sumSq = 0;
+                    for (d = 0; d < embeddings[i].dims; d = d + 1) {
+                        dv = embeddings[i].values[d] - embeddings[j].values[d];
+                        sumSq = sumSq + dv * dv;
+                    }
+                    dist = 0;
+                    if (sumSq > 0) {
+                        g = sumSq / 2;
+                        for (iter = 0; iter < 15; iter = iter + 1) {
+                            nx = (g + sumSq / g) / 2;
+                            df = nx - g;
+                            if (df < 0) df = 0 - df;
+                            g = nx;
+                            if (df < 0.001) iter = 15;
+                        }
+                        dist = g;
+                    }
+                    sim = 1 / (1 + dist);
+                } else if (method == "manhattan") {
+                    dist = 0;
+                    for (d = 0; d < embeddings[i].dims; d = d + 1) {
+                        dv = embeddings[i].values[d] - embeddings[j].values[d];
+                        if (dv < 0) dv = 0 - dv;
+                        dist = dist + dv;
+                    }
+                    sim = 1 / (1 + dist);
+                } else {
+                    dot = 0;
+                    n1 = 0;
+                    n2 = 0;
+                    for (d = 0; d < embeddings[i].dims; d = d + 1) {
+                        a = embeddings[i].values[d];
+                        b = embeddings[j].values[d];
+                        dot = dot + a * b;
+                        n1 = n1 + a * a;
+                        n2 = n2 + b * b;
+                    }
+                    if (n1 > 0 && n2 > 0) {
+                        g1 = n1 / 2;
+                        for (iter = 0; iter < 15; iter = iter + 1) {
+                            nx = (g1 + n1 / g1) / 2;
+                            df = nx - g1;
+                            if (df < 0) df = 0 - df;
+                            g1 = nx;
+                            if (df < 0.001) iter = 15;
+                        }
+                        g2 = n2 / 2;
+                        for (iter = 0; iter < 15; iter = iter + 1) {
+                            nx = (g2 + n2 / g2) / 2;
+                            df = nx - g2;
+                            if (df < 0) df = 0 - df;
+                            g2 = nx;
+                            if (df < 0.001) iter = 15;
+                        }
+                        if (g1 > 0 && g2 > 0) sim = dot / (g1 * g2);
+                    }
+                }
+            }
+            row.add(sim);
+        }
+        matrix.add(row);
+    }
+    
+    return matrix;
+};
+
 // Transform all embeddings in batch
 batchTransform = func(embeddings, transformFunc) {
     result = [];

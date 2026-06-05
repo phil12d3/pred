@@ -274,6 +274,13 @@ rotated = embed.ops.rotate(emb, 0.5);
 - `rotate(embedding, factor)` - Cyclic rotation in embedding space
 - `positionalEncoding(position, dimensions, maxPosition)` - Create a normalized deterministic position vector
 - `addPositionalEncoding(embedding, position, strength)` - Blend sequence position into an embedding
+- `analogy(aEmbedding, bEmbedding, cEmbedding)` - Create a relationship query with `a - b + c`
+- `compose(base, additions, removals)` - Build a flexible query with `base + additions - removals`
+- `moveAwayFrom(source, avoid, strength)` - Push a query away from an unwanted concept
+- `applyDirection(source, direction, strength)` - Apply a reusable direction vector to a source embedding
+- `centroidDirection(fromGroup, toGroup)` - Learn the direction from one group center to another
+- `contrast(a, b, candidates, k)` - Find candidates aligned with the `a - b` direction
+- `sequenceEmbedding(embeddings, positionalStrength)` - Summarize an ordered sequence while preserving position signal
 - `orthogonalize(emb1, emb2)` - Remove correlation with reference
 
 ### Utils Module (`embed.utils`)
@@ -286,6 +293,7 @@ rotated = embed.ops.rotate(emb, 0.5);
 - `cluster(embeddings, maxDist, metric)` - Distance-based clustering
 - `centroid(cluster)` - Compute cluster center
 - `filterBySimilarity(embeddings, query, minSim, metric)` - Filter by threshold
+- `similarityMatrix(embeddings, metric)` - Build an all-vs-all pairwise similarity table
 - `batchTransform(embeddings, function)` - Apply function to all
 - `embedCollection(items, keyExtractor, contentAnalyzer, dims)` - Embed collection
 - `toMatrix(embeddings)` - Convert to matrix representation
