@@ -1,0 +1,15 @@
+store = import("./store.ns").store;
+
+packed = store.pack({A: 7, B: "active"});
+bundle = store.bundle("forecast.v1", packed, {source: "demo", horizon: 1});
+unpacked = store.unpack(bundle.payload);
+
+printline("Bundle:");
+printline("name = ", bundle.name);
+printline("kind = ", bundle.kind);
+printline("metadata source = ", bundle.metadata.source);
+
+printline("");
+printline("Unpacked payload:");
+printline("A = ", unpacked.A);
+printline("B = ", unpacked.B);

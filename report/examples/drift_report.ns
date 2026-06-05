@@ -1,0 +1,13 @@
+report = import("./report.ns").report;
+
+drift = {
+    streams: [
+        {stream: "A", kind: "numeric", score: 0.82, flagged: true, meanDelta: 3.1, medianDelta: 2.6},
+        {stream: "B", kind: "categorical", score: 0.41, flagged: false, modeChanged: false, rareAdded: 1, rareRemoved: 0}
+    ]
+};
+
+lines = report.render(report.driftReport(drift));
+for (i = 0; i < lines.count(); i = i + 1) {
+    printline(lines[i]);
+}

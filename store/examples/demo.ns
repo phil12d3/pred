@@ -1,0 +1,21 @@
+store = import("./store.ns").store;
+
+s = store.create();
+s = store.put(s, "history", {rows: 4, streams: 3});
+s = store.put(s, "forecast", {A: 7, B: "active"});
+s = store.put(s, "drift", {flagged: 1, score: 0.86});
+
+printline("Stored keys:");
+for (i = 0; i < store.list(s).count(); i = i + 1) {
+    key = store.list(s)[i];
+    printline(i, " | ", key, " | ", stringify(store.lookup(s, key)));
+}
+
+snapshot = store.snapshot(s);
+restored = store.restore(snapshot);
+
+printline("");
+printline("Restored bundle:");
+printline("item count = ", restored.entries.count());
+printline("forecast A = ", restored.entries[1].value.A);
+printline("drift flagged = ", restored.entries[2].value.flagged);

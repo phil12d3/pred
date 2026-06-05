@@ -1,0 +1,18 @@
+report = import("./report.ns").report;
+
+forecast = {
+    row: {A: 8, B: "active"},
+    predictions: {
+        A: {value: 8, support: 0.6, samples: 4, depth: 2, path: []},
+        B: {value: "active", support: 0.7, samples: 4, depth: 1, path: []}
+    },
+    consistency: {report: [{source: "A", from: 1, to: 2, effects: [{target: "B", direct: "active", counterfactual: "active", matches: true}]}]}
+};
+
+actual = {A: 9, B: "active"};
+built = report.forecastReport(forecast, actual, ["A", "B"]);
+lines = report.render(built);
+
+for (i = 0; i < lines.count(); i = i + 1) {
+    printline(lines[i]);
+}

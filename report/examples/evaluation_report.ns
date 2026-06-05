@@ -1,0 +1,13 @@
+report = import("./report.ns").report;
+
+backtest = {
+    stats: {
+        sales: {type: "numeric", mae: 0.8, folds: 5},
+        state: {type: "categorical", accuracy: 0.75, folds: 5}
+    }
+};
+
+lines = report.render(report.evaluationReport(backtest));
+for (i = 0; i < lines.count(); i = i + 1) {
+    printline(lines[i]);
+}

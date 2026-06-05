@@ -1,0 +1,19 @@
+simulate = import("./simulate.ns").simulate;
+
+history = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 1, B: "low"},
+        {A: 2, B: "mid"},
+        {A: 3, B: "mid"}
+    ]
+};
+
+updated = simulate.withLastRow(history, {A: 5, B: "high"});
+
+printline("Original last row:");
+printline("A=", history.rows[2].A, " | B=", history.rows[2].B);
+
+printline("");
+printline("Updated last row:");
+printline("A=", updated.rows[2].A, " | B=", updated.rows[2].B);

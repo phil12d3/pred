@@ -1,0 +1,23 @@
+evaluation = import("./eval.ns").evaluation;
+
+base = {
+    stats: {
+        sales: {type: "numeric", mae: 1.4, folds: 5},
+        state: {type: "categorical", accuracy: 0.6, folds: 5}
+    }
+};
+
+current = {
+    stats: {
+        sales: {type: "numeric", mae: 0.9, folds: 5},
+        state: {type: "categorical", accuracy: 0.8, folds: 5}
+    }
+};
+
+rows = evaluation.compareBacktests(base, current);
+
+printline("Backtest comparison:");
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline(row.stream, " | kind=", row.kind, " | base=", row.base, " | current=", row.current, " | delta=", row.delta);
+}

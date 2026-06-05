@@ -1,0 +1,14 @@
+evaluation = import("./eval.ns").evaluation;
+
+rows = [
+    {A: 1, B: "idle"},
+    {A: 2, B: "idle"},
+    {A: 3, B: "active"}
+];
+
+comparison = evaluation.compareForecasts(rows[2], {A: 4, B: "active"}, ["A", "B"]);
+
+printline("comparisons = ", comparison.comparisons);
+printline("matches = ", comparison.matches);
+printline("numeric mae = ", comparison.numericMae);
+printline("categorical accuracy = ", comparison.categoricalAccuracy);

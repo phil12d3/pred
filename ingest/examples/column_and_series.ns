@@ -1,0 +1,21 @@
+ingest = import("./ingest.ns").ingest;
+
+columns = {
+    sales: [10, 12, 15],
+    state: ["low", "mid"]
+};
+columnRows = ingest.rowsFromColumns(columns);
+seriesRows = ingest.rowsFromSeries("temperature", [18, 21, 19]);
+
+printline("Rows from columns:");
+for (i = 0; i < columnRows.rows.count(); i = i + 1) {
+    row = columnRows.rows[i];
+    printline(i, " | sales=", row.sales, " | state=", row.state);
+}
+
+printline("");
+printline("Rows from one series:");
+for (i = 0; i < seriesRows.rows.count(); i = i + 1) {
+    row = seriesRows.rows[i];
+    printline(i, " | temperature=", row.temperature);
+}

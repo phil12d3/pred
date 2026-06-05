@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>report Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; letter-spacing: 0; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop, .note {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>report Documentation</h1>
+      <p class="muted">Build readable report objects and render them as plain text lines.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a>.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Module Is For</h2>
+      <p><code>report</code> is the presentation layer for terminal-friendly analysis output. It does not create forecasts, detect drift, or measure model quality. It takes structured rows from other modules and arranges them into titled sections.</p>
+      <p>The design goal is simple and stable text. That matters when you want output that can be printed line by line, logged, copied into notes, or compared between runs.</p>
+      <div class="note">A report in this module is data first, text second. You build a structured report object, then call <code>render()</code> to turn it into printable lines.</div>
+    </div>
+
+    <div class="section">
+      <h2>Report Shape</h2>
+      <div class="code"><code>{
+    title: "Forecast Report",
+    sections: [
+        {
+            title: "Prediction Summary",
+            rows: [...]
+        },
+        {
+            title: "Forecast Score",
+            rows: [...]
+        }
+    ]
+}</code></div>
+      <p>This is a small document model. Each section has a title and a row array. Each row is an ordinary object. The rendering step turns each row into one text line by printing its scalar fields as <code>name=value</code> pairs.</p>
+    </div>
+
+    <div class="section">
+      <h2>Functions</h2>
+
+      <h3>create(title)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> starting an empty report.
+        <br><strong>Output:</strong> <code>{title, sections: []}</code>.
+      </div>
+
+      <h3>section(title, rows)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> building one section object explicitly.
+        <br><strong>Output:</strong> <code>{title, rows}</code>.
+      </div>
+
+      <h3>addSection(report, title, rows)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> appending a new section to an existing report.
+        <br><strong>Output:</strong> a new report object with one additional section.
+      </div>
+      <div class="code"><code>r = report.create("Analysis Report");
+r = report.addSection(r, "Summary", [{stream: "A", value: 10}]);</code></div>
+      <p>This keeps report assembly compositional. You can start with a title and add sections one by one as new outputs become available.</p>
+
+      <h3>forecastReport(forecast, actualRow, streamNames)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> building a complete report around one forecast result.
+        <br><strong>Input:</strong> a forecast object, the actual row to compare against, and the stream order.
+        <br><strong>Output:</strong> a report titled <code>"Forecast Report"</code>.
+      </div>
+      <p>This function combines three pieces of information:</p>
+      <ul>
+        <li>A prediction summary from <code>explain.summarizePrediction()</code>.</li>
+        <li>A forecast score from <code>eval.scoreForecast()</code>.</li>
+        <li>The forecast consistency rows already present in <code>forecast.consistency.report</code>.</li>
+      </ul>
+      <div class="code"><code>r = report.forecastReport(forecast, actualRow, ["A", "B"]);
+
+// r.sections[0].title = "Prediction Summary"
+// r.sections[1].title = "Forecast Score"
+// r.sections[2].title = "Consistency"</code></div>
+
+      <h3>driftReport(drift)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> building a report around a discrepancy drift object.
+        <br><strong>Output:</strong> a report titled <code>"Drift Report"</code> with one section called <code>"Drift Summary"</code>.
+      </div>
+      <p>Internally this uses <code>explain.summarizeDrift()</code> so the report contains flattened rows rather than raw nested drift objects.</p>
+
+      <h3>evaluationReport(backtestResult)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> building a report from backtest metrics.
+        <br><strong>Output:</strong> a report titled <code>"Evaluation Report"</code>.
+      </div>
+      <p>This function uses <code>eval.summarizeBacktest()</code> to turn a stats object into a section called <code>"Backtest Summary"</code>.</p>
+
+      <h3>renderRow(row)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> converting one row object into one printable line.
+        <br><strong>Output:</strong> text such as <code>stream="A" | value=10 | flagged=false</code>.
+      </div>
+      <p>Scalar values are printed directly. Arrays and nested objects are labeled as <code>[array]</code> or <code>[object]</code>. That behavior keeps rendered lines compact and avoids dumping deeply nested structures into the report body.</p>
+
+      <h3>render(report)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> turning a whole report object into text lines.
+        <br><strong>Output:</strong> an array of strings ready to print.
+      </div>
+      <div class="code"><code>lines = report.render(report.evaluationReport(backtest));
+
+// lines[0] = "Evaluation Report"
+// lines[1] = ""
+// lines[2] = "Backtest Summary"</code></div>
+    </div>
+
+    <div class="section">
+      <h2>How Rendering Changes The Data</h2>
+      <p>The report object is structured data. The rendered output is a flat text representation of that structure. This distinction matters:</p>
+      <ul>
+        <li>Before rendering, you can still add sections, inspect rows, or pass the object to another module.</li>
+        <li>After rendering, you have plain text lines intended for terminal or log output.</li>
+      </ul>
+      <p>That separation follows a common software design rule: keep data structured as long as possible, then render at the boundary.</p>
+    </div>
+
+    <div class="section">
+      <h2>Example End-To-End Flow</h2>
+      <div class="code"><code>report = import("./report.ns").report;
+
+evaluationLines = report.render(
+    report.evaluationReport({
+        stats: {
+            A: {type: "numeric", mae: 0.8, folds: 5},
+            B: {type: "categorical", accuracy: 0.6, folds: 5}
+        }
+    })
+);
+
+// evaluationLines becomes a printable text block.</code></div>
+      <p>The reporting module therefore serves as the last step after evaluation, explanation, or discrepancy analysis. It is less about mathematics and more about preserving meaning while changing representation.</p>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+      <ul>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> builds forecast, drift, and evaluation reports and renders them to text.</li>
+        <li><a href="examples/manual_report.ns">examples/manual_report.ns</a> shows manual report assembly with <code>create()</code> and <code>addSection()</code>.</li>
+        <li><a href="examples/drift_report.ns">examples/drift_report.ns</a> shows the rendered output of <code>driftReport()</code>.</li>
+        <li><a href="examples/evaluation_report.ns">examples/evaluation_report.ns</a> shows the rendered output of <code>evaluationReport()</code>.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

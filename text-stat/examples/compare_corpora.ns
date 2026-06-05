@@ -1,0 +1,38 @@
+ts = import("./text-stat.ns");
+
+left = [
+    "apple apple banana orchard forecast",
+    "orchard harvest apple planning"
+];
+
+right = [
+    "banana carrot carrot garden planning",
+    "garden irrigation carrot schedule"
+];
+
+diff = ts.stats.compare(left, right, 5);
+
+printline("=== Compare Corpora Example ===");
+printline("left tokens=", diff.left.tokens, " unique=", diff.left.uniqueWords);
+printline("right tokens=", diff.right.tokens, " unique=", diff.right.uniqueWords);
+
+printline("");
+printline("Distinctive left:");
+for (i = 0; i < diff.distinctiveLeft.count(); i = i + 1) {
+    row = diff.distinctiveLeft[i];
+    printline("  ", row.word, " score=", row.score, " left=", row.countA, " right=", row.countB);
+}
+
+printline("");
+printline("Distinctive right:");
+for (i = 0; i < diff.distinctiveRight.count(); i = i + 1) {
+    row = diff.distinctiveRight[i];
+    printline("  ", row.word, " score=", row.score, " left=", row.countA, " right=", row.countB);
+}
+
+printline("");
+printline("Shared terms:");
+for (i = 0; i < diff.shared.count(); i = i + 1) {
+    row = diff.shared[i];
+    printline("  ", row.word, " shared=", row.sharedCount);
+}

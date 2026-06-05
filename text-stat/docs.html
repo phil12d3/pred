@@ -235,7 +235,18 @@ rels = ts.semantic.relationships(corpus, "poodles", 5);
       <h3>3.2 Common Row Shapes</h3>
       <div class="prop"><span class="name">ranked word row</span><br>{ word: string, count: number, ratio: number }</div>
       <div class="prop"><span class="name">bigram row</span><br>{ pair: string, count: number }</div>
+      <div class="prop"><span class="name">ngram row</span><br>{ phrase: string, count: number, n: number } and for bigrams also { pair: string }</div>
       <div class="prop"><span class="name">neighbor row</span><br>{ word: string, count: number }</div>
+      <div class="prop"><span class="name">keyword row</span><br>{ word: string, count: number, tf: number, df: number, idf: number, score: number }</div>
+      <div class="prop"><span class="name">tfidf summary row</span><br>{ word: string, docFrequency: number, idf: number, totalCount: number, avgScore: number, maxScore: number }</div>
+      <div class="prop"><span class="name">collocation row</span><br>{ phrase: string, count: number, n: number, expected: number, score: number }</div>
+      <div class="prop"><span class="name">kwic row</span><br>{ docIndex: number, position: number, left: string, match: string, right: string, context: string }</div>
+      <div class="prop"><span class="name">kwic group row</span><br>{ key: string, count: number, docCount: number, examples: [kwic rows...] }</div>
+      <div class="prop"><span class="name">compare row</span><br>{ word: string, countA: number, countB: number, ratioA: number, ratioB: number, score: number }</div>
+      <div class="prop"><span class="name">collocate row</span><br>{ word: string, count: number, score: number }</div>
+      <div class="prop"><span class="name">context cluster row</span><br>{ cluster: number, label: string, count: number, features: [ {word,count}, ... ], examples: [kwic rows...] }</div>
+      <div class="prop"><span class="name">dispersion doc row</span><br>{ docIndex: number, count: number, ratio: number }</div>
+      <div class="prop"><span class="name">dispersion segment row</span><br>{ docIndex: number, segmentIndex: number, count: number, ratio: number }</div>
       <div class="prop"><span class="name">stub group row</span><br>{ group: string, total: number, words: [ {word, count}, ... ] }</div>
 
       <h3>3.3 Semantic Return Shapes</h3>
@@ -255,11 +266,20 @@ rels = ts.semantic.relationships(corpus, "poodles", 5);
   leadingWords: [ {word, count, ratio}, ... ],
   tailWords: [ {word, count, ratio}, ... ],
   bigrams: [ {pair, count}, ... ],
+  ngrams: [ {phrase, count, n}, ... ],
+  collocations: [ {phrase, count, n, expected, score}, ... ],
   coOccurrence: {
     tokenA: { tokenB: count, tokenC: count, ... },
     tokenB: { tokenA: count, ... }
   },
-  groups: [ {group, total, words: [...]}, ... ]
+  groups: [ {group, total, words: [...]}, ... ],
+  tfidf: {
+    docs: number,
+    vocabulary: number,
+    words: [ {word, avgScore, maxScore, ...}, ... ],
+    perDoc: [ {docIndex, totalTerms, keywords:[...]}, ... ]
+  },
+  keywords: [ {word, count, tf, df, idf, score}, ... ]
 }</code></div>
     </section>
 
@@ -326,6 +346,39 @@ wc = ts.stats.wordCounts(c);
 // wc.total = 5
 // wc.counts = {a:1, b:3, c:1}</code></div>
 
+      <h3>stats.tfidf(corpus)</h3>
+      <p><strong>Purpose:</strong> Compute document-level keyword rows and a corpus summary of term distinctiveness.</p>
+      <p><strong>Interpretation:</strong> This implementation uses normalized term frequency multiplied by a simple corpus rarity factor <code>(docs + 1) / (df + 1)</code>. It is designed for inspectable ranking rather than textbook log-scaled TF-IDF.</p>
+      <p><strong>Returns:</strong> An object with two useful views:</p>
+      <ul>
+        <li><code>words</code>: corpus summary rows ranked by average per-document keyword score</li>
+        <li><code>perDoc</code>: per-document keyword rankings for drill-down use</li>
+      </ul>
+      <div class="code"><code>c = ts.stats.from([
+  "apple apple banana common",
+  "banana carrot common"
+]);
+
+tfidf = ts.stats.tfidf(c);
+printraw(tfidf.words[0]);
+printraw(tfidf.perDoc[0].keywords[0]);</code></div>
+
+      <h3>stats.keywords(docOrIndex, corpusOrTextList, limit)</h3>
+      <p><strong>Purpose:</strong> Return the highest-scoring keyword rows for one document.</p>
+      <p><strong>Inputs:</strong></p>
+      <ul>
+        <li><code>docOrIndex</code> can be a numeric document index into the corpus, or a raw text string</li>
+        <li><code>corpusOrTextList</code> is the reference corpus used to compute document frequency and rarity</li>
+        <li><code>limit</code> defaults to 10</li>
+      </ul>
+      <div class="note"><strong>Why this exists separately from tfidf():</strong> most workflows want a short per-document keyword list, not the full corpus object.</div>
+      <div class="code"><code>keywords0 = ts.stats.keywords(0, c, 5);
+keywordsRaw = ts.stats.keywords(
+  "apple banana banana seasonal launch",
+  c,
+  5
+);</code></div>
+
       <h3>stats.rankedWords(corpus)</h3>
       <p><strong>Purpose:</strong> Convert raw counts into sorted rows with relative frequency ratio.</p>
       <p><strong>Returns:</strong> [ {word, count, ratio}, ... ] sorted by count descending.</p>
@@ -350,6 +403,23 @@ top5 = ts.stats.leadingWords(corpus, 5);</code></div>
 b = ts.stats.bigrams(c);
 // [{pair:"service outage", count:2}, {pair:"outage service", count:1}]</code></div>
 
+      <h3>stats.ngrams(corpus, n)</h3>
+      <p><strong>Purpose:</strong> Generalize phrase counting beyond bigrams to any adjacent token span length.</p>
+      <p><strong>Defaults:</strong> <code>n = 2</code> if omitted. Values below 1 are clamped to 1.</p>
+      <p><strong>Returns:</strong> [ {phrase, count, n}, ... ] sorted descending by count. For <code>n = 2</code>, rows also include <code>pair</code> for compatibility with older bigram-oriented consumers.</p>
+      <div class="code"><code>trigrams = ts.stats.ngrams(corpus, 3);
+// Example row: {phrase:"machine learning model", count:4, n:3}</code></div>
+
+      <h3>stats.collocations(corpus, n, limit, minCount)</h3>
+      <p><strong>Purpose:</strong> Rank repeated n-grams by association strength, not just raw count.</p>
+      <p><strong>How score works:</strong> the function estimates how often the phrase would appear if each token were independent, then scores the actual count against that expectation.</p>
+      <p><strong>Useful effect:</strong> phrases like <code>"machine learning"</code> can outrank mechanically frequent but weaker combinations.</p>
+      <p><strong>Defaults:</strong> <code>n = 2</code>, <code>limit = 10</code>, <code>minCount = 2</code></p>
+      <div class="code"><code>cols = ts.stats.collocations(corpus, 2, 10, 2);
+for (i = 0; i < cols.count(); i = i + 1) {
+  printline(cols[i].phrase, " score=", cols[i].score);
+}</code></div>
+
       <h3>stats.bigramsFrom(textOrList)</h3>
       <p><strong>Purpose:</strong> Convenience wrapper for text-in/list-in to bigram-list-out.</p>
       <div class="code"><code>b = ts.stats.bigramsFrom([
@@ -357,6 +427,13 @@ b = ts.stats.bigrams(c);
   "service outage resolved"
 ]);
 printraw(b);</code></div>
+
+      <h3>stats.ngramsFrom(textOrList, n)</h3>
+      <p><strong>Purpose:</strong> Convenience wrapper for raw text/list input to n-gram rows.</p>
+      <div class="code"><code>ngr = ts.stats.ngramsFrom([
+  "machine learning pipeline",
+  "machine learning system"
+], 3);</code></div>
 
       <h3>stats.coOccurrence(corpus, windowSize)</h3>
       <p><strong>Purpose:</strong> Build token co-occurrence matrix using local context window.</p>
@@ -374,6 +451,80 @@ printraw(b);</code></div>
       <div class="code"><code>n = ts.stats.neighbors(corpus, "payment", 8, 2);
 for (i = 0; i < n.count(); i = i + 1) {
   printline(n[i].word, " -> ", n[i].count);
+}</code></div>
+
+      <h3>stats.kwic(corpus, word, windowSize, limit)</h3>
+      <p><strong>Purpose:</strong> Produce keyword-in-context rows for fast language inspection.</p>
+      <p><strong>Best use:</strong> when you want to inspect how a term is used rather than only how often it appears.</p>
+      <p><strong>Behavior:</strong></p>
+      <ul>
+        <li>Matches are case-insensitive through the module's token normalization</li>
+        <li>Context is token-based rather than character-based</li>
+        <li>Each row includes separate <code>left</code>, <code>match</code>, <code>right</code>, and combined <code>context</code> fields</li>
+      </ul>
+      <div class="code"><code>rows = ts.stats.kwic(corpus, "payment", 3, 20);
+// Example row:
+// {
+//   docIndex: 1,
+//   position: 7,
+//   left: "retry failed",
+//   match: "payment",
+//   right: "after timeout",
+//   context: "retry failed [payment] after timeout"
+// }</code></div>
+
+      <h3>stats.kwicSorted(corpus, word, windowSize, limit, side)</h3>
+      <p><strong>Purpose:</strong> Sort KWIC rows by one side of the context instead of returning them in document order.</p>
+      <p><strong>Valid side values:</strong> <code>"left"</code>, <code>"right"</code>, or <code>"context"</code>. Any other value falls back to <code>"left"</code>.</p>
+      <p><strong>When to use:</strong> this is the classic concordance browsing pattern where similar contexts sit next to each other and become visually scannable.</p>
+      <div class="code"><code>rows = ts.stats.kwicSorted(corpus, "payment", 3, 20, "right");
+for (i = 0; i < rows.count(); i = i + 1) {
+  printline(rows[i].right, " <= ", rows[i].context);
+}</code></div>
+
+      <h3>stats.kwicGroups(corpus, word, windowSize, limit, side)</h3>
+      <p><strong>Purpose:</strong> Collapse repeated KWIC contexts into grouped frequency rows.</p>
+      <p><strong>Useful effect:</strong> instead of seeing the same pattern line-by-line, you get counts for repeated left contexts, right contexts, or full contexts.</p>
+      <p><strong>Valid side values:</strong> <code>"left"</code>, <code>"right"</code>, or <code>"context"</code>. Default is <code>"context"</code>.</p>
+      <div class="code"><code>groups = ts.stats.kwicGroups(corpus, "payment", 3, 10, "right");
+// Example row:
+// {
+//   key: "retry failed after",
+//   count: 4,
+//   docCount: 3,
+//   examples: [ ... ]
+// }</code></div>
+
+      <h3>stats.concordance(corpus, word, windowSize, limit)</h3>
+      <p><strong>Purpose:</strong> Return a higher-level concordance summary for one term.</p>
+      <p><strong>Returns:</strong></p>
+      <ul>
+        <li><code>totalMatches</code>: how many times the target occurred</li>
+        <li><code>contexts</code>: repeated full context strings</li>
+        <li><code>leftContexts</code>: repeated left-side contexts</li>
+        <li><code>rightContexts</code>: repeated right-side contexts</li>
+      </ul>
+      <div class="note"><strong>Difference from kwic():</strong> <code>kwic()</code> is row-level inspection. <code>concordance()</code> is aggregated usage analysis.</div>
+      <div class="code"><code>conc = ts.stats.concordance(corpus, "payment", 3, 10);
+printline("matches=", conc.totalMatches);
+printraw(conc.rightContexts);</code></div>
+
+      <h3>stats.collocates(corpus, word, windowSize, limit)</h3>
+      <p><strong>Purpose:</strong> Find words that repeatedly appear near a target, separated into left-side, right-side, and combined views.</p>
+      <p><strong>Scoring:</strong> each occurrence contributes 1 count and a distance-weighted score where nearer words contribute more than farther words.</p>
+      <p><strong>Why this matters:</strong> this is more informative than a plain word search because it surfaces the typical lexical environment of a term.</p>
+      <div class="code"><code>cols = ts.stats.collocates(corpus, "payment", 3, 10);
+printraw(cols.right);
+printraw(cols.left);
+printraw(cols.both);</code></div>
+
+      <h3>stats.contextClusters(corpus, word, windowSize, limit)</h3>
+      <p><strong>Purpose:</strong> Group KWIC occurrences into lightweight context clusters based on overlapping surrounding tokens.</p>
+      <p><strong>Interpretation:</strong> this is a heuristic clustering layer, not a linguistic parser. It is meant to separate obvious usage neighborhoods such as <code>"payment retry failed"</code> versus <code>"payment incident"</code>.</p>
+      <p><strong>Returns:</strong> rows with a cluster id, a short label built from the strongest context features, top feature words, and a few example KWIC rows.</p>
+      <div class="code"><code>clusters = ts.stats.contextClusters(corpus, "payment", 3, 10);
+for (i = 0; i < clusters.count(); i = i + 1) {
+  printline(clusters[i].label, " count=", clusters[i].count);
 }</code></div>
 
       <h3>stats.levenshteinDistance(a, b)</h3>
@@ -413,6 +564,43 @@ far  = ts.stats.similarity("analysis", "banana");    // lower</code></div>
 ], 4, 2);
 printraw(stubs);</code></div>
 
+      <h3>stats.compare(leftTextOrCorpus, rightTextOrCorpus, limit)</h3>
+      <p><strong>Purpose:</strong> Compare two corpora and surface words that are overrepresented on each side.</p>
+      <p><strong>Returns:</strong></p>
+      <ul>
+        <li><code>left</code> and <code>right</code> corpus summaries</li>
+        <li><code>distinctiveLeft</code> ranked by how much more common a term is on the left</li>
+        <li><code>distinctiveRight</code> ranked symmetrically for the right</li>
+        <li><code>shared</code> common vocabulary ranked by minimum shared count</li>
+      </ul>
+      <p><strong>Scoring note:</strong> the comparison uses simple add-one smoothing so zero-count terms remain comparable instead of exploding to infinity.</p>
+      <div class="code"><code>diff = ts.stats.compare(
+  ["apple apple banana orchard"],
+  ["banana carrot carrot garden"],
+  5
+);
+
+printraw(diff.distinctiveLeft);
+printraw(diff.distinctiveRight);
+printraw(diff.shared);</code></div>
+
+      <h3>stats.dispersion(corpus, word)</h3>
+      <p><strong>Purpose:</strong> Measure how evenly or unevenly a token is distributed across documents and sentence-like segments.</p>
+      <p><strong>Why it matters:</strong> a word with count 20 can either be a global corpus theme or a one-document spike. Dispersion tells you which one it is.</p>
+      <p><strong>Key fields:</strong></p>
+      <div class="prop"><span class="name">docsWithWord</span><br>How many documents contain the token at least once.</div>
+      <div class="prop"><span class="name">docRatio</span><br>The share of documents containing the token.</div>
+      <div class="prop"><span class="name">concentration</span><br>The fraction of total occurrences that live in the most concentrated single document. Closer to 1 means heavily concentrated.</div>
+      <div class="prop"><span class="name">segmentsWithWord</span><br>How many sentence-like segments contain the token.</div>
+      <div class="prop"><span class="name">byDoc / bySegment</span><br>Detailed rows for plotting or further diagnostics.</div>
+      <div class="code"><code>disp = ts.stats.dispersion([
+  "apple apple. banana.",
+  "banana only here"
+], "apple");
+
+printline(disp.docsWithWord);
+printline(disp.concentration);</code></div>
+
       <h3>stats.report(textOrList, config)</h3>
       <p><strong>Purpose:</strong> Build one consolidated report object with all core analytics sections.</p>
       <p><strong>Config properties:</strong></p>
@@ -420,12 +608,16 @@ printraw(stubs);</code></div>
       <div class="prop"><span class="name">tailN</span><br>How many entries to include in tailWords. Default 10.</div>
       <div class="prop"><span class="name">windowSize</span><br>Context window size for coOccurrence. Default 2.</div>
       <div class="prop"><span class="name">prefixLen</span><br>Stub length used for groups. Default 4.</div>
+      <div class="prop"><span class="name">keywordN</span><br>How many keyword rows from the first document to expose at <code>report.keywords</code>. Default = topN.</div>
+      <div class="prop"><span class="name">ngramSize</span><br>Phrase length used for <code>report.ngrams</code>. Default 3.</div>
 
       <div class="code"><code>report = ts.stats.report(docs, {
   topN: 12,
   tailN: 8,
   windowSize: 3,
-  prefixLen: 5
+  prefixLen: 5,
+  keywordN: 6,
+  ngramSize: 3
 });
 
 printline("docs:", report.docs);
@@ -433,6 +625,9 @@ printline("tokens:", report.tokens);
 printline("unique:", report.uniqueWords);
 printraw(report.leadingWords);
 printraw(report.bigrams);
+printraw(report.ngrams);
+printraw(report.collocations);
+printraw(report.keywords);
 printraw(report.groups);</code></div>
     </section>
 

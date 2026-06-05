@@ -1,0 +1,40 @@
+ingest = import("./ingest.ns").ingest;
+
+records = [
+    {A: 1, B: "low", C: 10},
+    {A: 2, B: "low", C: 12},
+    {A: 3, B: "mid", C: 15},
+    {A: 4, B: "mid", C: 18}
+];
+
+normalized = ingest.rowsFromRecords(records);
+history = ingest.historyFromRecords(records);
+columns = {
+    A: [1, 2, 3, 4],
+    B: ["low", "low", "mid", "mid"],
+    C: [10, 12, 15, 18]
+};
+fromColumns = ingest.historyFromColumns(columns);
+tail = ingest.windowHistory(history, 2);
+
+printline("Rows from records:");
+for (i = 0; i < normalized.rows.count(); i = i + 1) {
+    row = normalized.rows[i];
+    printline(i, " | ", row.A, " | ", row.B, " | ", row.C);
+}
+
+printline("");
+printline("History from records:");
+printline("stream count = ", history.streamNames.count());
+printline("row count = ", history.rows.count());
+printline("last row B = ", history.rows[3].B);
+
+printline("");
+printline("History from columns:");
+printline("row count = ", fromColumns.rows.count());
+printline("third row C = ", fromColumns.rows[2].C);
+
+printline("");
+printline("Windowed history:");
+printline("row count = ", tail.rows.count());
+printline("first window row A = ", tail.rows[0].A);

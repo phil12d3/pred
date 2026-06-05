@@ -1,0 +1,15 @@
+report = import("./report.ns").report;
+
+r = report.create("Manual Analysis Report");
+r = report.addSection(r, "Inputs", [
+    {stream: "sales", lastValue: 12},
+    {stream: "state", lastValue: "active"}
+]);
+r = report.addSection(r, "Summary", [
+    {message: "Two input streams loaded", status: "ok"}
+]);
+
+lines = report.render(r);
+for (i = 0; i < lines.count(); i = i + 1) {
+    printline(lines[i]);
+}

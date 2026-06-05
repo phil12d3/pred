@@ -1,0 +1,58 @@
+ts = import("./text-stat.ns");
+
+docs = [
+    "Payment retry failed after gateway timeout.",
+    "Manual payment retry failed after review.",
+    "Support escalated the payment incident to operations.",
+    "Payment settled after manual review and retry."
+];
+
+rows = ts.stats.kwic(docs, "payment", 3, 10);
+sorted = ts.stats.kwicSorted(docs, "payment", 3, 10, "right");
+groups = ts.stats.kwicGroups(docs, "payment", 3, 10, "right");
+concordance = ts.stats.concordance(docs, "payment", 3, 5);
+collocates = ts.stats.collocates(docs, "payment", 3, 5);
+clusters = ts.stats.contextClusters(docs, "payment", 3, 5);
+
+printline("=== KWIC Example ===");
+printline("matches=", rows.count());
+
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline("  doc=", row.docIndex, " pos=", row.position, " :: ", row.context);
+}
+
+printline("");
+printline("Sorted by right context:");
+for (i = 0; i < sorted.count(); i = i + 1) {
+    row = sorted[i];
+    printline("  ", row.right, " <= ", row.context);
+}
+
+printline("");
+printline("Grouped right contexts:");
+for (i = 0; i < groups.count(); i = i + 1) {
+    row = groups[i];
+    printline("  ", row.key, " count=", row.count, " docs=", row.docCount);
+}
+
+printline("");
+printline("Concordance contexts:");
+for (i = 0; i < concordance.contexts.count(); i = i + 1) {
+    row = concordance.contexts[i];
+    printline("  ", row.key, " count=", row.count);
+}
+
+printline("");
+printline("Right-side collocates:");
+for (i = 0; i < collocates.right.count(); i = i + 1) {
+    row = collocates.right[i];
+    printline("  ", row.word, " count=", row.count, " score=", row.score);
+}
+
+printline("");
+printline("Context clusters:");
+for (i = 0; i < clusters.count(); i = i + 1) {
+    row = clusters[i];
+    printline("  cluster=", row.cluster, " label=", row.label, " count=", row.count);
+}

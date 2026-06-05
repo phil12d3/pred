@@ -1,0 +1,26 @@
+ingest = import("./ingest.ns").ingest;
+
+rows = [
+    {A: 1, B: "low"},
+    {A: 2, B: "low"},
+    {A: 3, B: "mid"},
+    {A: 4, B: "mid"}
+];
+
+history = ingest.historyFromRows(["A", "B"], rows);
+recentRows = ingest.windowRows(rows, 2);
+recentHistory = ingest.windowHistory(history, 2);
+
+printline("Windowed rows:");
+for (i = 0; i < recentRows.count(); i = i + 1) {
+    row = recentRows[i];
+    printline(i, " | A=", row.A, " | B=", row.B);
+}
+
+printline("");
+printline("Windowed history:");
+printline("stream count = ", recentHistory.streamNames.count());
+for (i = 0; i < recentHistory.rows.count(); i = i + 1) {
+    row = recentHistory.rows[i];
+    printline(i, " | A=", row.A, " | B=", row.B);
+}

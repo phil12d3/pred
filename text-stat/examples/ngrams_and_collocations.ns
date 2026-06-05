@@ -1,0 +1,35 @@
+ts = import("./text-stat.ns");
+
+docs = [
+    "machine learning model improves over time",
+    "machine learning pipeline needs clean data",
+    "machine learning machine learning platform rollout"
+];
+
+corpus = ts.stats.from(docs);
+bigrams = ts.stats.bigrams(corpus);
+trigrams = ts.stats.ngrams(corpus, 3);
+collocations = ts.stats.collocations(corpus, 2, 8, 2);
+
+printline("=== N-Grams And Collocations Example ===");
+
+printline("");
+printline("Top bigrams:");
+for (i = 0; i < bigrams.count() && i < 6; i = i + 1) {
+    row = bigrams[i];
+    printline("  ", row.pair, " count=", row.count);
+}
+
+printline("");
+printline("Top trigrams:");
+for (i = 0; i < trigrams.count() && i < 6; i = i + 1) {
+    row = trigrams[i];
+    printline("  ", row.phrase, " count=", row.count);
+}
+
+printline("");
+printline("Top collocations:");
+for (i = 0; i < collocations.count(); i = i + 1) {
+    row = collocations[i];
+    printline("  ", row.phrase, " count=", row.count, " expected=", row.expected, " score=", row.score);
+}

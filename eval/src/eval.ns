@@ -1,0 +1,137 @@
+abs = func(value) {
+    return value < 0 ? 0 - value : value;
+}
+
+scoreForecast = func(actualRow, forecastRow, streamNames) {
+    byStream = [];
+    comparisons = 0;
+    matches = 0;
+    numericTotal = 0;
+    numericCount = 0;
+    categoricalMatches = 0;
+    categoricalCount = 0;
+
+    for (i = 0; i < streamNames.count(); i = i + 1) {
+        stream = streamNames[i];
+        actual = actualRow[stream];
+        predicted = forecastRow[stream];
+        same = actual == predicted;
+        kind = "categorical";
+        error = 0;
+
+        if (type(actual).typename == "Number" && type(predicted).typename == "Number") {
+            kind = "numeric";
+            error = this.abs(predicted - actual);
+            numericTotal = numericTotal + error;
+            numericCount = numericCount + 1;
+            same = error < 0.000001;
+        } else {
+            categoricalCount = categoricalCount + 1;
+            if (same) categoricalMatches = categoricalMatches + 1;
+        }
+
+        if (same) matches = matches + 1;
+        comparisons = comparisons + 1;
+        byStream.add({
+            stream: stream,
+            kind: kind,
+            actual: actual,
+            predicted: predicted,
+            match: same,
+            error: error
+        });
+    }
+
+    return {
+        comparisons: comparisons,
+        matches: matches,
+        accuracy: comparisons > 0 ? matches / comparisons : 1,
+        numericMae: numericCount > 0 ? numericTotal / numericCount : 0,
+        numericCount: numericCount,
+        categoricalAccuracy: categoricalCount > 0 ? categoricalMatches / categoricalCount : 0,
+        categoricalCount: categoricalCount,
+        byStream: byStream
+    };
+}
+
+evaluateSystem = func(system, rows, minTrainSize, windowSize) {
+    return {
+        system: system,
+        rows: rows,
+        minTrainSize: minTrainSize,
+        windowSize: windowSize
+    };
+}
+
+summarizeBacktest = func(backtestResult) {
+    rows = [];
+    if (!defined(backtestResult) || backtestResult == null || !defined(backtestResult.stats)) return rows;
+    foreach(stream in backtestResult.stats.props) {
+        stat = backtestResult.stats[stream];
+        if (stat.type == "numeric") {
+            rows.add({
+                stream: stream,
+                kind: "numeric",
+                metric: "mae",
+                value: stat.mae,
+                folds: stat.folds
+            });
+        } else {
+            rows.add({
+                stream: stream,
+                kind: "categorical",
+                metric: "accuracy",
+                value: stat.accuracy,
+                folds: stat.folds
+            });
+        }
+    }
+    return rows;
+}
+
+compareBacktests = func(baseResult, currentResult) {
+    rows = [];
+    if (!defined(baseResult) || !defined(currentResult)) return rows;
+    foreach(stream in baseResult.stats.props) {
+        if (!defined(currentResult.stats[stream])) continue;
+        base = baseResult.stats[stream];
+        current = currentResult.stats[stream];
+        if (base.type == "numeric" && current.type == "numeric") {
+            rows.add({
+                stream: stream,
+                kind: "numeric",
+                base: base.mae,
+                current: current.mae,
+                delta: current.mae - base.mae
+            });
+        } else if (defined(base.accuracy) && defined(current.accuracy)) {
+            rows.add({
+                stream: stream,
+                kind: "categorical",
+                base: base.accuracy,
+                current: current.accuracy,
+                delta: current.accuracy - base.accuracy
+            });
+        }
+    }
+    return rows;
+}
+
+compareForecasts = func(actualRow, forecastRow, streamNames) {
+    return this.scoreForecast(actualRow, forecastRow, streamNames);
+}
+
+scoreDrift = func(driftReport) {
+    rows = [];
+    if (!defined(driftReport) || driftReport == null || !defined(driftReport.streams)) return rows;
+    for (i = 0; i < driftReport.streams.count(); i = i + 1) {
+        row = driftReport.streams[i];
+        rows.add({
+            stream: row.stream,
+            kind: row.kind,
+            score: row.score,
+            flagged: row.flagged
+        });
+    }
+    return rows;
+}

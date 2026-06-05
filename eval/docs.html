@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eval Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; letter-spacing: 0; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop, .note {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>eval Documentation</h1>
+      <p class="muted">Scoring utilities for forecasts, drift summaries, and backtest result comparison.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> and <a href="examples/forecast_score.ns">examples/forecast_score.ns</a>.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Module Is For</h2>
+      <p><code>eval</code> measures output quality. It does not train models, engineer features, or detect drift by itself. Its job is to turn predictions and summary objects into explicit metrics so you can judge whether a result is good, bad, improving, or degrading.</p>
+      <p>In data science terms, this is the evaluation layer. You take an actual outcome and compare it with a predicted outcome, or you take two model runs and compare their metrics. The module keeps those comparisons beginner-friendly and flat.</p>
+      <div class="note">A metric is just a rule for turning outcomes into a score. This module currently uses exact-match accuracy for categorical values and mean absolute error for numeric values.</div>
+    </div>
+
+    <div class="section">
+      <h2>Metric Concepts</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Meaning</th>
+            <th>Why it matters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>accuracy</code></td>
+            <td>Fraction of correct comparisons.</td>
+            <td>Easy to interpret for discrete labels and exact numeric matches.</td>
+          </tr>
+          <tr>
+            <td><code>numericMae</code></td>
+            <td>Mean absolute error. Average size of the numeric miss.</td>
+            <td>Shows how far numeric predictions are from reality without canceling positive and negative errors.</td>
+          </tr>
+          <tr>
+            <td><code>categoricalAccuracy</code></td>
+            <td>Accuracy over non-numeric streams only.</td>
+            <td>Keeps label performance separate from numeric performance.</td>
+          </tr>
+          <tr>
+            <td><code>delta</code></td>
+            <td>Current metric minus baseline metric.</td>
+            <td>Shows change between two backtest runs.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><strong>Mean absolute error</strong> is especially important. If the actual values are <code>9</code> and <code>4</code>, and the model predicts <code>11</code> and <code>2</code>, the absolute errors are <code>2</code> and <code>2</code>. Their average is <code>2</code>. Unlike signed error, MAE never hides mistakes by letting positive and negative misses cancel each other out.</p>
+    </div>
+
+    <div class="section">
+      <h2>Functions</h2>
+
+      <h3>scoreForecast(actualRow, forecastRow, streamNames)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> scoring one predicted row against one actual row.
+        <br><strong>Input:</strong> an actual row, a forecast row, and the ordered stream list.
+        <br><strong>Output:</strong> <code>{comparisons, matches, accuracy, numericMae, numericCount, categoricalAccuracy, categoricalCount, byStream}</code>.
+      </div>
+      <div class="code"><code>score = evaluation.scoreForecast(
+    {A: 9, B: "idle", C: 4},
+    {A: 11, B: "idle", C: 2},
+    ["A", "B", "C"]
+);
+
+// score.comparisons = 3
+// score.matches = 1
+// score.accuracy = 0.333...
+// score.numericMae = 2
+// score.byStream[0] = {
+//   stream: "A",
+//   kind: "numeric",
+//   actual: 9,
+//   predicted: 11,
+//   match: false,
+//   error: 2
+// }</code></div>
+      <p>The scoring rule changes slightly by data type. If both values are numbers, the module computes absolute error and treats the prediction as an exact match only when that error is essentially zero. Otherwise it uses direct equality. This is a practical split between regression-style and classification-style evaluation.</p>
+
+      <h3>compareForecasts(actualRow, forecastRow, streamNames)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> the same job as <code>scoreForecast()</code>, but with a name that reads more naturally in some scripts.
+        <br><strong>Current behavior:</strong> this is an alias for <code>scoreForecast()</code>.
+      </div>
+
+      <h3>summarizeBacktest(backtestResult)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> flattening a backtest stats object into printable rows.
+        <br><strong>Input:</strong> a backtest object with a <code>stats</code> property keyed by stream.
+        <br><strong>Output:</strong> rows with <code>stream</code>, <code>kind</code>, <code>metric</code>, <code>value</code>, and <code>folds</code>.
+      </div>
+      <div class="code"><code>backtest = {
+    stats: {
+        A: {type: "numeric", mae: 0.8, folds: 5},
+        B: {type: "categorical", accuracy: 0.6, folds: 5}
+    }
+};
+
+rows = evaluation.summarizeBacktest(backtest);
+
+// rows[0] = {
+//   stream: "A",
+//   kind: "numeric",
+//   metric: "mae",
+//   value: 0.8,
+//   folds: 5
+// }</code></div>
+      <p>This is a normalization step for reporting. Backtest outputs are usually keyed objects. Reports are easier to build from row arrays.</p>
+
+      <h3>compareBacktests(baseResult, currentResult)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> comparing two backtest results stream by stream.
+        <br><strong>Output:</strong> rows with <code>stream</code>, <code>kind</code>, <code>base</code>, <code>current</code>, and <code>delta</code>.
+      </div>
+      <div class="code"><code>diff = evaluation.compareBacktests(
+    {stats: {A: {type: "numeric", mae: 1.1}}},
+    {stats: {A: {type: "numeric", mae: 0.8}}}
+);
+
+// diff[0].delta = -0.3</code></div>
+      <p>Interpretation depends on metric direction. For numeric MAE, a lower number is better, so a negative delta means improvement. For categorical accuracy, a higher number is better, so a positive delta means improvement.</p>
+
+      <h3>scoreDrift(driftReport)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> extracting the main drift signals into a compact row array.
+        <br><strong>Input:</strong> a discrepancy drift report with a <code>streams</code> array.
+        <br><strong>Output:</strong> rows with <code>stream</code>, <code>kind</code>, <code>score</code>, and <code>flagged</code>.
+      </div>
+      <p>This is intentionally high-level. It does not preserve every detail from the underlying drift report. It keeps the fields most useful for dashboards, report summaries, or alert checks.</p>
+
+      <h3>evaluateSystem(system, rows, minTrainSize, windowSize)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> packaging evaluation inputs for a higher-level workflow.
+        <br><strong>Current output:</strong> <code>{system, rows, minTrainSize, windowSize}</code>.
+      </div>
+      <div class="note">This function is currently a workflow placeholder. It does not execute a backtest itself in the current implementation. The docs describe the real behavior here so a beginner does not assume it already runs model evaluation.</div>
+    </div>
+
+    <div class="section">
+      <h2>How To Read The Output</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>How to interpret it</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>comparisons</code></td>
+            <td>Total number of streams that were checked.</td>
+          </tr>
+          <tr>
+            <td><code>matches</code></td>
+            <td>How many streams matched exactly under the module’s rules.</td>
+          </tr>
+          <tr>
+            <td><code>accuracy</code></td>
+            <td><code>matches / comparisons</code>. Easy headline metric.</td>
+          </tr>
+          <tr>
+            <td><code>numericMae</code></td>
+            <td>Average numeric error size. Lower is better.</td>
+          </tr>
+          <tr>
+            <td><code>categoricalAccuracy</code></td>
+            <td>Label accuracy only. Higher is better.</td>
+          </tr>
+          <tr>
+            <td><code>byStream</code></td>
+            <td>The detailed row-level evidence behind the summary metrics.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>When To Use Which Function</h2>
+      <ul>
+        <li>Use <code>scoreForecast()</code> when you have one forecast and one actual outcome.</li>
+        <li>Use <code>summarizeBacktest()</code> when you already have backtest stats and need printable rows.</li>
+        <li>Use <code>compareBacktests()</code> when you want to judge whether a revised model improved over a baseline.</li>
+        <li>Use <code>scoreDrift()</code> when you want one compact row per stream from a discrepancy report.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+      <ul>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> scores a forecast and summarizes a backtest object.</li>
+        <li><a href="examples/forecast_score.ns">examples/forecast_score.ns</a> focuses on forecast scoring fields and interpretation.</li>
+        <li><a href="examples/compare_backtests.ns">examples/compare_backtests.ns</a> shows stream-by-stream backtest deltas.</li>
+        <li><a href="examples/drift_score.ns">examples/drift_score.ns</a> shows the compact rows returned by <code>scoreDrift()</code>.</li>
+        <li><a href="examples/evaluate_context.ns">examples/evaluate_context.ns</a> shows the current <code>evaluateSystem()</code> return shape.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

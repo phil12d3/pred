@@ -1,0 +1,16 @@
+discrep = import("./discrep.ns");
+
+report = discrep.detectSeries([3, 4, 4, 5, 4, 3, 4, 25], {
+    minSamples: 4,
+    outlierScale: 1.5,
+    rareThreshold: 0.2
+});
+
+printline("Series thresholds:");
+printline("count = ", report.count);
+printline("q1 = ", report.q1);
+printline("q3 = ", report.q3);
+printline("iqr = ", report.iqr);
+printline("lower fence = ", report.outliers[0].lowerFence);
+printline("upper fence = ", report.outliers[0].upperFence);
+printline("outliers = ", report.outliers.count());

@@ -1,0 +1,51 @@
+[test]
+scores_numeric_and_categorical_forecasts = func(t) {
+    evaluation = import("./eval.ns").evaluation;
+    actual = {A: 10, B: "on"};
+    forecast = {A: 12, B: "on"};
+    result = evaluation.scoreForecast(actual, forecast, ["A", "B"]);
+
+    t.equal(result.comparisons, 2, "scoreForecast checks every stream");
+    t.equal(result.matches, 1, "scoreForecast counts only exact matches");
+    t.truthy(result.numericMae > 1.9 && result.numericMae < 2.1, "scoreForecast computes numeric error");
+};
+
+[test]
+summarizes_backtests_and_compares_runs = func(t) {
+    evaluation = import("./eval.ns").evaluation;
+    base = {
+        stats: {
+            A: {type: "numeric", mae: 1.0, folds: 3},
+            B: {type: "categorical", accuracy: 0.5, folds: 3}
+        }
+    };
+    current = {
+        stats: {
+            A: {type: "numeric", mae: 0.7, folds: 3},
+            B: {type: "categorical", accuracy: 0.75, folds: 3}
+        }
+    };
+
+    summary = evaluation.summarizeBacktest(current);
+    diff = evaluation.compareBacktests(base, current);
+
+    t.equal(summary.count(), 2, "backtest summaries include every stream");
+    t.equal(diff.count(), 2, "backtest comparison includes every stream");
+    t.truthy(diff[0].delta != 0, "backtest comparison produces deltas");
+};
+
+[test]
+scores_drift_reports = func(t) {
+    evaluation = import("./eval.ns").evaluation;
+    drift = {
+        streams: [
+            {stream: "A", kind: "numeric", score: 0.2, flagged: true},
+            {stream: "B", kind: "categorical", score: 0.1, flagged: true}
+        ]
+    };
+
+    rows = evaluation.scoreDrift(drift);
+
+    t.equal(rows.count(), 2, "drift scoring returns one row per stream");
+    t.equal(rows[1].kind, "categorical", "drift scoring preserves the stream kind");
+};

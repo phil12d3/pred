@@ -1,0 +1,125 @@
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+copyObject = func(obj) {
+    out = {};
+    if (!defined(obj) || obj == null) return out;
+    foreach(name in obj.props) out[name] = obj[name];
+    return out;
+}
+
+createHistory = func(streamNames) {
+    return {
+        streamNames: this.copyArray(streamNames),
+        rows: []
+    };
+}
+
+inferStreamNames = func(records) {
+    names = [];
+    if (!defined(records) || records == null || records.count() == 0) return names;
+    first = records[0];
+    if (!defined(first) || first == null || type(first).typename != "Object") return names;
+    foreach(name in first.props) names.add(name);
+    return names;
+}
+
+rowsFromRecords = func(records) {
+    rows = [];
+    names = this.inferStreamNames(records);
+    if (!defined(records) || records == null) return {streamNames: names, rows: rows};
+
+    for (i = 0; i < records.count(); i = i + 1) {
+        record = records[i];
+        row = {};
+        for (j = 0; j < names.count(); j = j + 1) {
+            stream = names[j];
+            value = defined(record) && defined(record[stream]) ? record[stream] : null;
+            row[stream] = value;
+        }
+        rows.add(row);
+    }
+
+    return {streamNames: names, rows: rows};
+}
+
+rowsFromColumns = func(columns) {
+    names = [];
+    if (!defined(columns) || columns == null) return {streamNames: names, rows: []};
+    foreach(name in columns.props) names.add(name);
+
+    rowCount = 0;
+    for (i = 0; i < names.count(); i = i + 1) {
+        stream = names[i];
+        values = columns[stream];
+        if (defined(values) && values != null && values.count() > rowCount) rowCount = values.count();
+    }
+
+    rows = [];
+    for (i = 0; i < rowCount; i = i + 1) {
+        row = {};
+        for (j = 0; j < names.count(); j = j + 1) {
+            stream = names[j];
+            values = columns[stream];
+            row[stream] = defined(values) && values != null && i < values.count() ? values[i] : null;
+        }
+        rows.add(row);
+    }
+
+    return {streamNames: names, rows: rows};
+}
+
+rowsFromSeries = func(streamName, values) {
+    rows = [];
+    if (!defined(values) || values == null) return {streamNames: [streamName], rows: rows};
+    for (i = 0; i < values.count(); i = i + 1) {
+        row = {};
+        row[streamName] = values[i];
+        rows.add(row);
+    }
+    return {streamNames: [streamName], rows: rows};
+}
+
+historyFromRows = func(streamNames, rows) {
+    history = this.createHistory(streamNames);
+    history.rows = this.copyArray(rows);
+    return history;
+}
+
+historyFromRecords = func(records) {
+    normalized = this.rowsFromRecords(records);
+    return this.historyFromRows(normalized.streamNames, normalized.rows);
+}
+
+historyFromColumns = func(columns) {
+    normalized = this.rowsFromColumns(columns);
+    return this.historyFromRows(normalized.streamNames, normalized.rows);
+}
+
+windowRows = func(rows, maxRows) {
+    if (!defined(rows) || rows == null) return [];
+    if (!defined(maxRows) || maxRows <= 0 || rows.count() <= maxRows) return this.copyArray(rows);
+    start = rows.count() - maxRows;
+    out = [];
+    for (i = start; i < rows.count(); i = i + 1) out.add(rows[i]);
+    return out;
+}
+
+windowHistory = func(history, maxRows) {
+    if (!defined(history) || history == null) return this.createHistory([]);
+    if (!defined(maxRows) || maxRows <= 0 || history.rows.count() <= maxRows) return {
+        streamNames: this.copyArray(history.streamNames),
+        rows: this.copyArray(history.rows)
+    };
+    start = history.rows.count() - maxRows;
+    rows = [];
+    for (i = start; i < history.rows.count(); i = i + 1) rows.add(this.copyObject(history.rows[i]));
+    return {
+        streamNames: this.copyArray(history.streamNames),
+        rows: rows
+    };
+}

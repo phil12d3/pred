@@ -16,6 +16,55 @@ echo "== Running predict tests =="
 )
 
 echo
+echo "== Running discrepancy tests =="
+(
+  cd "$ROOT_DIR/discrep"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
+echo "== Running ingest tests =="
+(
+  cd "$ROOT_DIR/ingest"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
+echo "== Running store tests =="
+(
+  cd "$ROOT_DIR/store"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
+echo "== Running eval tests =="
+(
+  cd "$ROOT_DIR/eval"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
+echo "== Running simulate tests =="
+(
+  cd "$ROOT_DIR/simulate"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
+echo "== Running explain tests =="
+(
+  cd "$ROOT_DIR/explain"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
+echo "== Running report tests =="
+(
+  cd "$ROOT_DIR/report"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
 echo "== Running decision-tree tests =="
 (
   cd "$ROOT_DIR/decision-tree"

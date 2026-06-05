@@ -1,0 +1,40 @@
+[test]
+applies_changes_to_last_row = func(t) {
+    simulate = import("./simulate.ns").simulate;
+    history = {
+        streamNames: ["A", "B"],
+        rows: [
+            {A: 1, B: "idle"},
+            {A: 2, B: "idle"}
+        ]
+    };
+    changed = simulate.withLastRow(history, {A: 9, B: "active"});
+
+    t.equal(changed.rows[1].A, 9, "withLastRow updates the latest numeric value");
+    t.equal(changed.rows[1].B, "active", "withLastRow updates the latest categorical value");
+};
+
+[test]
+creates_scenario_grids_from_change_maps = func(t) {
+    simulate = import("./simulate.ns").simulate;
+    scenarios = simulate.scenarioChanges({
+        A: [1, 2],
+        B: ["idle", "active"]
+    });
+
+    t.equal(scenarios.count(), 4, "scenarioChanges builds the cross product");
+    t.equal(scenarios[0].A, 1, "scenarioChanges keeps the first axis value");
+};
+
+[test]
+generates_scenario_histories = func(t) {
+    simulate = import("./simulate.ns").simulate;
+    history = {
+        streamNames: ["A"],
+        rows: [{A: 1}, {A: 2}]
+    };
+    outputs = simulate.scenarioHistories(history, {A: [3, 4]});
+
+    t.equal(outputs.count(), 2, "scenarioHistories returns one history per scenario");
+    t.equal(outputs[1].rows[1].A, 4, "scenarioHistories applies each scenario to the last row");
+};

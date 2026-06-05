@@ -4,6 +4,18 @@ This project is a modular, explainable multi-stream prediction package written i
 
 The system stores streams as a time-indexed table, extracts lagged/history features, trains one small tree model per target stream, predicts the next value/event for each stream, and reports counterfactual cross-stream influence.
 
+## Toolkit Map
+
+The prediction package is now one part of a larger analysis toolkit:
+
+- `discrep/` for outlier detection, row comparison, and drift checks.
+- `ingest/` for turning raw rows, columns, or records into history objects.
+- `store/` for simple artifact storage and round-tripping bundles.
+- `eval/` for scoring forecasts, drift reports, and backtests.
+- `simulate/` for what-if scenarios and row perturbations.
+- `explain/` for beginner-friendly summaries of forecasts and drift.
+- `report/` for turning analysis objects into readable text reports.
+
 ## Quick Start
 
 Use the umbrella entrypoint for a clean module surface:
@@ -40,7 +52,7 @@ printline("next A:", forecast.row.A);
 - `tests/` contains focused ns tests.
 - `docs.html` is the beginner-friendly package guide.
 
-For outlier detection, row comparison, and drift checks, use the sibling `discrep/` package.
+For outlier detection, row comparison, and drift checks, use the sibling `discrep/` package. For ingestion, storage, evaluation, simulation, explanation, and report generation, use the sibling packages listed above.
 
 ## Run
 

@@ -1,0 +1,21 @@
+explain = import("./explain.ns").explain;
+
+predictions = {
+    sales: {
+        value: 14,
+        path: [
+            {feature: "promo.current", value: 1, direction: "right", threshold: 0, gain: 0.8},
+            {feature: "sales.lag.1", value: 12, direction: "right", threshold: 10, gain: 0.4}
+        ]
+    }
+};
+
+rows = explain.summarizePrediction(predictions);
+
+printline("Prediction factors:");
+printline("stream = ", rows[0].stream);
+printline("value = ", rows[0].value);
+for (i = 0; i < rows[0].factors.count(); i = i + 1) {
+    factor = rows[0].factors[i];
+    printline(i, " | feature=", factor.feature, " | condition=", factor.condition, " | gain=", factor.gain);
+}

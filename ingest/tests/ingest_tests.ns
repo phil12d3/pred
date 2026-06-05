@@ -1,0 +1,50 @@
+[test]
+infers_stream_names_and_builds_rows_from_records = func(t) {
+    ingest = import("./ingest.ns").ingest;
+    records = [
+        {A: 1, B: "low"},
+        {A: 2, B: "mid"},
+        {A: 3, B: "high"}
+    ];
+
+    normalized = ingest.rowsFromRecords(records);
+
+    t.equal(normalized.streamNames.count(), 2, "record import infers two streams");
+    t.equal(normalized.rows[1].B, "mid", "record import preserves values");
+};
+
+[test]
+builds_histories_from_columns_and_series = func(t) {
+    ingest = import("./ingest.ns").ingest;
+    columns = {
+        A: [1, 2, 3, 4],
+        B: ["off", "off", "on", "on"]
+    };
+
+    history = ingest.historyFromColumns(columns);
+    series = ingest.rowsFromSeries("score", [10, 20, 30]);
+
+    t.equal(history.rows.count(), 4, "column import turns columns into rows");
+    t.equal(history.rows[2].B, "on", "column import keeps each stream aligned");
+    t.equal(series.rows.count(), 3, "series import creates one row per value");
+    t.equal(series.rows[1].score, 20, "series import names the output field");
+};
+
+[test]
+windows_rows_and_histories = func(t) {
+    ingest = import("./ingest.ns").ingest;
+    rows = [
+        {A: 1},
+        {A: 2},
+        {A: 3},
+        {A: 4}
+    ];
+
+    rowWindow = ingest.windowRows(rows, 2);
+    history = ingest.historyFromRows(["A"], rows);
+    historyWindow = ingest.windowHistory(history, 2);
+
+    t.equal(rowWindow.count(), 2, "row window keeps the requested number of rows");
+    t.equal(rowWindow[0].A, 3, "row window keeps the newest rows");
+    t.equal(historyWindow.rows.count(), 2, "history window keeps the requested number of rows");
+};

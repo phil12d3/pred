@@ -1,0 +1,21 @@
+discrep = import("./discrep.ns");
+
+history = {
+    streamNames: ["temp", "state"],
+    rows: [
+        {temp: 18, state: "idle"},
+        {temp: 19, state: "idle"},
+        {temp: 20, state: "idle"},
+        {temp: 44, state: "fault"},
+        {temp: 19, state: "idle"},
+        {temp: 18, state: "idle"}
+    ]
+};
+
+profile = discrep.profileHistory(history, {minSamples: 4, rareThreshold: 0.2});
+
+printline("History profile:");
+printline("row count = ", profile.rowCount);
+printline("flagged count = ", profile.flagged.count());
+printline("temp outliers = ", profile.streams.temp.outliers.count());
+printline("state rare values = ", profile.streams.state.rareValues.count());

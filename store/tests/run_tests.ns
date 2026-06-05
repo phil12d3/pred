@@ -1,0 +1,74 @@
+frameworkModule = import("./tests/framework.ns");
+t = frameworkModule.create();
+
+collectTests = func(path) {
+    results = [];
+    info = directory(path);
+
+    for (i = 0; i < info.files.count(); i = i + 1) {
+        file = info.files[i];
+        filename = defined(file.filename) ? file.filename : "";
+        fullPath = path + "/" + filename;
+        if (fullPath == "./tests/run_tests.ns") continue;
+        if (fullPath == "./tests/framework.ns") continue;
+        if (regex_test(filename, "tests\\.ns$")) {
+            results.add(fullPath);
+        }
+    }
+
+    return results;
+};
+
+sortStrings = func(values) {
+    if (!defined(values) || values.count() <= 1) return values;
+    copy = [];
+    for (i = 0; i < values.count(); i = i + 1) copy.add(values[i]);
+    copy.sort(func(indexA, valueA, indexB, valueB) => valueA < valueB);
+    return copy;
+};
+
+runAttributedTests = func(path, module) {
+    testNames = membersWithAttribute(module, "test");
+    if (!defined(testNames) || testNames.count() == 0) {
+        t.fail("{path} has no [test] functions");
+        return false;
+    }
+
+    testNames = sortStrings(testNames);
+    for (ti = 0; ti < testNames.count(); ti = ti + 1) {
+        name = testNames[ti];
+        fn = module[name];
+        if (!defined(fn) || type(fn).typename != "Function") {
+            t.fail("{path}::{name} is marked [test] but is not a function");
+            continue;
+        }
+        t.runCase(path, name, fn);
+    }
+
+    return true;
+};
+
+testFiles = sortStrings(collectTests("./tests"));
+
+printline("Running store tests");
+printline("");
+
+if (testFiles.count() == 0) {
+    printline("No test files found.");
+    exit(1);
+}
+
+for (i = 0; i < testFiles.count(); i = i + 1) {
+    path = testFiles[i];
+    t.beginFile(path);
+    try {
+        module = import(path);
+        runAttributedTests(path, module);
+    } catch (ex) {
+        t.fileError(path, ex);
+    }
+    printline("");
+}
+
+ok = t.summary();
+if (!ok) exit(1);

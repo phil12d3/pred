@@ -1,0 +1,12 @@
+explain = import("./explain.ns").explain;
+
+rows = explain.summarizeBacktest([
+    {stream: "sales", kind: "numeric", metric: "mae", value: 0.8, folds: 5},
+    {stream: "state", kind: "categorical", metric: "accuracy", value: 0.75, folds: 5}
+]);
+
+printline("Backtest summary rows:");
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline(row.stream, " | ", row.kind, " | ", row.metric, " | ", row.value, " | folds=", row.folds);
+}

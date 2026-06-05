@@ -1,0 +1,23 @@
+explain = import("./explain.ns").explain;
+
+predictions = {
+    A: {value: 8, support: 0.7, samples: 5, depth: 2, path: [{feature: "A.lag.1", value: 3, direction: "left", threshold: 4, gain: 0.4}]},
+    B: {value: "active", support: 0.6, samples: 4, depth: 1, path: []}
+};
+
+summary = explain.summarizePrediction(predictions);
+printline("Prediction summary:");
+for (i = 0; i < summary.count(); i = i + 1) {
+    row = summary[i];
+    printline(row.stream, " | ", row.value, " | factors=", row.factors.count());
+}
+
+influence = {
+    report: [
+        {source: "A", from: 1, to: 2, effects: [{target: "B", delta: 1}, {target: "A", delta: 0}]}
+    ]
+};
+influenceRows = explain.summarizeInfluence(influence);
+printline("");
+printline("Influence summary:");
+printline(influenceRows[0].source, " -> ", influenceRows[0].strongestTarget, " (", influenceRows[0].strongestDelta, ")");

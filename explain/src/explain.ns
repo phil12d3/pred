@@ -1,0 +1,91 @@
+summarizePrediction = func(predictions) {
+    rows = [];
+    if (!defined(predictions) || predictions == null) return rows;
+    foreach(stream in predictions.props) {
+        item = predictions[stream];
+        factors = [];
+        if (defined(item.path) && item.path != null) {
+            limit = item.path.count();
+            if (limit > 4) limit = 4;
+            for (i = 0; i < limit; i = i + 1) {
+                step = item.path[i];
+                factors.add({
+                    feature: step.feature,
+                    condition: step.value + " " + (step.direction == "left" ? "<= " : "> ") + step.threshold,
+                    gain: step.gain
+                });
+            }
+        }
+        rows.add({
+            stream: stream,
+            value: item.value,
+            factors: factors
+        });
+    }
+    return rows;
+}
+
+summarizeInfluence = func(influence) {
+    rows = [];
+    if (!defined(influence) || influence == null || !defined(influence.report)) return rows;
+    for (i = 0; i < influence.report.count(); i = i + 1) {
+        item = influence.report[i];
+        strongestTarget = "none";
+        strongestDelta = 0;
+        for (j = 0; j < item.effects.count(); j = j + 1) {
+            effect = item.effects[j];
+            size = effect.delta < 0 ? 0 - effect.delta : effect.delta;
+            if (size > strongestDelta) {
+                strongestDelta = size;
+                strongestTarget = effect.target;
+            }
+        }
+        rows.add({
+            source: item.source,
+            from: item.from,
+            to: item.to,
+            strongestTarget: strongestTarget,
+            strongestDelta: strongestDelta,
+            effects: item.effects
+        });
+    }
+    return rows;
+}
+
+summarizeDrift = func(driftReport) {
+    rows = [];
+    if (!defined(driftReport) || driftReport == null || !defined(driftReport.streams)) return rows;
+    for (i = 0; i < driftReport.streams.count(); i = i + 1) {
+        stream = driftReport.streams[i];
+        rows.add({
+            stream: stream.stream,
+            kind: stream.kind,
+            score: stream.score,
+            flagged: stream.flagged,
+            meanDelta: defined(stream.meanDelta) ? stream.meanDelta : 0,
+            medianDelta: defined(stream.medianDelta) ? stream.medianDelta : 0,
+            modeChanged: defined(stream.modeChanged) ? stream.modeChanged : false,
+            modeRatioDelta: defined(stream.modeRatioDelta) ? stream.modeRatioDelta : 0,
+            outlierDelta: defined(stream.outlierDelta) ? stream.outlierDelta : 0,
+            rareAdded: defined(stream.rareAdded) ? stream.rareAdded : 0,
+            rareRemoved: defined(stream.rareRemoved) ? stream.rareRemoved : 0
+        });
+    }
+    return rows;
+}
+
+summarizeBacktest = func(backtestRows) {
+    rows = [];
+    if (!defined(backtestRows) || backtestRows == null) return rows;
+    for (i = 0; i < backtestRows.count(); i = i + 1) {
+        item = backtestRows[i];
+        rows.add({
+            stream: item.stream,
+            kind: item.kind,
+            metric: item.metric,
+            value: item.value,
+            folds: item.folds
+        });
+    }
+    return rows;
+}

@@ -1,0 +1,78 @@
+[test]
+saves_and_loads_plain_values_from_files = func(t) {
+    store = import("./store.ns").store;
+    mkdir("./tmp");
+    path = "./tmp/store_value.bin";
+    if (exists(path)) deleteFile(path);
+
+    store.saveFile(path, {
+        forecast: {A: 12, B: "idle"},
+        tags: ["baseline", "demo"]
+    });
+    loaded = store.loadFile(path);
+
+    t.truthy(exists(path), "saveFile writes the requested file");
+    t.equal(loaded.forecast.A, 12, "loadFile restores nested numeric values");
+    t.equal(loaded.tags[1], "demo", "loadFile restores arrays");
+
+    if (exists(path)) deleteFile(path);
+};
+
+[test]
+saves_and_loads_store_snapshots_from_files = func(t) {
+    store = import("./store.ns").store;
+    mkdir("./tmp");
+    path = "./tmp/store_snapshot.bin";
+    if (exists(path)) deleteFile(path);
+
+    s = store.create();
+    s = store.put(s, "forecast", {A: 9, B: "active"});
+    s = store.put(s, "drift", {flagged: 1, score: 0.81});
+
+    result = store.saveStore(s, path);
+    restored = store.loadStore(path);
+
+    t.equal(result.path, path, "saveStore reports the output path");
+    t.truthy(store.has(restored, "forecast"), "loadStore restores stored keys");
+    t.equal(store.lookup(restored, "drift").score, 0.81, "loadStore restores stored values");
+
+    if (exists(path)) deleteFile(path);
+};
+
+[test]
+stores_and_retrieves_analysis_artifacts = func(t) {
+    store = import("./store.ns").store;
+    s = store.create();
+    s = store.put(s, "forecast", {A: 12, B: "idle"});
+    s = store.put(s, "drift", {flagged: 2});
+
+    t.truthy(store.has(s, "forecast"), "store records inserted keys");
+    t.equal(store.lookup(s, "forecast").A, 12, "store retrieves stored values");
+    t.equal(store.list(s).count(), 2, "store keeps insertion order");
+};
+
+[test]
+round_trips_snapshots_and_bundles = func(t) {
+    store = import("./store.ns").store;
+    s = store.create();
+    s = store.put(s, "report", {title: "summary", rows: [1, 2, 3]});
+    snapshot = store.snapshot(s);
+    restored = store.restore(snapshot);
+    bundle = store.bundle("analysis", {rows: 3}, {owner: "demo"});
+
+    t.equal(restored.entries[0].value.title, "summary", "snapshot restores the stored content");
+    t.equal(bundle.name, "analysis", "bundle keeps the bundle name");
+    t.equal(bundle.payload.rows, 3, "bundle keeps the payload");
+};
+
+[test]
+removes_keys_without_affecting_other_entries = func(t) {
+    store = import("./store.ns").store;
+    s = store.create();
+    s = store.put(s, "a", 1);
+    s = store.put(s, "b", 2);
+    trimmed = store.drop(s, "a");
+
+    t.truthy(!store.has(trimmed, "a"), "remove drops the requested key");
+    t.truthy(store.has(trimmed, "b"), "remove keeps the other keys");
+};

@@ -1,0 +1,17 @@
+ingest = import("./ingest.ns").ingest;
+
+records = [
+    {temperature: 18, humidity: 45, mode: "idle"},
+    {temperature: 19, humidity: 44, mode: "idle"},
+    {temperature: 21, humidity: 41, mode: "active"}
+];
+
+normalized = ingest.rowsFromRecords(records);
+history = ingest.historyFromRows(normalized.streamNames, normalized.rows);
+
+printline("stream names | ", normalized.streamNames.count());
+printline("rows | ", normalized.rows.count());
+for (i = 0; i < history.rows.count(); i = i + 1) {
+    row = history.rows[i];
+    printline(i, " | ", row.temperature, " | ", row.humidity, " | ", row.mode);
+}

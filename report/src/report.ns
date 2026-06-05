@@ -1,0 +1,89 @@
+evaluation = import("/home/phil/dev/pred/eval/src/eval.ns");
+explain = import("/home/phil/dev/pred/explain/src/explain.ns");
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+create = func(title) {
+    return {
+        title: defined(title) ? title : "Analysis Report",
+        sections: []
+    };
+}
+
+section = func(title, rows) {
+    return {
+        title: title,
+        rows: defined(rows) ? rows : []
+    };
+}
+
+addSection = func(report, title, rows) {
+    next = {
+        title: report.title,
+        sections: this.copyArray(report.sections)
+    };
+    next.sections.add(this.section(title, rows));
+    return next;
+}
+
+forecastReport = func(forecast, actualRow, streamNames) {
+    rows = this.explain.summarizePrediction(forecast.predictions);
+    score = this.evaluation.scoreForecast(actualRow, forecast.row, streamNames);
+    report = this.create("Forecast Report");
+    report = this.addSection(report, "Prediction Summary", rows);
+    report = this.addSection(report, "Forecast Score", [score]);
+    report = this.addSection(report, "Consistency", forecast.consistency.report);
+    return report;
+}
+
+driftReport = func(drift) {
+    rows = this.explain.summarizeDrift(drift);
+    report = this.create("Drift Report");
+    report = this.addSection(report, "Drift Summary", rows);
+    return report;
+}
+
+evaluationReport = func(backtestResult) {
+    rows = this.evaluation.summarizeBacktest(backtestResult);
+    report = this.create("Evaluation Report");
+    report = this.addSection(report, "Backtest Summary", rows);
+    return report;
+}
+
+renderRow = func(row) {
+    if (!defined(row) || row == null) return "";
+    text = "";
+    foreach(name in row.props) {
+        if (text != "") text = text + " | ";
+        value = row[name];
+        kind = type(value).typename;
+        if (kind == "Array") {
+            text = text + name + "=[array]";
+        } else if (kind == "Object") {
+            text = text + name + "=[object]";
+        } else {
+            text = text + name + "=" + stringify(value);
+        }
+    }
+    return text;
+}
+
+render = func(report) {
+    lines = [];
+    if (!defined(report) || report == null) return lines;
+    if (defined(report.title)) lines.add(report.title);
+    for (i = 0; i < report.sections.count(); i = i + 1) {
+        section = report.sections[i];
+        lines.add("");
+        lines.add(section.title);
+        for (j = 0; j < section.rows.count(); j = j + 1) {
+            lines.add(this.renderRow(section.rows[j]));
+        }
+    }
+    return lines;
+}

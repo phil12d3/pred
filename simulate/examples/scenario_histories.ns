@@ -1,0 +1,21 @@
+simulate = import("./simulate.ns").simulate;
+
+history = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 1, B: "low"},
+        {A: 2, B: "mid"},
+        {A: 3, B: "mid"}
+    ]
+};
+
+histories = simulate.scenarioHistories(history, {
+    A: [3, 5],
+    B: ["mid", "high"]
+});
+
+printline("Scenario histories:");
+for (i = 0; i < histories.count(); i = i + 1) {
+    last = histories[i].rows[histories[i].rows.count() - 1];
+    printline(i, " | A=", last.A, " | B=", last.B);
+}

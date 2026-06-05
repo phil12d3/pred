@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>explain Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; letter-spacing: 0; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop, .note {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>explain Documentation</h1>
+      <p class="muted">Readable summaries for predictions, counterfactual influence, drift, and backtest rows.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a>.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Module Is For</h2>
+      <p><code>explain</code> is a translation layer. Many analysis modules produce detailed objects that are useful for machines and developers but too dense for beginners or reporting code. This module keeps the important evidence and strips away the rest.</p>
+      <p>The key idea is summarization without inventing new meaning. The functions do not retrain models or recompute metrics. They condense existing outputs into smaller row arrays with consistent field names.</p>
+      <div class="note">This module is especially useful before passing results into <code>report</code>, because flat rows are easier to render than nested model objects.</div>
+    </div>
+
+    <div class="section">
+      <h2>Functions</h2>
+
+      <h3>summarizePrediction(predictions)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> turning per-stream prediction objects into short explanation rows.
+        <br><strong>Input:</strong> an object keyed by stream name, where each entry may contain <code>value</code> and a decision <code>path</code>.
+        <br><strong>Output:</strong> rows with <code>stream</code>, <code>value</code>, and <code>factors</code>.
+      </div>
+      <div class="code"><code>rows = explain.summarizePrediction({
+    A: {
+        value: 12,
+        path: [
+            {feature: "B.current", value: 3, direction: "left", threshold: 4, gain: 0.8},
+            {feature: "A.lag.1", value: 10, direction: "right", threshold: 8, gain: 0.4}
+        ]
+    }
+});
+
+// rows[0] = {
+//   stream: "A",
+//   value: 12,
+//   factors: [
+//     {feature: "B.current", condition: "3 <= 4", gain: 0.8},
+//     {feature: "A.lag.1", condition: "10 > 8", gain: 0.4}
+//   ]
+// }</code></div>
+      <p>The function keeps at most four path steps. That is a deliberate readability limit. It helps beginners see the strongest rule chain without reading a full tree trace.</p>
+
+      <h3>summarizeInfluence(influence)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> flattening counterfactual influence output into one row per source change.
+        <br><strong>Input:</strong> an object with a <code>report</code> array.
+        <br><strong>Output:</strong> rows with <code>source</code>, <code>from</code>, <code>to</code>, <code>strongestTarget</code>, <code>strongestDelta</code>, and <code>effects</code>.
+      </div>
+      <div class="code"><code>rows = explain.summarizeInfluence({
+    report: [{
+        source: "A",
+        from: 10,
+        to: 12,
+        effects: [
+            {target: "B", delta: 0.2},
+            {target: "C", delta: 1.5}
+        ]
+    }]
+});
+
+// rows[0].strongestTarget = "C"
+// rows[0].strongestDelta = 1.5</code></div>
+      <p>The logic here is “find the biggest downstream movement.” It computes the strongest effect by absolute delta, not by signed delta, so large negative and large positive effects are treated as equally strong.</p>
+
+      <h3>summarizeDrift(driftReport)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> turning a discrepancy drift report into flat rows that are easier to compare or render.
+        <br><strong>Input:</strong> a drift report with a <code>streams</code> array.
+        <br><strong>Output:</strong> rows with common fields such as <code>stream</code>, <code>kind</code>, <code>score</code>, <code>flagged</code>, plus numeric and categorical drift details where available.
+      </div>
+      <div class="code"><code>rows = explain.summarizeDrift({
+    streams: [{
+        stream: "A",
+        kind: "numeric",
+        score: 0.82,
+        flagged: true,
+        meanDelta: 3.1,
+        medianDelta: 2.7
+    }]
+});
+
+// rows[0].meanDelta = 3.1
+// rows[0].modeChanged = false
+// rows[0].rareAdded = 0</code></div>
+      <p>This function normalizes mixed drift shapes into a shared row format. Numeric and categorical streams do not naturally carry the same detail fields, so the missing fields are filled with neutral defaults such as <code>0</code> or <code>false</code>.</p>
+
+      <h3>summarizeBacktest(backtestRows)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> standardizing already-flat backtest rows.
+        <br><strong>Input:</strong> an array of rows like the output of <code>eval.summarizeBacktest()</code>.
+        <br><strong>Output:</strong> rows with <code>stream</code>, <code>kind</code>, <code>metric</code>, <code>value</code>, and <code>folds</code>.
+      </div>
+      <p>This function is intentionally minimal. It keeps a consistent row shape so later rendering code can rely on stable fields.</p>
+    </div>
+
+    <div class="section">
+      <h2>How To Interpret The Summary Rows</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>factors</code></td>
+            <td>The main decision steps that led to a prediction.</td>
+          </tr>
+          <tr>
+            <td><code>strongestTarget</code></td>
+            <td>The stream most affected by a source perturbation.</td>
+          </tr>
+          <tr>
+            <td><code>strongestDelta</code></td>
+            <td>The size of the strongest effect.</td>
+          </tr>
+          <tr>
+            <td><code>flagged</code></td>
+            <td>Whether a drift summary crossed the discrepancy module’s flag threshold.</td>
+          </tr>
+          <tr>
+            <td><code>metric</code> and <code>value</code></td>
+            <td>The name of a performance metric and its measured amount.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Example End-To-End Use</h2>
+      <div class="code"><code>predictionRows = explain.summarizePrediction(predictions);
+influenceRows = explain.summarizeInfluence(influence);
+driftRows = explain.summarizeDrift(driftReport);
+backtestRows = explain.summarizeBacktest(metricRows);</code></div>
+      <p>The consistent pattern is: take a dense object, produce a row array. That row array is then easier to print, sort, filter, or hand to the reporting layer.</p>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+      <ul>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> shows prediction, influence, drift, and backtest summarization in one place.</li>
+        <li><a href="examples/prediction_factors.ns">examples/prediction_factors.ns</a> focuses on the <code>factors</code> array from <code>summarizePrediction()</code>.</li>
+        <li><a href="examples/drift_summary.ns">examples/drift_summary.ns</a> shows the flattened rows returned by <code>summarizeDrift()</code>.</li>
+        <li><a href="examples/backtest_summary.ns">examples/backtest_summary.ns</a> shows the stable row shape returned by <code>summarizeBacktest()</code>.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

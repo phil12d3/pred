@@ -1,0 +1,14 @@
+explain = import("./explain.ns").explain;
+
+rows = explain.summarizeDrift({
+    streams: [
+        {stream: "A", kind: "numeric", score: 0.82, flagged: true, meanDelta: 3.1, medianDelta: 2.6},
+        {stream: "B", kind: "categorical", score: 0.41, flagged: false, modeChanged: false, rareAdded: 1, rareRemoved: 0}
+    ]
+});
+
+printline("Drift summary rows:");
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline(row.stream, " | kind=", row.kind, " | score=", row.score, " | flagged=", row.flagged, " | meanDelta=", row.meanDelta, " | rareAdded=", row.rareAdded);
+}

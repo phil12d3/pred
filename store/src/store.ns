@@ -1,0 +1,130 @@
+create = func() {
+    return {
+        entries: []
+    };
+}
+
+put = func(store, key, value) {
+    next = {
+        entries: []
+    };
+    if (defined(store) && store != null && defined(store.entries)) {
+        for (i = 0; i < store.entries.count(); i = i + 1) {
+            entry = store.entries[i];
+            if (entry.key == key) {
+                next.entries.add({key: key, value: value});
+            } else {
+                next.entries.add({key: entry.key, value: entry.value});
+            }
+        }
+    }
+    found = false;
+    for (i = 0; i < next.entries.count(); i = i + 1) {
+        if (next.entries[i].key == key) found = true;
+    }
+    if (!found) next.entries.add({key: key, value: value});
+    return next;
+}
+
+lookup = func(store, key) {
+    if (!defined(store) || store == null) return null;
+    for (i = 0; i < store.entries.count(); i = i + 1) {
+        entry = store.entries[i];
+        if (entry.key == key) return entry.value;
+    }
+    return null;
+}
+
+has = func(store, key) {
+    if (!defined(store) || store == null) return false;
+    for (i = 0; i < store.entries.count(); i = i + 1) {
+        if (store.entries[i].key == key) return true;
+    }
+    return false;
+}
+
+drop = func(store, key) {
+    next = {
+        entries: []
+    };
+    if (!defined(store) || store == null) return next;
+    for (i = 0; i < store.entries.count(); i = i + 1) {
+        entry = store.entries[i];
+        if (entry.key == key) continue;
+        next.entries.add({key: entry.key, value: entry.value});
+    }
+    return next;
+}
+
+list = func(store) {
+    if (!defined(store) || store == null) return [];
+    names = [];
+    for (i = 0; i < store.entries.count(); i = i + 1) names.add(store.entries[i].key);
+    return names;
+}
+
+snapshot = func(store) {
+    next = this.create();
+    if (defined(store) && store != null && defined(store.entries)) {
+        for (i = 0; i < store.entries.count(); i = i + 1) {
+            entry = store.entries[i];
+            next.entries.add({key: entry.key, value: entry.value});
+        }
+    }
+    return next;
+}
+
+restore = func(snapshot) {
+    if (!defined(snapshot) || snapshot == null) return this.create();
+    if (defined(snapshot.entries)) {
+        next = this.create();
+        for (i = 0; i < snapshot.entries.count(); i = i + 1) {
+            entry = snapshot.entries[i];
+            next.entries.add({key: entry.key, value: entry.value});
+        }
+        return next;
+    }
+    return this.create();
+}
+
+bundle = func(name, payload, metadata) {
+    bundle = {
+        name: name,
+        payload: payload,
+        metadata: defined(metadata) ? metadata : {},
+        kind: "analysis.bundle"
+    };
+    return bundle;
+}
+
+pack = func(value) {
+    return value;
+}
+
+unpack = func(value) {
+    return value;
+}
+
+saveFile = func(path, value) {
+    payload = this.pack(value);
+    compress_to_file(payload, path);
+    return {
+        path: path,
+        saved: true
+    };
+}
+
+loadFile = func(path) {
+    payload = decompress_from_file(path);
+    return this.unpack(payload);
+}
+
+saveStore = func(store, path) {
+    snapshot = this.snapshot(store);
+    return this.saveFile(path, snapshot);
+}
+
+loadStore = func(path) {
+    snapshot = this.loadFile(path);
+    return this.restore(snapshot);
+}

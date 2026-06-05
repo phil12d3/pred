@@ -1,0 +1,19 @@
+store = import("./store.ns").store;
+
+mkdir("./tmp");
+path = "./tmp/example_store.bin";
+if (exists(path)) deleteFile(path);
+
+s = store.create();
+s = store.put(s, "history", {rows: 4, streams: 2});
+s = store.put(s, "forecast", {A: 8, B: "active"});
+s = store.put(s, "drift", {flagged: 1, score: 0.76});
+
+store.saveStore(s, path);
+restored = store.loadStore(path);
+
+printline("Restored store:");
+for (i = 0; i < restored.entries.count(); i = i + 1) {
+    entry = restored.entries[i];
+    printline(i, " | ", entry.key, " | ", stringify(entry.value));
+}

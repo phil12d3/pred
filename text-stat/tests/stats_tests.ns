@@ -64,3 +64,128 @@ report_includes_requested_sections = func(t) {
     t.equal(report.tailWords.count(), 2, "report respects tailN for tail words");
     t.truthy(defined(report.coOccurrence), "report includes co-occurrence matrix");
 };
+
+[test]
+tfidf_and_keywords_surface_distinctive_terms = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from([
+        "apple apple banana common",
+        "banana carrot common"
+    ]);
+
+    tfidf = ts.stats.tfidf(corpus);
+    keywords = ts.stats.keywords(0, corpus, 3);
+
+    t.equal(tfidf.docs, 2, "tfidf reports document count");
+    t.truthy(tfidf.words.count() >= 3, "tfidf reports vocabulary rows");
+    t.equal(keywords[0].word, "apple", "keywords favor distinctive repeated terms");
+};
+
+[test]
+ngrams_and_collocations_extend_phrase_analysis = func(t) {
+    ts = import("./text-stat.ns");
+
+    corpus = ts.stats.from([
+        "machine learning model improves",
+        "machine learning pipeline grows",
+        "machine learning machine learning"
+    ]);
+
+    trigrams = ts.stats.ngrams(corpus, 3);
+    collocations = ts.stats.collocations(corpus, 2, 5, 2);
+
+    t.truthy(trigrams.count() > 0, "ngrams returns higher-order phrases");
+    t.equal(trigrams[0].n, 3, "ngrams rows include gram size");
+    t.equal(collocations[0].phrase, "machine learning", "collocations rank repeated phrase highly");
+};
+
+[test]
+kwic_returns_context_windows = func(t) {
+    ts = import("./text-stat.ns");
+
+    rows = ts.stats.kwic([
+        "alpha beta gamma delta",
+        "beta epsilon zeta"
+    ], "beta", 1, 5);
+
+    t.equal(rows.count(), 2, "kwic finds all matching occurrences up to limit");
+    t.truthy(rows[0].context != "", "kwic row contains printable context");
+    t.equal(rows[0].match, "beta", "kwic normalizes and returns the matched token");
+};
+
+[test]
+kwic_sorting_grouping_and_concordance_support_exploration = func(t) {
+    ts = import("./text-stat.ns");
+
+    docs = [
+        "alpha beta gamma",
+        "theta beta gamma",
+        "theta beta delta"
+    ];
+
+    sorted = ts.stats.kwicSorted(docs, "beta", 1, 10, "left");
+    groups = ts.stats.kwicGroups(docs, "beta", 1, 10, "right");
+    concordance = ts.stats.concordance(docs, "beta", 1, 10);
+
+    t.equal(sorted[0].left, "alpha", "kwicSorted orders rows by requested side context");
+    t.equal(groups[0].key, "gamma", "kwicGroups aggregates repeated right contexts");
+    t.equal(groups[0].count, 2, "kwicGroups counts repeated contexts");
+    t.equal(concordance.totalMatches, 3, "concordance reports total match count");
+    t.equal(concordance.rightContexts[0].key, "gamma", "concordance exposes common right contexts");
+};
+
+[test]
+collocates_and_context_clusters_add_richer_language_views = func(t) {
+    ts = import("./text-stat.ns");
+
+    docs = [
+        "payment retry failed after timeout",
+        "payment retry succeeded after review",
+        "manual payment review completed"
+    ];
+
+    collocates = ts.stats.collocates(docs, "payment", 2, 10);
+    clusters = ts.stats.contextClusters(docs, "payment", 2, 10);
+
+    t.equal(collocates.totalMatches, 3, "collocates reports total target matches");
+    t.truthy(collocates.right.count() > 0, "collocates returns right-side collocates");
+    t.equal(collocates.right[0].word, "retry", "collocates ranks repeated immediate right words highly");
+    t.truthy(clusters.count() > 0, "contextClusters returns at least one cluster");
+    t.truthy(defined(clusters[0].label), "contextClusters rows include a label");
+    t.truthy(clusters[0].examples.count() > 0, "contextClusters expose example contexts");
+};
+
+[test]
+compare_highlights_distinctive_vocabulary = func(t) {
+    ts = import("./text-stat.ns");
+
+    diff = ts.stats.compare(
+        ["apple apple banana orchard"],
+        ["banana carrot carrot garden"],
+        3
+    );
+
+    t.equal(diff.left.tokens > 0, true, "compare returns left corpus summary");
+    t.equal(diff.right.tokens > 0, true, "compare returns right corpus summary");
+    t.equal(diff.distinctiveLeft[0].word, "apple", "compare highlights words distinctive to left corpus");
+    hasCarrot = false;
+    for (i = 0; i < diff.distinctiveRight.count(); i = i + 1) {
+        if (diff.distinctiveRight[i].word == "carrot") hasCarrot = true;
+    }
+    t.truthy(hasCarrot, "compare includes right-side distinctive words");
+};
+
+[test]
+dispersion_tracks_distribution_across_docs_and_segments = func(t) {
+    ts = import("./text-stat.ns");
+
+    profile = ts.stats.dispersion([
+        "apple apple. banana.",
+        "banana only here"
+    ], "apple");
+
+    t.equal(profile.totalCount, 2, "dispersion counts total matches");
+    t.equal(profile.docsWithWord, 1, "dispersion counts documents containing the word");
+    t.truthy(profile.bySegment.count() >= 2, "dispersion exposes segment-level rows");
+};

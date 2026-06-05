@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>store Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; letter-spacing: 0; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop, .note {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>store Documentation</h1>
+      <p class="muted">A small in-memory container for forecasts, drift reports, evaluation summaries, and any other structured analysis artifact.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> and <a href="examples/bundle_roundtrip.ns">examples/bundle_roundtrip.ns</a>.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Module Is For</h2>
+      <p><code>store</code> is a lightweight registry. It gives a name to an analysis object and keeps that object available for later steps in the same process. This is useful when you have several intermediate products such as a normalized history, a forecast, an evaluation summary, and a drift report, and you want a simple place to keep them organized.</p>
+      <p>This module is deliberately small. It is still an in-process registry first, but it can now save values and whole store snapshots to disk and load them back later. Think of it as an indexed shelf with optional local persistence, not a database.</p>
+      <div class="note">The current internal shape is <code>{entries: [{key, value}, ...]}</code>. Order matters. The module preserves insertion order so reports and demos stay predictable.</div>
+    </div>
+
+    <div class="section">
+      <h2>Data Model</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>entries</code></td>
+            <td>An ordered array of objects, each with <code>key</code> and <code>value</code>.</td>
+          </tr>
+          <tr>
+            <td><code>key</code></td>
+            <td>The name used to look up the stored artifact later.</td>
+          </tr>
+          <tr>
+            <td><code>value</code></td>
+            <td>Any structured object, row, history, report, or summary you want to keep.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Conceptually, this behaves like a map with stable ordering. Unlike a raw object map, the ordering is explicit because it is stored as an array of entries.</p>
+    </div>
+
+    <div class="section">
+      <h2>Functions</h2>
+
+      <h3>create()</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> creating an empty store.
+        <br><strong>Output:</strong> <code>{entries: []}</code>.
+        <br><strong>What it does:</strong> establishes the standard container shape used by every other function.
+      </div>
+
+      <h3>put(store, key, value)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> adding a new artifact or replacing an existing one.
+        <br><strong>Input:</strong> a store object, a key string, and any value.
+        <br><strong>Output:</strong> a new store object.
+        <br><strong>What it does:</strong> walks through the entries, replaces the entry if the key already exists, otherwise appends a new entry.
+      </div>
+      <div class="code"><code>s = store.create();
+s = store.put(s, "history", {rows: 4, streams: 3});
+s = store.put(s, "forecast", {A: 7, B: "active"});
+
+// s.entries = [
+//   {key: "history", value: {rows: 4, streams: 3}},
+//   {key: "forecast", value: {A: 7, B: "active"}}
+// ]</code></div>
+      <p>The practical effect is immutability by replacement. The function returns a fresh container instead of editing the prior one in place. That makes step-by-step workflows easier to reason about.</p>
+
+      <h3>lookup(store, key)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> retrieving one stored value.
+        <br><strong>Input:</strong> a store and a key.
+        <br><strong>Output:</strong> the stored value, or <code>null</code> if the key is missing.
+        <br><strong>What it does:</strong> performs a linear scan over the ordered entries until it finds a matching key.
+      </div>
+      <p>This is the basic read operation. Because the store is implemented as an ordered array, lookup cost grows with the number of items. That is fine for small analysis workflows, which is the intended use case.</p>
+
+      <h3>has(store, key)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> checking whether an item exists before reading or replacing it.
+        <br><strong>Output:</strong> <code>true</code> or <code>false</code>.
+      </div>
+
+      <h3>drop(store, key)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> removing one entry by name.
+        <br><strong>Output:</strong> a new store without that key.
+        <br><strong>What it does:</strong> copies every entry except the matching one.
+      </div>
+      <div class="code"><code>s = store.drop(s, "history");
+
+// If "history" existed, it is gone.
+// All other entries keep their original order.</code></div>
+
+      <h3>list(store)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> seeing which artifacts are stored and in what order.
+        <br><strong>Output:</strong> an array of keys.
+      </div>
+
+      <h3>snapshot(store)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> copying the store into a plain transferable object.
+        <br><strong>Output:</strong> another store-shaped object.
+        <br><strong>What it does:</strong> copies the <code>entries</code> array into a fresh container.
+      </div>
+
+      <h3>restore(snapshot)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> rebuilding a store from a snapshot object.
+        <br><strong>Output:</strong> a valid store object.
+      </div>
+      <p><code>snapshot()</code> and <code>restore()</code> form a round-trip pair. They are useful when a workflow wants to pass store contents between modules without exposing the original live store object.</p>
+
+      <h3>bundle(name, payload, metadata)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> grouping one result with descriptive context.
+        <br><strong>Output:</strong> <code>{name, payload, metadata, kind:"analysis.bundle"}</code>.
+        <br><strong>What it does:</strong> packages a result with a human-readable name and optional metadata such as source, date, or scenario label.
+      </div>
+      <div class="code"><code>artifact = store.bundle(
+    "baseline-forecast",
+    {A: 7, B: "active"},
+    {createdBy: "demo", horizon: 1}
+);
+
+// artifact.kind = "analysis.bundle"</code></div>
+
+      <h3>pack(value) and unpack(value)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> marking a value as ready to move into or out of the store interface.
+        <br><strong>Current behavior:</strong> both functions return the value unchanged.
+      </div>
+      <p>These functions exist as extension points. Right now they are identity operations, which means no encoding or structural rewrite is applied. In a future version they could become a place to standardize serialization rules.</p>
+
+      <h3>saveFile(path, value)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> saving one value to disk.
+        <br><strong>Input:</strong> a file path and any store-compatible value.
+        <br><strong>Output:</strong> <code>{path, saved}</code>.
+        <br><strong>What it does:</strong> packs the value and writes it through the runtime's compressed file format.
+      </div>
+      <div class="code"><code>result = store.saveFile("./tmp/forecast.bin", {
+    forecast: {A: 12, B: "idle"},
+    notes: ["baseline", "saved to disk"]
+});
+
+// result = {path: "./tmp/forecast.bin", saved: true}</code></div>
+      <p>This is persistence for arbitrary analysis values, not just whole store objects. The saved file is meant to be loaded back through <code>loadFile()</code>.</p>
+
+      <h3>loadFile(path)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> restoring one previously saved value from disk.
+        <br><strong>Input:</strong> a file path created by <code>saveFile()</code>.
+        <br><strong>Output:</strong> the restored value.
+      </div>
+      <div class="code"><code>loaded = store.loadFile("./tmp/forecast.bin");
+
+// loaded.forecast.A = 12
+// loaded.notes[1] = "saved to disk"</code></div>
+      <p>The structural effect is a round trip: nested objects, arrays, strings, and numbers come back in the same shape they had before saving.</p>
+
+      <h3>saveStore(store, path)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> saving a whole store snapshot to disk.
+        <br><strong>Output:</strong> the same result shape as <code>saveFile()</code>.
+        <br><strong>What it does:</strong> snapshots the current store and persists that snapshot as one file.
+      </div>
+
+      <h3>loadStore(path)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> restoring a previously saved store file.
+        <br><strong>Output:</strong> a live store object with <code>entries</code>.
+        <br><strong>What it does:</strong> loads the saved snapshot and passes it back through <code>restore()</code>.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Example Workflow</h2>
+      <div class="code"><code>store = import("./store.ns").store;
+
+s = store.create();
+s = store.put(s, "history", {rows: 4, streams: 3});
+s = store.put(s, "forecast", {A: 7, B: "active"});
+s = store.put(s, "drift", {flagged: 1, score: 0.86});
+
+keys = store.list(s);
+forecast = store.lookup(s, "forecast");
+snapshot = store.snapshot(s);
+restored = store.restore(snapshot);</code></div>
+      <p>This shows the module’s role clearly: it does not analyze the objects, it organizes them. That separation is useful. Prediction modules make the artifacts. The store keeps them named and retrievable.</p>
+      <div class="code"><code>store.saveStore(s, "./tmp/analysis_store.bin");
+reloaded = store.loadStore("./tmp/analysis_store.bin");
+
+// reloaded.entries contains the same named artifacts as s.</code></div>
+      <p>With persistence added, the same organized artifact set can now survive beyond one script run.</p>
+    </div>
+
+    <div class="section">
+      <h2>When To Use It</h2>
+      <ul>
+        <li>Use <code>store</code> when one script creates several named results and you want to pass them around consistently.</li>
+        <li>Use <code>bundle()</code> when one result needs attached metadata.</li>
+        <li>Use <code>saveFile()</code> or <code>saveStore()</code> when those results need to survive after the script exits.</li>
+        <li>Do not use this module as a substitute for a database. It is intentionally simple local persistence.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+      <ul>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> stores several artifacts and reads them back.</li>
+        <li><a href="examples/basic_lookup.ns">examples/basic_lookup.ns</a> focuses on <code>put()</code>, <code>list()</code>, <code>has()</code>, and <code>lookup()</code>.</li>
+        <li><a href="examples/drop_and_restore.ns">examples/drop_and_restore.ns</a> shows <code>drop()</code>, <code>snapshot()</code>, and <code>restore()</code>.</li>
+        <li><a href="examples/bundle_roundtrip.ns">examples/bundle_roundtrip.ns</a> focuses on bundle creation and round-tripping.</li>
+        <li><a href="examples/pack_and_bundle.ns">examples/pack_and_bundle.ns</a> shows <code>pack()</code>, <code>bundle()</code>, and <code>unpack()</code>.</li>
+        <li><a href="examples/save_file.ns">examples/save_file.ns</a> shows <code>saveFile()</code> and <code>loadFile()</code>.</li>
+        <li><a href="examples/save_store.ns">examples/save_store.ns</a> shows <code>saveStore()</code> and <code>loadStore()</code>.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

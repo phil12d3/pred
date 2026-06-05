@@ -1,0 +1,14 @@
+report = import("./report.ns").report;
+
+row = {
+    stream: "sales",
+    value: 12,
+    flags: ["recent", "forecast"],
+    detail: {kind: "numeric"}
+};
+
+section = report.section("One Row", [row]);
+
+printline("Section title = ", section.title);
+printline("Row count = ", section.rows.count());
+printline("Rendered row = ", report.renderRow(row));

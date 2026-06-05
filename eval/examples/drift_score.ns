@@ -1,0 +1,16 @@
+evaluation = import("./eval.ns").evaluation;
+
+drift = {
+    streams: [
+        {stream: "A", kind: "numeric", score: 0.82, flagged: true, meanDelta: 3.1},
+        {stream: "B", kind: "categorical", score: 0.35, flagged: false, modeChanged: false}
+    ]
+};
+
+rows = evaluation.scoreDrift(drift);
+
+printline("Drift score rows:");
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline(row.stream, " | kind=", row.kind, " | score=", row.score, " | flagged=", row.flagged);
+}

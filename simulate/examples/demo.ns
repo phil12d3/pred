@@ -1,0 +1,28 @@
+simulate = import("./simulate.ns").simulate;
+
+history = {
+    streamNames: ["A", "B", "C"],
+    rows: [
+        {A: 1, B: "idle", C: 10},
+        {A: 2, B: "idle", C: 11},
+        {A: 3, B: "active", C: 12}
+    ]
+};
+
+printline("Base history:");
+for (i = 0; i < history.rows.count(); i = i + 1) {
+    row = history.rows[i];
+    printline(i, " | ", row.A, " | ", row.B, " | ", row.C);
+}
+
+variants = simulate.scenarioChanges({
+    A: [4, 5],
+    B: ["idle", "active"]
+});
+
+printline("");
+printline("Scenario count = ", variants.count());
+for (i = 0; i < variants.count(); i = i + 1) {
+    row = variants[i];
+    printline(i, " | A=", row.A, " | B=", row.B);
+}

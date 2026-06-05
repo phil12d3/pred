@@ -1,0 +1,13 @@
+store = import("./store.ns").store;
+
+bundle = store.bundle("predict-run", {
+    forecast: {A: 10, B: 11},
+    backtest: {A: {mae: 0.4}}
+}, {source: "demo", version: 1});
+
+pack = store.pack(bundle);
+unpacked = store.unpack(pack);
+
+printline("bundle name = ", unpacked.name);
+printline("payload forecast A = ", unpacked.payload.forecast.A);
+printline("metadata source = ", unpacked.metadata.source);

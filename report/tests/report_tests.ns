@@ -1,0 +1,31 @@
+[test]
+builds_and_renders_forecast_reports = func(t) {
+    report = import("./report.ns").report;
+    forecast = {
+        row: {A: 8, B: "active"},
+        predictions: {
+            A: {value: 8, support: 0.6, samples: 4, depth: 2, path: []},
+            B: {value: "active", support: 0.7, samples: 4, depth: 1, path: []}
+        },
+        consistency: {report: [{source: "A", from: 1, to: 2, effects: []}]}
+    };
+    actual = {A: 9, B: "active"};
+    built = report.forecastReport(forecast, actual, ["A", "B"]);
+    lines = report.render(built);
+
+    t.equal(built.sections.count(), 3, "forecast report builds all sections");
+    t.truthy(lines.count() > 0, "forecast report renders lines");
+};
+
+[test]
+builds_drift_and_evaluation_reports = func(t) {
+    report = import("./report.ns").report;
+    drift = {streams: [{stream: "A", kind: "numeric", score: 0.2, flagged: true}]};
+    backtest = {stats: {A: {type: "numeric", mae: 0.8, folds: 4}}};
+
+    driftReport = report.driftReport(drift);
+    evalReport = report.evaluationReport(backtest);
+
+    t.equal(driftReport.sections[0].rows.count(), 1, "drift report keeps the drift rows");
+    t.equal(evalReport.sections[0].rows[0].metric, "mae", "evaluation report keeps the metric");
+};

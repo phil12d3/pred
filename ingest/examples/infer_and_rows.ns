@@ -1,0 +1,22 @@
+ingest = import("./ingest.ns").ingest;
+
+records = [
+    {temp: 18, state: "idle", load: 0.2},
+    {temp: 21, state: "active", load: 0.6},
+    {temp: 19, state: "idle", load: 0.3}
+];
+
+names = ingest.inferStreamNames(records);
+normalized = ingest.rowsFromRecords(records);
+
+printline("Inferred stream names:");
+for (i = 0; i < names.count(); i = i + 1) {
+    printline(i, " | ", names[i]);
+}
+
+printline("");
+printline("Rows from records:");
+for (i = 0; i < normalized.rows.count(); i = i + 1) {
+    row = normalized.rows[i];
+    printline(i, " | temp=", row.temp, " | state=", row.state, " | load=", row.load);
+}

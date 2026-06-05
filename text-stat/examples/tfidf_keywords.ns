@@ -1,0 +1,36 @@
+ts = import("./text-stat.ns");
+
+docs = [
+    "apple apple banana common launch",
+    "banana carrot common planning",
+    "apple seasonal launch roadmap"
+];
+
+corpus = ts.stats.from(docs);
+tfidf = ts.stats.tfidf(corpus);
+keywords0 = ts.stats.keywords(0, corpus, 5);
+keywords2 = ts.stats.keywords(2, corpus, 5);
+
+printline("=== TF-IDF And Keywords Example ===");
+printline("docs=", tfidf.docs, " vocabulary=", tfidf.vocabulary);
+
+printline("");
+printline("Corpus summary rows:");
+for (i = 0; i < tfidf.words.count() && i < 5; i = i + 1) {
+    row = tfidf.words[i];
+    printline("  ", row.word, " avg=", row.avgScore, " max=", row.maxScore, " df=", row.docFrequency);
+}
+
+printline("");
+printline("Document 0 keywords:");
+for (i = 0; i < keywords0.count(); i = i + 1) {
+    row = keywords0[i];
+    printline("  ", row.word, " score=", row.score, " tf=", row.tf, " idf=", row.idf);
+}
+
+printline("");
+printline("Document 2 keywords:");
+for (i = 0; i < keywords2.count(); i = i + 1) {
+    row = keywords2[i];
+    printline("  ", row.word, " score=", row.score, " tf=", row.tf, " idf=", row.idf);
+}

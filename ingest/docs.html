@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ingest Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; letter-spacing: 0; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop, .note {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>ingest Documentation</h1>
+      <p class="muted">Turn raw records, columns, or single-series data into the row and history shapes used by the rest of the toolkit.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> and <a href="examples/records_to_history.ns">examples/records_to_history.ns</a>. They show the same dataset being reorganized into toolkit-ready shapes.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Module Is For</h2>
+      <p><code>ingest</code> solves a structural problem, not a modeling problem. Real data arrives in different layouts. Forecasting code usually wants a stable time-ordered table: one row per time step and one named field per stream. This module converts several common layouts into that shape.</p>
+      <p>The underlying idea is simple data normalization. A later stage should not have to care whether the source was a list of records, a dictionary of columns, or a single list of values. Once the shape is normalized, downstream code can focus on feature extraction, prediction, discrepancy detection, or reporting.</p>
+      <div class="note">
+        A <strong>row</strong> is one observation such as <code>{A: 3, B: "mid"}</code>.
+        A <strong>history</strong> is <code>{streamNames, rows}</code>, where <code>streamNames</code> preserves column order and <code>rows</code> stores the ordered observations.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Core Shapes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Shape</th>
+            <th>Example</th>
+            <th>What it means</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>records</code></td>
+            <td><code>[{A:1, B:"low"}, {A:2, B:"mid"}]</code></td>
+            <td>Already row-oriented. Each object is one event or time step.</td>
+          </tr>
+          <tr>
+            <td><code>columns</code></td>
+            <td><code>{A:[1,2], B:["low","mid"]}</code></td>
+            <td>Column-oriented. Useful when data was collected per field.</td>
+          </tr>
+          <tr>
+            <td><code>series</code></td>
+            <td><code>[10, 12, 15]</code></td>
+            <td>A one-dimensional stream that still needs a field name.</td>
+          </tr>
+          <tr>
+            <td><code>history</code></td>
+            <td><code>{streamNames:["A","B"], rows:[...]}</code></td>
+            <td>The normalized form expected by sibling packages.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>How The Transform Works</h2>
+      <p>All functions in this module preserve order. That matters because later prediction modules interpret the row order as time order. The first row is the oldest observation. The last row is the newest observation.</p>
+      <p>When a value is missing during conversion, <code>null</code> is inserted. This is deliberate. It keeps the table rectangular, which means every row has the same fields even if the source data was uneven.</p>
+      <div class="code"><code>records = [
+    {A: 1, B: "low"},
+    {A: 2},
+    {A: 3, B: "high"}
+];
+
+normalized = ingest.rowsFromRecords(records);
+
+// Result:
+// {
+//   streamNames: ["A", "B"],
+//   rows: [
+//     {A: 1, B: "low"},
+//     {A: 2, B: null},
+//     {A: 3, B: "high"}
+//   ]
+// }</code></div>
+      <p>This is a common data engineering pattern. Rather than dropping incomplete observations or guessing replacements, the module keeps positional integrity and makes missingness explicit.</p>
+    </div>
+
+    <div class="section">
+      <h2>Functions</h2>
+
+      <h3>inferStreamNames(records)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> discovering the field order from record-style input.
+        <br><strong>Input:</strong> an array of objects.
+        <br><strong>Output:</strong> an array such as <code>["A", "B", "C"]</code>.
+        <br><strong>What it does:</strong> reads the first record only and returns its property names in that order.
+      </div>
+      <div class="code"><code>names = ingest.inferStreamNames([
+    {A: 1, B: "low", C: 10},
+    {A: 2, B: "mid", C: 12}
+]);
+
+// names = ["A", "B", "C"]</code></div>
+      <p>This function does not inspect later rows for extra fields. That means the first record defines the schema. For beginner use, that is predictable and easy to reason about, but it also means you should make sure the first record is representative.</p>
+
+      <h3>rowsFromRecords(records)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> turning record-style data into the module’s normalized row bundle.
+        <br><strong>Input:</strong> an array of objects.
+        <br><strong>Output:</strong> <code>{streamNames, rows}</code>.
+        <br><strong>What it does:</strong> infers the stream names, then rewrites every record so each row has the same fields in the same schema.
+      </div>
+      <div class="code"><code>normalized = ingest.rowsFromRecords([
+    {temp: 18, state: "idle"},
+    {temp: 21, state: "active"}
+]);
+
+// normalized.streamNames = ["temp", "state"]
+// normalized.rows[0] = {temp: 18, state: "idle"}</code></div>
+      <p>The important effect is schema alignment. If one row is missing a field, the field still exists in the output row and is set to <code>null</code>. This helps later code compare rows field by field.</p>
+
+      <h3>rowsFromColumns(columns)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> converting column-oriented data into row-oriented data.
+        <br><strong>Input:</strong> an object whose values are arrays.
+        <br><strong>Output:</strong> <code>{streamNames, rows}</code>.
+        <br><strong>What it does:</strong> computes the longest column length, then builds one row per index.
+      </div>
+      <div class="code"><code>normalized = ingest.rowsFromColumns({
+    A: [1, 2, 3],
+    B: ["low", "mid"],
+    C: [10, 12, 15]
+});
+
+// normalized.rows[1] = {A: 2, B: "mid", C: 12}
+// normalized.rows[2] = {A: 3, B: null, C: 15}</code></div>
+      <p>This function is effectively a column-to-row transpose. In data theory terms, it converts a field-major representation into an observation-major representation.</p>
+
+      <h3>rowsFromSeries(streamName, values)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> wrapping a single numeric or categorical series in row form.
+        <br><strong>Input:</strong> a stream name and an array of values.
+        <br><strong>Output:</strong> <code>{streamNames:[streamName], rows:[...]}</code>.
+        <br><strong>What it does:</strong> creates one-field rows such as <code>{sales: 10}</code>, <code>{sales: 12}</code>, and so on.
+      </div>
+      <div class="code"><code>single = ingest.rowsFromSeries("sales", [10, 12, 15]);
+
+// single.rows = [
+//   {sales: 10},
+//   {sales: 12},
+//   {sales: 15}
+// ]</code></div>
+      <p>This is useful when you want to start simple with one stream and later feed that result into a package that expects multi-stream history objects.</p>
+
+      <h3>historyFromRows(streamNames, rows)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> wrapping already-normalized rows into a history object.
+        <br><strong>Input:</strong> a name array and a row array.
+        <br><strong>Output:</strong> <code>{streamNames, rows}</code>.
+        <br><strong>What it does:</strong> copies the arrays into the standard history shape used by the toolkit.
+      </div>
+      <p>This is mostly a boundary function. It says, “this data is now ready to be treated as a time-ordered history.”</p>
+
+      <h3>historyFromRecords(records)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> going directly from raw records to a history object in one call.
+        <br><strong>Input:</strong> an array of record objects.
+        <br><strong>Output:</strong> a history object.
+        <br><strong>What it does:</strong> runs <code>rowsFromRecords()</code> and then <code>historyFromRows()</code>.
+      </div>
+
+      <h3>historyFromColumns(columns)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> going directly from column arrays to a history object.
+        <br><strong>Input:</strong> a column object.
+        <br><strong>Output:</strong> a history object.
+        <br><strong>What it does:</strong> runs <code>rowsFromColumns()</code> and then wraps the result as history.
+      </div>
+
+      <h3>windowRows(rows, maxRows)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> keeping only the newest rows.
+        <br><strong>Input:</strong> a row array and a maximum length.
+        <br><strong>Output:</strong> a shortened row array.
+        <br><strong>What it does:</strong> drops the oldest rows if the array is longer than <code>maxRows</code>.
+      </div>
+      <div class="code"><code>recent = ingest.windowRows([
+    {A: 1},
+    {A: 2},
+    {A: 3},
+    {A: 4}
+], 2);
+
+// recent = [{A: 3}, {A: 4}]</code></div>
+      <p>This is a rolling-window operation. In time-series work, a rolling window limits memory and focuses analysis on recent behavior.</p>
+
+      <h3>windowHistory(history, maxRows)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> shortening a whole history object while keeping stream names intact.
+        <br><strong>Input:</strong> a history object and a maximum row count.
+        <br><strong>Output:</strong> a new history object with fewer rows.
+        <br><strong>What it does:</strong> keeps the schema, copies the newest rows, and discards older history beyond the requested depth.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>End-To-End Example</h2>
+      <div class="code"><code>ingest = import("./ingest.ns").ingest;
+
+records = [
+    {A: 1, B: "low", C: 10},
+    {A: 2, B: "low", C: 12},
+    {A: 3, B: "mid", C: 15},
+    {A: 4, B: "mid", C: 18}
+];
+
+normalized = ingest.rowsFromRecords(records);
+history = ingest.historyFromRecords(records);
+tail = ingest.windowHistory(history, 2);
+
+// normalized.streamNames = ["A", "B", "C"]
+// history.rows.count() = 4
+// tail.rows = [
+//   {A: 3, B: "mid", C: 15},
+//   {A: 4, B: "mid", C: 18}
+// ]</code></div>
+      <p>The structural effect is clear. The raw data starts as records, becomes a standardized table, and can then be reduced to a recent window without changing its schema. That is exactly the kind of stable preprocessing other modules depend on.</p>
+    </div>
+
+    <div class="section">
+      <h2>When To Use Which Function</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>If your data looks like...</th>
+            <th>Use...</th>
+            <th>Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>[{...}, {...}]</code></td>
+            <td><code>rowsFromRecords()</code> or <code>historyFromRecords()</code></td>
+            <td>Your data is already row-oriented.</td>
+          </tr>
+          <tr>
+            <td><code>{A:[...], B:[...]}</code></td>
+            <td><code>rowsFromColumns()</code> or <code>historyFromColumns()</code></td>
+            <td>You need to transpose columns into rows.</td>
+          </tr>
+          <tr>
+            <td><code>[10, 12, 15]</code></td>
+            <td><code>rowsFromSeries()</code></td>
+            <td>You only have one stream and need a name for it.</td>
+          </tr>
+          <tr>
+            <td>Too much old data</td>
+            <td><code>windowRows()</code> or <code>windowHistory()</code></td>
+            <td>You want a recent rolling slice.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+      <ul>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> shows records, columns, histories, and windowing in one script.</li>
+        <li><a href="examples/infer_and_rows.ns">examples/infer_and_rows.ns</a> focuses on <code>inferStreamNames()</code> and <code>rowsFromRecords()</code>.</li>
+        <li><a href="examples/column_and_series.ns">examples/column_and_series.ns</a> shows <code>rowsFromColumns()</code> and <code>rowsFromSeries()</code>.</li>
+        <li><a href="examples/records_to_history.ns">examples/records_to_history.ns</a> focuses on the direct path from records to history.</li>
+        <li><a href="examples/window_rows.ns">examples/window_rows.ns</a> shows <code>historyFromRows()</code>, <code>windowRows()</code>, and <code>windowHistory()</code>.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

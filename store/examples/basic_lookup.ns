@@ -1,0 +1,16 @@
+store = import("./store.ns").store;
+
+s = store.create();
+s = store.put(s, "history", {rows: 4});
+s = store.put(s, "forecast", {A: 8, B: "active"});
+
+printline("Store keys:");
+keys = store.list(s);
+for (i = 0; i < keys.count(); i = i + 1) {
+    printline(i, " | ", keys[i]);
+}
+
+printline("");
+printline("Has forecast = ", store.has(s, "forecast"));
+printline("Has drift = ", store.has(s, "drift"));
+printline("Lookup forecast = ", stringify(store.lookup(s, "forecast")));

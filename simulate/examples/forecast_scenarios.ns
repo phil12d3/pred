@@ -1,0 +1,22 @@
+simulate = import("./simulate.ns").simulate;
+
+system = {name: "demo.forecaster"};
+history = simulate.historyFromRows(
+    ["A", "B"],
+    [
+        {A: 1, B: "low"},
+        {A: 2, B: "mid"},
+        {A: 3, B: "mid"}
+    ]
+);
+
+outputs = simulate.forecastScenarios(system, history, {
+    A: [3, 5],
+    B: ["mid", "high"]
+});
+
+printline("Scenario package rows:");
+for (i = 0; i < outputs.count(); i = i + 1) {
+    item = outputs[i];
+    printline(i, " | changes=", stringify(item.changes), " | last row=", stringify(item.history.rows[item.history.rows.count() - 1]), " | system=", item.system.name);
+}

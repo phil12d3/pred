@@ -1,0 +1,29 @@
+ts = import("./text-stat.ns");
+
+docs = [
+    "apple apple apple. orchard planning continues.",
+    "banana appears here. apple appears once here.",
+    "carrot planning only. no apple in this segment."
+];
+
+disp = ts.stats.dispersion(docs, "apple");
+
+printline("=== Dispersion Example ===");
+printline("word=", disp.word, " total=", disp.totalCount);
+printline("docsWithWord=", disp.docsWithWord, " docRatio=", disp.docRatio);
+printline("segmentsWithWord=", disp.segmentsWithWord, " segmentRatio=", disp.segmentRatio);
+printline("concentration=", disp.concentration);
+
+printline("");
+printline("By document:");
+for (i = 0; i < disp.byDoc.count(); i = i + 1) {
+    row = disp.byDoc[i];
+    printline("  doc=", row.docIndex, " count=", row.count, " ratio=", row.ratio);
+}
+
+printline("");
+printline("By segment:");
+for (i = 0; i < disp.bySegment.count(); i = i + 1) {
+    row = disp.bySegment[i];
+    printline("  doc=", row.docIndex, " seg=", row.segmentIndex, " count=", row.count, " ratio=", row.ratio);
+}

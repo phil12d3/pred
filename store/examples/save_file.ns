@@ -1,0 +1,22 @@
+store = import("./store.ns").store;
+
+mkdir("./tmp");
+path = "./tmp/example_value.bin";
+if (exists(path)) deleteFile(path);
+
+result = store.saveFile(path, {
+    forecast: {A: 12, B: "idle"},
+    notes: ["baseline", "saved to disk"]
+});
+
+loaded = store.loadFile(path);
+
+printline("Saved value file:");
+printline("path = ", result.path);
+printline("saved = ", result.saved);
+
+printline("");
+printline("Loaded value:");
+printline("forecast A = ", loaded.forecast.A);
+printline("forecast B = ", loaded.forecast.B);
+printline("note 1 = ", loaded.notes[1]);

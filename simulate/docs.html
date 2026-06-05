@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>simulate Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; letter-spacing: 0; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop, .note {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>simulate Documentation</h1>
+      <p class="muted">Deterministic scenario generation for what-if analysis.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> and <a href="examples/scenario_sweep.ns">examples/scenario_sweep.ns</a>.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Module Is For</h2>
+      <p><code>simulate</code> explores alternatives to the most recent state of a history. It does not sample random futures and it does not contain a physics or probability engine. Instead, it deterministically rewrites the last row of a history and generates one or more scenario variants.</p>
+      <p>This is the classic “what if we changed the latest condition?” workflow. For example: what if demand were 20 instead of 15, what if the device state were <code>"active"</code> instead of <code>"idle"</code>, or what if both changed together?</p>
+      <div class="note">The module treats the newest row as the point of intervention. Older rows remain unchanged. That means the scenario branch is local and easy to inspect.</div>
+    </div>
+
+    <div class="section">
+      <h2>Conceptual Model</h2>
+      <p>Every scenario starts from an observed history. A change object such as <code>{A: 10, B: "active"}</code> acts like a counterfactual intervention on the most recent row. In causal language, you are not claiming that the world truly changed. You are asking what the downstream system would see if the latest state had been different.</p>
+      <p>The current implementation is deterministic and exhaustive. If you give it two axes such as <code>A = [1, 2]</code> and <code>B = ["idle", "active"]</code>, it builds the full cross-product of combinations rather than sampling a subset.</p>
+    </div>
+
+    <div class="section">
+      <h2>Functions</h2>
+
+      <h3>applyChanges(row, changes)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> making a modified copy of a single row.
+        <br><strong>Input:</strong> a row object and a change object.
+        <br><strong>Output:</strong> a new row with the requested replacements applied.
+      </div>
+      <div class="code"><code>row = {A: 3, B: "idle", C: 12};
+changed = simulate.applyChanges(row, {B: "active", C: 15});
+
+// changed = {A: 3, B: "active", C: 15}</code></div>
+      <p>This is a direct overwrite operation. Fields listed in <code>changes</code> replace the corresponding row values. Unmentioned fields are preserved.</p>
+
+      <h3>withLastRow(history, changes)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> branching a history at its latest point.
+        <br><strong>Input:</strong> a history object and a change object.
+        <br><strong>Output:</strong> a new history where only the last row differs.
+      </div>
+      <div class="code"><code>branch = simulate.withLastRow(
+    {
+        streamNames: ["A", "B"],
+        rows: [{A: 1, B: "low"}, {A: 2, B: "mid"}]
+    },
+    {B: "high"}
+);
+
+// branch.rows = [
+//   {A: 1, B: "low"},
+//   {A: 2, B: "high"}
+// ]</code></div>
+      <p>This is the most important transformation in the module. It leaves history length and stream names unchanged. Only the newest observation is rewritten.</p>
+
+      <h3>sweepLast(history, streamName, values)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> testing several possible values for one stream.
+        <br><strong>Input:</strong> a history, one stream name, and a list of values.
+        <br><strong>Output:</strong> an array of scenario histories.
+      </div>
+      <div class="code"><code>scenarios = simulate.sweepLast(history, "A", [10, 20, 30]);
+
+// scenarios.count() = 3
+// scenarios[0].rows[last].A = 10
+// scenarios[1].rows[last].A = 20
+// scenarios[2].rows[last].A = 30</code></div>
+      <p>This is a one-dimensional parameter sweep. It is useful when you want to inspect sensitivity to one variable while holding everything else constant.</p>
+
+      <h3>scenarioChanges(changeMap)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> generating the full set of multi-axis change objects.
+        <br><strong>Input:</strong> an object such as <code>{A:[1,2], B:["idle","active"]}</code>.
+        <br><strong>Output:</strong> an array of change objects representing every combination.
+      </div>
+      <div class="code"><code>variants = simulate.scenarioChanges({
+    A: [1, 2],
+    B: ["idle", "active"]
+});
+
+// variants = [
+//   {A: 1, B: "idle"},
+//   {A: 1, B: "active"},
+//   {A: 2, B: "idle"},
+//   {A: 2, B: "active"}
+// ]</code></div>
+      <p>This is a Cartesian product. In data theory, a Cartesian product enumerates every combination across independent option sets. That is why the number of scenarios grows quickly when many streams have many candidate values.</p>
+
+      <h3>scenarioHistories(history, changeMap)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> applying the full scenario grid directly to a history.
+        <br><strong>Output:</strong> one history per scenario combination.
+      </div>
+      <p>The function first builds the change combinations with <code>scenarioChanges()</code>, then applies each combination to the last row with <code>withLastRow()</code>.</p>
+
+      <h3>forecastScenarios(system, history, changeMap)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> packaging scenario histories together with the target system object for later forecasting steps.
+        <br><strong>Current output:</strong> rows of the form <code>{changes, history, system}</code>.
+      </div>
+      <div class="note">Despite its name, the current implementation does not call the prediction engine itself. It prepares scenario histories and pairs them with the provided <code>system</code>. The docs state this explicitly because the older summary implied that forecasts were already being computed.</div>
+
+      <h3>historyFromRows(streamNames, rows)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> building a history object inside simulation workflows.
+        <br><strong>Output:</strong> <code>{streamNames, rows}</code>.
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Example Scenario Flow</h2>
+      <div class="code"><code>simulate = import("./simulate.ns").simulate;
+
+history = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 1, B: "low"},
+        {A: 2, B: "mid"},
+        {A: 3, B: "mid"}
+    ]
+};
+
+variants = simulate.scenarioChanges({
+    A: [3, 5],
+    B: ["mid", "high"]
+});
+
+histories = simulate.scenarioHistories(history, {
+    A: [3, 5],
+    B: ["mid", "high"]
+});</code></div>
+      <p>The important data effect is this: the first two rows stay exactly the same in every branch. Only the final row changes, and it changes according to the generated scenario combination. That makes side-by-side comparison easy.</p>
+    </div>
+
+    <div class="section">
+      <h2>When To Use Which Function</h2>
+      <ul>
+        <li>Use <code>applyChanges()</code> when you only need a modified row.</li>
+        <li>Use <code>withLastRow()</code> when you want one counterfactual history.</li>
+        <li>Use <code>sweepLast()</code> when one stream is the only thing changing.</li>
+        <li>Use <code>scenarioChanges()</code> when you want the raw combination grid.</li>
+        <li>Use <code>scenarioHistories()</code> when you want ready-to-use history objects for each combination.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+      <ul>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> shows direct scenario construction and inspection.</li>
+        <li><a href="examples/apply_changes.ns">examples/apply_changes.ns</a> focuses on <code>applyChanges()</code>.</li>
+        <li><a href="examples/with_last_row.ns">examples/with_last_row.ns</a> shows how one history branch is created.</li>
+        <li><a href="examples/scenario_sweep.ns">examples/scenario_sweep.ns</a> focuses on changing one stream across several candidate values.</li>
+        <li><a href="examples/forecast_scenarios.ns">examples/forecast_scenarios.ns</a> shows the current packaged output of <code>forecastScenarios()</code>.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,108 @@
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+copyObject = func(obj) {
+    out = {};
+    if (!defined(obj) || obj == null) return out;
+    foreach(name in obj.props) out[name] = obj[name];
+    return out;
+}
+
+createHistory = func(streamNames) {
+    return {
+        streamNames: this.copyArray(streamNames),
+        rows: []
+    };
+}
+
+applyChanges = func(row, changes) {
+    next = this.copyObject(row);
+    if (!defined(changes) || changes == null) return next;
+    foreach(name in changes.props) next[name] = changes[name];
+    return next;
+}
+
+withLastRow = func(history, changes) {
+    if (!defined(history) || history == null || history.rows.count() == 0) return history;
+    nextRows = this.copyArray(history.rows);
+    last = this.applyChanges(nextRows[nextRows.count() - 1], changes);
+    nextRows[nextRows.count() - 1] = last;
+    return {
+        streamNames: this.copyArray(history.streamNames),
+        rows: nextRows
+    };
+}
+
+sweepLast = func(history, streamName, values) {
+    scenarios = [];
+    if (!defined(values) || values == null) return scenarios;
+    for (i = 0; i < values.count(); i = i + 1) {
+        changes = {};
+        changes[streamName] = values[i];
+        scenarios.add(this.withLastRow(history, changes));
+    }
+    return scenarios;
+}
+
+expandAxes = func(axes, index, current, output) {
+    if (index >= axes.count()) {
+        output.add(this.copyObject(current));
+        return true;
+    }
+    axis = axes[index];
+    stream = axis.stream;
+    values = axis.values;
+    if (!defined(values) || values == null || values.count() == 0) {
+        return this.expandAxes(axes, index + 1, current, output);
+    }
+    for (i = 0; i < values.count(); i = i + 1) {
+        current[stream] = values[i];
+        this.expandAxes(axes, index + 1, current, output);
+    }
+    return true;
+}
+
+scenarioChanges = func(changeMap) {
+    axes = [];
+    if (defined(changeMap) && changeMap != null) {
+        foreach(name in changeMap.props) {
+            axes.add({stream: name, values: changeMap[name]});
+        }
+    }
+    scenarios = [];
+    this.expandAxes(axes, 0, {}, scenarios);
+    return scenarios;
+}
+
+scenarioHistories = func(history, changeMap) {
+    scenarios = this.scenarioChanges(changeMap);
+    outputs = [];
+    for (i = 0; i < scenarios.count(); i = i + 1) {
+        outputs.add(this.withLastRow(history, scenarios[i]));
+    }
+    return outputs;
+}
+
+forecastScenarios = func(system, history, changeMap) {
+    scenarios = this.scenarioChanges(changeMap);
+    outputs = [];
+    for (i = 0; i < scenarios.count(); i = i + 1) {
+        scenarioHistory = this.withLastRow(history, scenarios[i]);
+        outputs.add({
+            changes: scenarios[i],
+            history: scenarioHistory,
+            system: system
+        });
+    }
+    return outputs;
+}
+
+historyFromRows = func(streamNames, rows) {
+    history = this.createHistory(streamNames);
+    history.rows = this.copyArray(rows);
+    return history;
+}

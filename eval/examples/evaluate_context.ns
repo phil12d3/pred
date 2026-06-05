@@ -1,0 +1,16 @@
+evaluation = import("./eval.ns").evaluation;
+
+system = {name: "demo.system", version: 1};
+rows = [
+    {A: 1, B: "low"},
+    {A: 2, B: "mid"},
+    {A: 3, B: "high"}
+];
+
+context = evaluation.evaluateSystem(system, rows, 2, 4);
+
+printline("Evaluation context:");
+printline("system name = ", context.system.name);
+printline("row count = ", context.rows.count());
+printline("min train size = ", context.minTrainSize);
+printline("window size = ", context.windowSize);

@@ -1,0 +1,22 @@
+explain = import("./explain.ns").explain;
+
+rows = explain.summarizeInfluence({
+    report: [
+        {
+            source: "sales",
+            from: 10,
+            to: 12,
+            effects: [
+                {target: "stock", delta: 2},
+                {target: "price", delta: 0.5}
+            ]
+        }
+    ]
+});
+
+printline("Influence summary:");
+printline("source = ", rows[0].source);
+printline("from = ", rows[0].from);
+printline("to = ", rows[0].to);
+printline("strongest target = ", rows[0].strongestTarget);
+printline("strongest delta = ", rows[0].strongestDelta);

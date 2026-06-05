@@ -1,0 +1,39 @@
+[test]
+summarizes_predictions_and_influence = func(t) {
+    explain = import("./explain.ns").explain;
+    predictions = {
+        A: {value: 7, support: 0.5, samples: 3, depth: 2, path: []},
+        B: {value: "idle", support: 0.4, samples: 4, depth: 1, path: []}
+    };
+    influence = {
+        report: [
+            {source: "A", from: 1, to: 2, effects: [{target: "B", delta: 1}]}
+        ]
+    };
+
+    predictionRows = explain.summarizePrediction(predictions);
+    influenceRows = explain.summarizeInfluence(influence);
+
+    t.equal(predictionRows.count(), 2, "prediction summaries include every stream");
+    t.equal(influenceRows[0].strongestTarget, "B", "influence summaries surface the strongest effect");
+};
+
+[test]
+summarizes_drift_and_backtest_rows = func(t) {
+    explain = import("./explain.ns").explain;
+    drift = {
+        streams: [
+            {stream: "A", kind: "numeric", score: 0.1, flagged: true, meanDelta: 3, medianDelta: 2},
+            {stream: "B", kind: "categorical", score: 0.2, flagged: false, rareAdded: 1}
+        ]
+    };
+    backtestRows = [
+        {stream: "A", kind: "numeric", metric: "mae", value: 0.7, folds: 4}
+    ];
+
+    driftRows = explain.summarizeDrift(drift);
+    backRows = explain.summarizeBacktest(backtestRows);
+
+    t.equal(driftRows.count(), 2, "drift summaries include every stream");
+    t.equal(backRows[0].metric, "mae", "backtest summaries keep the metric name");
+};

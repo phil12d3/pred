@@ -1,0 +1,18 @@
+simulate = import("./simulate.ns").simulate;
+
+history = {
+    streamNames: ["temperature", "mode"],
+    rows: [
+        {temperature: 18, mode: "idle"},
+        {temperature: 19, mode: "idle"},
+        {temperature: 20, mode: "active"}
+    ]
+};
+
+sweep = simulate.sweepLast(history, "temperature", [21, 22, 23]);
+
+printline("scenario count = ", sweep.count());
+for (i = 0; i < sweep.count(); i = i + 1) {
+    last = sweep[i].rows[sweep[i].rows.count() - 1];
+    printline(i, " | temperature=", last.temperature, " | mode=", last.mode);
+}

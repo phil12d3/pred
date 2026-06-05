@@ -1,0 +1,33 @@
+evaluation = import("./eval.ns").evaluation;
+
+actual = {A: 9, B: "idle", C: 4};
+forecast = {A: 11, B: "idle", C: 2};
+score = evaluation.scoreForecast(actual, forecast, ["A", "B", "C"]);
+
+printline("Forecast score:");
+printline("comparisons | ", score.comparisons);
+printline("matches | ", score.matches);
+printline("accuracy | ", score.accuracy);
+printline("numeric mae | ", score.numericMae);
+
+printline("");
+printline("Per-stream detail:");
+for (i = 0; i < score.byStream.count(); i = i + 1) {
+    row = score.byStream[i];
+    printline(row.stream, " | ", row.kind, " | ", row.actual, " | ", row.predicted, " | ", row.match, " | ", row.error);
+}
+
+backtest = {
+    stats: {
+        A: {type: "numeric", mae: 0.8, folds: 5},
+        B: {type: "categorical", accuracy: 0.6, folds: 5}
+    }
+};
+summary = evaluation.summarizeBacktest(backtest);
+
+printline("");
+printline("Backtest summary:");
+for (i = 0; i < summary.count(); i = i + 1) {
+    row = summary[i];
+    printline(row.stream, " | ", row.kind, " | ", row.metric, " | ", row.value, " | ", row.folds);
+}

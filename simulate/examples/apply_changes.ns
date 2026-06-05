@@ -1,0 +1,11 @@
+simulate = import("./simulate.ns").simulate;
+
+row = {A: 3, B: "idle", C: 12};
+changed = simulate.applyChanges(row, {B: "active", C: 15});
+
+printline("Original row:");
+printline("A=", row.A, " | B=", row.B, " | C=", row.C);
+
+printline("");
+printline("Changed row:");
+printline("A=", changed.A, " | B=", changed.B, " | C=", changed.C);
