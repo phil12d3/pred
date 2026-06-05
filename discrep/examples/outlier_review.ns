@@ -1,0 +1,14 @@
+discrep = import("./discrep.ns");
+
+series = [3, 4, 4, 5, 4, 3, 4, 25];
+report = discrep.detectSeries(series, {minSamples: 4});
+
+printline("=== outlier review ===");
+printline("series length: ", report.count);
+printline("mean: ", report.mean);
+printline("median: ", report.median);
+printline("q1: ", report.q1);
+printline("q3: ", report.q3);
+printline("outlier count: ", report.outliers.count());
+printline("first outlier:");
+printline("  index=", report.outliers[0].index, " value=", report.outliers[0].value, " reason=", report.outliers[0].reason);

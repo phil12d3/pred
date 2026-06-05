@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>discrep Documentation</title>
+  <style>
+    :root {
+      --bg: #f5f8fb;
+      --panel: #ffffff;
+      --ink: #17212b;
+      --muted: #53606c;
+      --line: #d8e2ea;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --accent3: #b45309;
+      --radius: 12px;
+      --max: 1140px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3, h4 {
+      margin: 0;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      letter-spacing: 0;
+    }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 {
+      font-size: 1.5rem;
+      margin: 24px 0 12px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    h3 { font-size: 1.1rem; margin: 18px 0 8px; color: var(--accent); }
+    h4 { font-size: 0.98rem; margin: 14px 0 6px; color: var(--accent2); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: #f8fafc;
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>discrep Documentation</h1>
+      <p class="muted">Outlier detection, row comparison, and drift analysis for ns.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a>. It prints one example for each function and shows the shape of the returned objects.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Package Is For</h2>
+      <p><code>discrep</code> is a small analysis package. It does not forecast future values. It helps you answer different questions:</p>
+      <ul>
+        <li>Does one stream contain unusually large or unusual values?</li>
+        <li>Are some categorical values rare enough to deserve attention?</li>
+        <li>Do two rows agree, stream by stream?</li>
+        <li>Has a recent window drifted away from a baseline window?</li>
+      </ul>
+      <p class="prop"><strong>One series</strong> means one column of values. <strong>A history</strong> means a table-like object with <code>streamNames</code> and <code>rows</code>.</p>
+    </div>
+
+    <div class="section">
+      <h2>How To Import</h2>
+      <p>Use the package wrapper when you want a clean entrypoint:</p>
+      <div class="code"><code>discrep = import("./discrep.ns");</code></div>
+      <p>The wrapper exposes the public functions directly:</p>
+      <ul>
+        <li><code>detectSeries(values, config)</code></li>
+        <li><code>profileHistory(history, config)</code></li>
+        <li><code>compareRows(expectedRow, actualRow, streamNames, config)</code></li>
+        <li><code>detectDrift(baselineHistory, currentHistory, config)</code></li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Configuration</h2>
+      <p>Every function that accepts <code>config</code> uses the same shared defaults unless you override them.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Default</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>minSamples</code></td><td>5</td><td>Minimum number of numeric samples before outlier rules are allowed to flag values.</td></tr>
+          <tr><td><code>iqrMultiplier</code></td><td>1.5</td><td>How far beyond the interquartile range a value must be before the IQR rule considers it unusual.</td></tr>
+          <tr><td><code>madThreshold</code></td><td>3.5</td><td>Threshold for the modified z-score rule based on median absolute deviation.</td></tr>
+          <tr><td><code>rareThreshold</code></td><td>0.1</td><td>For categorical values, anything with a frequency at or below this share is considered rare.</td></tr>
+          <tr><td><code>meanShiftThreshold</code></td><td>1</td><td>How much the mean must move before a numeric drift report becomes interesting.</td></tr>
+          <tr><td><code>medianShiftThreshold</code></td><td>1</td><td>How much the median must move before a numeric drift report becomes interesting.</td></tr>
+          <tr><td><code>ratioShiftThreshold</code></td><td>0.1</td><td>How much the mode share must change before a categorical drift report becomes interesting.</td></tr>
+          <tr><td><code>tolerance</code></td><td>0.000001</td><td>Equality tolerance for numeric row comparisons.</td></tr>
+        </tbody>
+      </table>
+      <p>In practice, <code>minSamples</code> and the two drift thresholds are the ones you tune most often.</p>
+    </div>
+
+    <div class="section">
+      <h2>detectSeries</h2>
+      <p><strong>Signature:</strong> <code>detectSeries(values, config)</code></p>
+      <p>Use this when you want to inspect one list of values. It works with numeric values, categorical values, or a mix. Numeric values are used for outlier calculations. Categorical values are used for mode and rarity information.</p>
+
+      <h3>What It Returns</h3>
+      <div class="prop"><strong>count</strong> total input size, including missing values.</div>
+      <div class="prop"><strong>missingCount</strong> how many entries were missing or null.</div>
+      <div class="prop"><strong>numericCount</strong> how many entries were numbers.</div>
+      <div class="prop"><strong>categoricalCount</strong> non-missing values that were not numbers.</div>
+      <div class="prop"><strong>modeValue</strong> the most common value in the whole input list.</div>
+      <div class="prop"><strong>modeCount</strong> how many times the mode appeared.</div>
+      <div class="prop"><strong>modeRatio</strong> the mode count divided by the total non-missing count.</div>
+      <div class="prop"><strong>min</strong>, <strong>max</strong>, <strong>mean</strong>, <strong>median</strong>, <strong>q1</strong>, <strong>q3</strong>, <strong>iqr</strong>, and <strong>mad</strong> summarize the numeric portion of the series.</div>
+      <div class="prop"><strong>outliers</strong> is a list of unusual numeric values. Each item has <code>index</code>, <code>value</code>, <code>lowerFence</code>, <code>upperFence</code>, <code>modifiedZ</code>, and <code>reason</code>.</div>
+      <div class="prop"><strong>rareValues</strong> is used later by history profiling and drift analysis. In the series summary it stays empty unless you are looking at a categorical-only series inside the larger profiling flow.</div>
+
+      <h3>When A Value Becomes An Outlier</h3>
+      <p>The module uses two numeric checks:</p>
+      <ul>
+        <li><strong>IQR fence</strong>: values below <code>q1 - iqrMultiplier * iqr</code> or above <code>q3 + iqrMultiplier * iqr</code>.</li>
+        <li><strong>Modified z-score</strong>: values whose distance from the median, scaled by MAD, passes <code>madThreshold</code>.</li>
+      </ul>
+      <p>A value can be flagged by either rule. The <code>reason</code> field shows which rule triggered it.</p>
+
+      <h3>Example</h3>
+      <div class="code"><code>discrep = import("./discrep.ns");
+series = discrep.detectSeries([10, 11, 10, 9, 12, 10, 200], {minSamples: 4});
+printline(series.mean);
+printline(series.median);
+printline(series.outliers[0].value);</code></div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Outlier field</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>index</code></td><td>The position of the value in the original input list.</td></tr>
+          <tr><td><code>value</code></td><td>The actual outlier value.</td></tr>
+          <tr><td><code>lowerFence</code> / <code>upperFence</code></td><td>The fence range used by the IQR rule.</td></tr>
+          <tr><td><code>modifiedZ</code></td><td>The modified z-score computed from the median and MAD.</td></tr>
+          <tr><td><code>reason</code></td><td><code>iqr</code>, <code>mad</code>, or <code>iqr+mad</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>profileHistory</h2>
+      <p><strong>Signature:</strong> <code>profileHistory(history, config)</code></p>
+      <p>Use this when your data is already organized into named streams and rows. The function runs <code>detectSeries</code> for every stream in the history and combines the results into one report.</p>
+
+      <h3>What It Returns</h3>
+      <div class="prop"><strong>rowCount</strong> total number of rows in the history.</div>
+      <div class="prop"><strong>streams</strong> a map keyed by stream name. Each value is a series report from <code>detectSeries</code>.</div>
+      <div class="prop"><strong>flagged</strong> a flat list of all flagged items across all streams.</div>
+
+      <h3>How To Read It</h3>
+      <p>If you want one stream’s mean or outliers, read <code>report.streams.A.mean</code> or <code>report.streams.A.outliers</code>. If you want everything flagged in one place, use <code>report.flagged</code>.</p>
+
+      <h3>Example</h3>
+      <div class="code"><code>history = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 10, B: "ok"},
+        {A: 11, B: "ok"},
+        {A: 10, B: "ok"},
+        {A: 9, B: "ok"},
+        {A: 12, B: "glitch"},
+        {A: 10, B: "ok"},
+        {A: 200, B: "ok"}
+    ]
+};
+
+profile = discrep.profileHistory(history, {minSamples: 4, rareThreshold: 0.2});
+printline(profile.rowCount);
+printline(profile.streams.A.mean);
+printline(profile.flagged.count());</code></div>
+    </div>
+
+    <div class="section">
+      <h2>compareRows</h2>
+      <p><strong>Signature:</strong> <code>compareRows(expectedRow, actualRow, streamNames, config)</code></p>
+      <p>This function compares two rows stream by stream. It is useful when you want to see whether a forecast matches what actually happened, or when you want to compare two records from different sources.</p>
+
+      <h3>Inputs</h3>
+      <ul>
+        <li><code>expectedRow</code> is the baseline row.</li>
+        <li><code>actualRow</code> is the row you are checking.</li>
+        <li><code>streamNames</code> tells the function which fields to compare.</li>
+        <li><code>config.tolerance</code> controls how close two numeric values need to be to count as matching.</li>
+      </ul>
+
+      <h3>What It Returns</h3>
+      <div class="prop"><strong>report</strong> a list of per-stream comparison items.</div>
+      <div class="prop"><strong>matches</strong> how many streams matched.</div>
+      <div class="prop"><strong>comparisons</strong> how many streams were checked.</div>
+      <div class="prop"><strong>score</strong> <code>matches / comparisons</code>. A value of 1 means every stream matched.</div>
+
+      <h3>Per-Stream Report Fields</h3>
+      <div class="prop"><strong>stream</strong> the stream name.</div>
+      <div class="prop"><strong>expected</strong> the baseline value.</div>
+      <div class="prop"><strong>actual</strong> the value being checked.</div>
+      <div class="prop"><strong>matches</strong> boolean result for that stream.</div>
+      <div class="prop"><strong>delta</strong> numeric difference if both values are numbers.</div>
+      <div class="prop"><strong>difference</strong> the numeric gap, or <code>0</code>/<code>1</code> for categorical values.</div>
+
+      <h3>Example</h3>
+      <div class="code"><code>result = discrep.compareRows(
+    {A: 10, B: "ok"},
+    {A: 12, B: "ok"},
+    ["A", "B"],
+    null
+);
+
+printline(result.comparisons);
+printline(result.matches);
+printline(result.score);</code></div>
+      <p>Here, <code>B</code> matches and <code>A</code> does not, so the score is <code>0.5</code>.</p>
+    </div>
+
+    <div class="section">
+      <h2>detectDrift</h2>
+      <p><strong>Signature:</strong> <code>detectDrift(baselineHistory, currentHistory, config)</code></p>
+      <p>Use this when you want to compare one time window with another. The baseline is the earlier or normal window. The current history is the newer one. The function profiles both and then compares the per-stream summaries.</p>
+
+      <h3>What It Returns</h3>
+      <div class="prop"><strong>streams</strong> a list of comparison rows, one per stream.</div>
+      <div class="prop"><strong>flagged</strong> the subset of streams whose drift looks meaningful according to the thresholds.</div>
+      <div class="prop"><strong>baseline</strong> the full profile report for the baseline history.</div>
+      <div class="prop"><strong>current</strong> the full profile report for the current history.</div>
+
+      <h3>Per-Stream Drift Fields</h3>
+      <div class="prop"><strong>kind</strong> either <code>numeric</code>, <code>categorical</code>, or <code>missing</code>.</div>
+      <div class="prop"><strong>meanDelta</strong> current mean minus baseline mean for numeric streams.</div>
+      <div class="prop"><strong>medianDelta</strong> current median minus baseline median for numeric streams.</div>
+      <div class="prop"><strong>modeChanged</strong> whether the most common value changed.</div>
+      <div class="prop"><strong>modeRatioDelta</strong> how much the mode share changed.</div>
+      <div class="prop"><strong>outlierDelta</strong> how many more or fewer numeric outliers the current window has.</div>
+      <div class="prop"><strong>rareAdded</strong> count of rare values seen in the current profile but not the baseline profile.</div>
+      <div class="prop"><strong>rareRemoved</strong> count of rare values that disappeared from the baseline profile.</div>
+      <div class="prop"><strong>score</strong> a simple drift magnitude used for ranking, not a statistical p-value.</div>
+
+      <h3>How To Read Drift</h3>
+      <p>For numeric streams, large shifts in <code>meanDelta</code> or <code>medianDelta</code> usually mean the center of the distribution moved. A change in <code>outlierDelta</code> means the shape changed as well. For categorical streams, watch <code>modeChanged</code> and <code>modeRatioDelta</code>.</p>
+
+      <h3>Example</h3>
+      <div class="code"><code>baseline = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 10, B: "ok"},
+        {A: 11, B: "ok"},
+        {A: 10, B: "ok"},
+        {A: 9, B: "glitch"},
+        {A: 12, B: "ok"}
+    ]
+};
+
+current = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 20, B: "ok"},
+        {A: 21, B: "ok"},
+        {A: 20, B: "warn"},
+        {A: 19, B: "ok"},
+        {A: 22, B: "ok"}
+    ]
+};
+
+drift = discrep.detectDrift(baseline, current, {
+    meanShiftThreshold: 3,
+    medianShiftThreshold: 3,
+    rareThreshold: 0.2,
+    ratioShiftThreshold: 0.1
+});
+
+printline(drift.flagged.count());
+printline(drift.streams[0].meanDelta);
+printline(drift.streams[1].modeChanged);</code></div>
+    </div>
+
+    <div class="section">
+      <h2>Practical Reading Guide</h2>
+      <h3>When To Use Each Function</h3>
+      <ul>
+        <li><code>detectSeries</code>: inspect one list of values.</li>
+        <li><code>profileHistory</code>: inspect every stream in a dataset.</li>
+        <li><code>compareRows</code>: compare one expected row against one actual row.</li>
+        <li><code>detectDrift</code>: compare a baseline dataset against a later dataset.</li>
+      </ul>
+
+      <h3>Common Mistakes</h3>
+      <ul>
+        <li>Passing an ordinary array where a history object is required.</li>
+        <li>Expecting <code>compareRows</code> to understand fields that are not listed in <code>streamNames</code>.</li>
+        <li>Treating <code>score</code> as a statistical confidence value. It is not; it is a simple agreement or drift measure.</li>
+        <li>Using drift thresholds that are too low for noisy data.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+      <p>These scripts are in the <code>examples/</code> folder and are meant to be run directly.</p>
+
+      <h3>1. Outlier review</h3>
+      <p>Use this when you want to inspect one numeric series and see exactly which value was flagged.</p>
+      <div class="code"><code>discrep = import("./discrep.ns");
+series = [3, 4, 4, 5, 4, 3, 4, 25];
+report = discrep.detectSeries(series, {minSamples: 4});
+printline(report.mean);
+printline(report.outliers[0]);</code></div>
+      <p>The output tells you the center of the series and gives you the outlier record, including the index and the fence values that triggered it.</p>
+      <p><a href="examples/outlier_review.ns">Open outlier_review.ns</a></p>
+
+      <h3>2. Row comparison</h3>
+      <p>Use this when you already have two rows and want a per-stream check.</p>
+      <div class="code"><code>expected = {A: 10, B: "ok", C: 3};
+actual = {A: 12, B: "ok", C: 3};
+result = discrep.compareRows(expected, actual, ["A", "B", "C"], null);
+printline(result.matches);
+printline(result.report[0]);</code></div>
+      <p>The result object gives you the overall score plus a per-stream report that shows which fields matched, which values differed, and by how much.</p>
+      <p><a href="examples/row_compare.ns">Open row_compare.ns</a></p>
+
+      <h3>3. Drift review</h3>
+      <p>Use this when you want to compare an earlier baseline against a more recent window.</p>
+      <div class="code"><code>drift = discrep.detectDrift(baseline, current, {
+    meanShiftThreshold: 2,
+    medianShiftThreshold: 2,
+    rareThreshold: 0.2,
+    ratioShiftThreshold: 0.1
+});
+printline(drift.flagged.count());
+printline(drift.streams[0]);</code></div>
+      <p>The drift rows tell you whether the shift is numeric or categorical and which parts changed the most.</p>
+      <p><a href="examples/drift_review.ns">Open drift_review.ns</a></p>
+    </div>
+
+    <div class="section">
+      <h2>Related Files</h2>
+      <ul>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> - runnable walkthrough</li>
+        <li><a href="examples/outlier_review.ns">examples/outlier_review.ns</a> - numeric outlier review</li>
+        <li><a href="examples/row_compare.ns">examples/row_compare.ns</a> - row-by-row comparison</li>
+        <li><a href="examples/drift_review.ns">examples/drift_review.ns</a> - baseline vs current drift</li>
+        <li><a href="README.md">README.md</a> - short overview</li>
+        <li><a href="../predict/docs.html">predict/docs.html</a> - forecasting package docs</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,15 @@
+discrep = import("./discrep.ns");
+
+expected = {A: 10, B: "ok", C: 3};
+actual = {A: 12, B: "ok", C: 3};
+
+result = discrep.compareRows(expected, actual, ["A", "B", "C"], null);
+
+printline("=== row comparison ===");
+printline("comparisons: ", result.comparisons);
+printline("matches: ", result.matches);
+printline("score: ", result.score);
+for (i = 0; i < result.report.count(); i = i + 1) {
+    item = result.report[i];
+    printline("stream ", item.stream, " expected=", item.expected, " actual=", item.actual, " matches=", item.matches);
+}

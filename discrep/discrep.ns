@@ -1,0 +1,18 @@
+core = import("/home/phil/dev/pred/discrep/src/discrep.ns");
+utils = import("/home/phil/dev/pred/discrep/src/utils.ns");
+
+detectSeries = func(values, config) {
+    return import("/home/phil/dev/pred/discrep/src/discrep.ns").detectSeries(values, config);
+}
+
+profileHistory = func(history, config) {
+    return import("/home/phil/dev/pred/discrep/src/discrep.ns").profileHistory(history, config);
+}
+
+compareRows = func(expectedRow, actualRow, streamNames, config) {
+    return import("/home/phil/dev/pred/discrep/src/discrep.ns").compareRows(expectedRow, actualRow, streamNames, config);
+}
+
+detectDrift = func(baselineHistory, currentHistory, config) {
+    return import("/home/phil/dev/pred/discrep/src/discrep.ns").detectDrift(baselineHistory, currentHistory, config);
+}

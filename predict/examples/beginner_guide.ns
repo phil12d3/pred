@@ -1,0 +1,164 @@
+predict = import("./predict.ns");
+discrep = import("../discrep/discrep.ns");
+
+rows = [];
+mode = "idle";
+for (i = 0; i < 12; i = i + 1) {
+    a = i % 6;
+    b = 10 + (i % 4);
+    if (i == 7) a = 30;
+    if (a >= 4) mode = "busy";
+    if (a <= 1) mode = "idle";
+    rows.add({A: a, B: b, C: mode});
+}
+
+streamNames = ["A", "B", "C"];
+history = predict.history.fromRows(streamNames, rows);
+current = predict.history.window(history, 6);
+
+printline("=== Predict beginner guide ===");
+printline("");
+
+printline("1) History objects");
+printline("history.streamNames tells you which columns are tracked.");
+printline("history.rows is the actual time-ordered data.");
+printline("last row: ", predict.history.lastRow(history));
+printline("");
+
+printline("2) History helpers");
+printline("window(history, 6) keeps only the latest 6 rows.");
+printline("withCounterfactual(history, 'A', 99) changes the newest A value without mutating the original history.");
+counterfactualHistory = predict.history.withCounterfactual(current, "A", 99);
+printline("current last row: ", predict.history.lastRow(current));
+printline("counterfactual last row: ", predict.history.lastRow(counterfactualHistory));
+printline("");
+
+printline("3) Feature extraction");
+features = predict.features.extractAt(history, history.rows.count() - 1, {lags: 2, rolling: 3, pattern: 2}, {});
+printline("features.values is a map of derived numbers used by the tree model.");
+printline("features.categories stores encoded labels for non-numeric values.");
+printline("feature keys include things like A.current, A.lag.1, A.delta.1, A.rolling.3, A.timeSinceChange, and A.pattern.2.");
+printline("A.current = ", features.values["A.current"]);
+printline("A.lag.1 = ", features.values["A.lag.1"]);
+printline("A.delta.1 = ", features.values["A.delta.1"]);
+printline("A.rolling.3 = ", features.values["A.rolling.3"]);
+printline("A.timeSinceChange = ", features.values["A.timeSinceChange"]);
+printline("");
+
+printline("4) Training data");
+trainingSet = predict.features.buildTrainingSet(history, "A", {lags: 2, rolling: 3, pattern: 2});
+printline("trainingSet.rows is the list of feature/target pairs used by the tree learner.");
+printline("Each row has features plus the next-step target value.");
+printline("training rows count: ", trainingSet.rows.count());
+printline("");
+
+printline("5) Decision tree");
+treeTraining = trainingSet.rows;
+treeModel = predict.tree.train(treeTraining, {maxDepth: 3, minSamples: 2});
+treePrediction = predict.tree.predict(treeModel, features.values);
+printline("treeModel.root is the learned tree structure.");
+printline("treePrediction.value is the leaf prediction.");
+printline("treePrediction.samples is how many training rows reached that leaf.");
+printline("treePrediction.depth is how deep the chosen leaf is.");
+printline("treePrediction.path is the list of split decisions followed to reach the leaf.");
+printline("tree prediction value: ", treePrediction.value);
+printline("");
+
+printline("6) Low-level predictor");
+systemModel = predict.predictor.train(history, {feature: {lags: 2, rolling: 3, pattern: 2}, tree: {maxDepth: 3, minSamples: 2}});
+oneA = predict.predictor.predictOne(systemModel, current, "A");
+allPredictions = predict.predictor.predictAll(systemModel, current);
+nextState = predict.predictor.predictNextState(systemModel, current);
+consistency = predict.predictor.checkForecastConsistency(systemModel, current, nextState.row);
+influence = predict.predictor.counterfactualInfluence(systemModel, current, {A: 5});
+printline("predictOne(system, history, 'A') returns a single stream forecast.");
+printline("  stream = ", oneA.stream);
+printline("  value = ", oneA.value);
+printline("  support = ", oneA.support, "  higher means the prediction came from a larger leaf.");
+printline("  samples = ", oneA.samples);
+printline("  depth = ", oneA.depth);
+printline("  path length = ", oneA.path.count());
+printline("predictAll(system, history) returns an object keyed by stream name.");
+printline("  keys: A, B, C");
+printline("predictNextState(system, history) returns row + predictions + consistency.");
+printline("  nextState.row: the predicted next row");
+printline("  nextState.predictions: per-stream prediction objects");
+printline("  nextState.consistency.score: how often direct and counterfactual checks agree");
+printline("consistency.report contains one item per source stream.");
+printline("influence.report shows what changes when one source stream is perturbed.");
+printline("consistency score: ", consistency.score);
+printline("influence base prediction for A: ", influence.base.A.value);
+printline("");
+
+printline("7) High-level streams API");
+system = predict.streams.train(streamNames, rows, {
+    feature: {lags: 2, rolling: 3, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+streamPrediction = predict.streams.predict(system, current, "A");
+streamAll = predict.streams.predictAll(system, current);
+streamForecast = predict.streams.forecast(system, current);
+streamConsistency = predict.streams.consistency(system, current, streamForecast.row);
+streamInfluence = predict.streams.influence(system, current, {B: 99});
+streamBacktest = predict.streams.backtestRun(system, rows, 4, 0);
+printline("streams.train(...) wraps the low-level predictor and keeps the original stream names.");
+printline("streams.predict(...) predicts one stream.");
+printline("streams.predictAll(...) predicts every stream.");
+printline("streams.forecast(...) bundles row, predictions, and consistency.");
+printline("streams.consistency(...) checks whether a forecast is self-consistent.");
+printline("streams.influence(...) shows counterfactual changes.");
+printline("streams.backtestRun(...) does walk-forward backtesting.");
+printline("forecast row: ", streamForecast.row);
+printline("forecast consistency score: ", streamForecast.consistency.score);
+printline("backtest fold count: ", streamBacktest.foldCount);
+printline("");
+
+printline("8) Explain helpers");
+predictionSummary = predict.explain.summarizePrediction(streamAll);
+influenceSummary = predict.explain.summarizeInfluence(streamInfluence);
+printline("summarizePrediction(...) turns prediction paths into short rows.");
+printline("  each row has stream, value, and factors.");
+printline("summarizeInfluence(...) finds the strongest downstream target for each source.");
+printline("  each row has source, from, to, strongestTarget, and strongestDelta.");
+printline("prediction summary first row: ", predictionSummary[0]);
+printline("influence summary first row: ", influenceSummary[0]);
+printline("");
+
+printline("9) Discrep analysis");
+numericSeries = [10, 11, 10, 9, 12, 10, 200];
+seriesReport = discrep.detectSeries(numericSeries, {minSamples: 4});
+historyReport = discrep.profileHistory(history, {minSamples: 4, rareThreshold: 0.2});
+rowCompare = discrep.compareRows({A: 10, B: 11}, {A: 10, B: 12}, ["A", "B"], null);
+baselineRows = rows;
+currentRows = [];
+for (i = 0; i < rows.count(); i = i + 1) {
+    baseRow = rows[i];
+    shiftedA = baseRow.A + 5;
+    shiftedMode = baseRow.C;
+    if (i == 2) shiftedMode = "warn";
+    currentRows.add({A: shiftedA, B: baseRow.B, C: shiftedMode});
+}
+drift = discrep.detectDrift(
+    {streamNames: ["A", "B", "C"], rows: baselineRows},
+    {streamNames: ["A", "B", "C"], rows: currentRows},
+    {meanShiftThreshold: 1, medianShiftThreshold: 1, rareThreshold: 0.2, ratioShiftThreshold: 0.1}
+);
+printline("detectSeries(values) summarizes one stream.");
+printline("  count = ", seriesReport.count);
+printline("  mean = ", seriesReport.mean);
+printline("  median = ", seriesReport.median);
+printline("  modeValue = ", seriesReport.modeValue);
+printline("  outliers = ", seriesReport.outliers.count());
+printline("profileHistory(history) gives one series report per stream and a flagged list.");
+printline("  historyReport.streams.A.mean = ", historyReport.streams.A.mean);
+printline("  historyReport.flagged.count = ", historyReport.flagged.count());
+printline("compareRows(expected, actual, streamNames, config) compares values stream by stream.");
+printline("  comparisons = ", rowCompare.comparisons);
+printline("  matches = ", rowCompare.matches);
+printline("  score = ", rowCompare.score);
+printline("detectDrift(baselineHistory, currentHistory, config) compares two windows.");
+printline("  drift.flagged.count = ", drift.flagged.count());
+printline("  first drift row = ", drift.streams[0]);
+printline("");
+
+printline("Done.");

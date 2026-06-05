@@ -1,0 +1,35 @@
+discrep = import("./discrep.ns");
+
+baseline = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 2, B: "idle"},
+        {A: 3, B: "idle"},
+        {A: 2, B: "active"},
+        {A: 3, B: "idle"},
+        {A: 2, B: "idle"}
+    ]
+};
+
+current = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 8, B: "active"},
+        {A: 9, B: "active"},
+        {A: 8, B: "active"},
+        {A: 10, B: "warn"},
+        {A: 9, B: "active"}
+    ]
+};
+
+drift = discrep.detectDrift(baseline, current, {
+    meanShiftThreshold: 2,
+    medianShiftThreshold: 2,
+    rareThreshold: 0.2,
+    ratioShiftThreshold: 0.1
+});
+
+printline("=== drift review ===");
+printline("flagged streams: ", drift.flagged.count());
+printline("first row: stream=", drift.streams[0].stream, " kind=", drift.streams[0].kind, " meanDelta=", drift.streams[0].meanDelta, " modeChanged=", drift.streams[0].modeChanged);
+printline("second row: stream=", drift.streams[1].stream, " kind=", drift.streams[1].kind, " modeRatioDelta=", drift.streams[1].modeRatioDelta, " rareAdded=", drift.streams[1].rareAdded);

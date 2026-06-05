@@ -72,8 +72,8 @@ frequencyTable = func(outcomes) {
     counts = {};
     total = 0;
     i = 0;
-    while (i < outcomes.count()) {
-        v = stringify(outcomes[i]);
+while (i < outcomes.count()) {
+        v = outcomes[i];
         if (!defined(counts[v])) counts[v] = 0;
         counts[v] = counts[v] + 1;
         total = total + 1;
@@ -86,7 +86,7 @@ frequencyTable = func(outcomes) {
 // P(outcome) = count(outcome) / total
 probability = func(outcomes, outcome) {
     tbl = this.frequencyTable(outcomes);
-    key = stringify(outcome);
+    key = outcome;
     count = defined(tbl.counts[key]) ? tbl.counts[key] : 0;
     return this.safeDiv(count, tbl.total);
 };

@@ -36,7 +36,11 @@ printline("next A:", forecast.row.A);
 - `src/predictor.ns` low-level per-stream training and prediction internals.
 - `src/explain.ns` turns model paths and influence reports into readable summaries.
 - `examples/demo.ns` shows prediction plus influence mapping.
+- `examples/beginner_guide.ns` walks through every major module and the shape of the returned objects.
 - `tests/` contains focused ns tests.
+- `docs.html` is the beginner-friendly package guide.
+
+For outlier detection, row comparison, and drift checks, use the sibling `discrep/` package.
 
 ## Run
 

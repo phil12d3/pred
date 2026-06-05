@@ -1,0 +1,84 @@
+[test]
+flags_numeric_outliers_with_iqr_and_mad = func(t) {
+    discrep = import("./src/discrep.ns");
+    series = [10, 11, 10, 9, 12, 10, 200];
+
+    report = discrep.detectSeries(series, {minSamples: 4});
+
+    t.equal(report.outliers.count(), 1, "numeric series flags the obvious outlier");
+    t.equal(report.outliers[0].value, 200, "numeric series keeps the outlier value");
+    t.truthy(report.median > 9 && report.median < 11, "numeric series computes a sensible median");
+};
+
+[test]
+profiles_history_with_stream_outliers_and_rare_values = func(t) {
+    discrep = import("./src/discrep.ns");
+    history = {
+        streamNames: ["A", "B"],
+        rows: [
+            {A: 10, B: "ok"},
+            {A: 11, B: "ok"},
+            {A: 10, B: "ok"},
+            {A: 9, B: "ok"},
+            {A: 12, B: "ok"},
+            {A: 10, B: "glitch"},
+            {A: 200, B: "ok"}
+        ]
+    };
+
+    report = discrep.profileHistory(history, {minSamples: 4, rareThreshold: 0.2});
+
+    t.equal(report.streams.A.outliers.count(), 1, "history profiling flags numeric stream outliers");
+    t.equal(report.streams.B.rareValues.count(), 1, "history profiling flags rare categorical values");
+    t.equal(report.flagged.count(), 2, "history profiling collects all flagged items");
+};
+
+[test]
+compares_rows_and_scores_discrepancies = func(t) {
+    discrep = import("./src/discrep.ns");
+
+    result = discrep.compareRows(
+        {A: 10, B: "ok"},
+        {A: 12, B: "ok"},
+        ["A", "B"],
+        null
+    );
+
+    t.equal(result.comparisons, 2, "row comparison checks every stream");
+    t.equal(result.matches, 1, "row comparison counts exact matches");
+    t.truthy(result.score > 0 && result.score < 1, "row comparison produces a fractional score");
+};
+
+[test]
+detects_drift_between_baseline_and_current_histories = func(t) {
+    discrep = import("./src/discrep.ns");
+    baseline = {
+        streamNames: ["A", "B"],
+        rows: [
+            {A: 10, B: "ok"},
+            {A: 11, B: "ok"},
+            {A: 10, B: "ok"},
+            {A: 9, B: "glitch"},
+            {A: 12, B: "ok"}
+        ]
+    };
+    current = {
+        streamNames: ["A", "B"],
+        rows: [
+            {A: 20, B: "ok"},
+            {A: 21, B: "ok"},
+            {A: 20, B: "warn"},
+            {A: 19, B: "ok"},
+            {A: 22, B: "ok"}
+        ]
+    };
+
+    report = discrep.detectDrift(baseline, current, {meanShiftThreshold: 3, medianShiftThreshold: 3, rareThreshold: 0.2, ratioShiftThreshold: 0.1});
+
+    t.equal(report.streams.count(), 2, "drift report includes both streams");
+    t.equal(report.streams[0].kind, "numeric", "numeric stream is classified as numeric drift");
+    t.equal(report.streams[1].kind, "categorical", "categorical stream is classified as categorical drift");
+    t.truthy(report.streams[0].meanDelta > 5, "numeric drift captures the mean shift");
+    t.truthy(report.streams[1].rareAdded > 0 || report.streams[1].rareRemoved > 0, "categorical drift notices rare value changes");
+    t.truthy(report.flagged.count() >= 2, "drift detection flags both changed streams");
+};

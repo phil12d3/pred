@@ -1,0 +1,64 @@
+discrep = import("./discrep.ns");
+
+rows = [
+    {A: 10, B: "ok"},
+    {A: 11, B: "ok"},
+    {A: 10, B: "ok"},
+    {A: 9, B: "ok"},
+    {A: 12, B: "glitch"},
+    {A: 10, B: "ok"},
+    {A: 200, B: "ok"}
+];
+
+history = {
+    streamNames: ["A", "B"],
+    rows: rows
+};
+
+printline("=== discrepancy demo ===");
+printline("");
+
+series = discrep.detectSeries([10, 11, 10, 9, 12, 10, 200], {minSamples: 4});
+printline("One stream summary:");
+printline("  count = ", series.count);
+printline("  mean = ", series.mean);
+printline("  median = ", series.median);
+printline("  modeValue = ", series.modeValue);
+printline("  outlier count = ", series.outliers.count());
+printline("");
+
+profile = discrep.profileHistory(history, {minSamples: 4, rareThreshold: 0.2});
+printline("History profile:");
+printline("  rowCount = ", profile.rowCount);
+printline("  flagged = ", profile.flagged.count());
+printline("  A mean = ", profile.streams.A.mean);
+printline("");
+
+rowCheck = discrep.compareRows({A: 10, B: "ok"}, {A: 12, B: "ok"}, ["A", "B"], null);
+printline("Row comparison:");
+printline("  comparisons = ", rowCheck.comparisons);
+printline("  matches = ", rowCheck.matches);
+printline("  score = ", rowCheck.score);
+printline("");
+
+baseline = {
+    streamNames: ["A", "B"],
+    rows: rows
+};
+current = {
+    streamNames: ["A", "B"],
+    rows: [
+        {A: 20, B: "ok"},
+        {A: 21, B: "ok"},
+        {A: 20, B: "warn"},
+        {A: 19, B: "ok"},
+        {A: 22, B: "ok"},
+        {A: 20, B: "ok"},
+        {A: 220, B: "ok"}
+    ]
+};
+
+drift = discrep.detectDrift(baseline, current, {meanShiftThreshold: 3, medianShiftThreshold: 3, rareThreshold: 0.2, ratioShiftThreshold: 0.1});
+printline("Drift report:");
+printline("  flagged = ", drift.flagged.count());
+printline("  first stream = ", drift.streams[0]);

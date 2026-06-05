@@ -1,0 +1,454 @@
+utils = import("./src/utils.ns");
+
+defaultConfig = func() {
+    return {
+        minSamples: 5,
+        iqrMultiplier: 1.5,
+        madThreshold: 3.5,
+        rareThreshold: 0.1,
+        meanShiftThreshold: 1,
+        medianShiftThreshold: 1,
+        ratioShiftThreshold: 0.1,
+        tolerance: 0.000001
+    };
+}
+
+normalizeConfig = func(config) {
+    base = this.defaultConfig();
+    if (!defined(config) || config == null) return base;
+    if (defined(config.minSamples)) base.minSamples = config.minSamples;
+    if (defined(config.iqrMultiplier)) base.iqrMultiplier = config.iqrMultiplier;
+    if (defined(config.madThreshold)) base.madThreshold = config.madThreshold;
+    if (defined(config.rareThreshold)) base.rareThreshold = config.rareThreshold;
+    if (defined(config.meanShiftThreshold)) base.meanShiftThreshold = config.meanShiftThreshold;
+    if (defined(config.medianShiftThreshold)) base.medianShiftThreshold = config.medianShiftThreshold;
+    if (defined(config.ratioShiftThreshold)) base.ratioShiftThreshold = config.ratioShiftThreshold;
+    if (defined(config.tolerance)) base.tolerance = config.tolerance;
+    return base;
+}
+
+copyValues = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+numericValues = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (this.utils.isNumber(values[i])) out.add(values[i]);
+    }
+    return out;
+}
+
+sortedNumbers = func(values) {
+    copy = this.numericValues(values);
+    if (copy.count() <= 1) return copy;
+    copy = copy.sort(func(indexA, valueA, indexB, valueB) => valueA - valueB);
+    return copy;
+}
+
+sum = func(values) {
+    total = 0;
+    for (i = 0; i < values.count(); i = i + 1) total = total + values[i];
+    return total;
+}
+
+floorValue = func(value) {
+    whole = 0;
+    while (whole + 1 <= value) whole = whole + 1;
+    return whole;
+}
+
+mean = func(values) {
+    if (!defined(values) || values.count() == 0) return 0;
+    return this.sum(values) / values.count();
+}
+
+median = func(sortedValues) {
+    if (!defined(sortedValues) || sortedValues.count() == 0) return 0;
+    mid = this.floorValue(sortedValues.count() / 2);
+    if (sortedValues.count() % 2 == 1) return sortedValues[mid];
+    return (sortedValues[mid - 1] + sortedValues[mid]) / 2;
+}
+
+quartile = func(sortedValues, upper) {
+    if (!defined(sortedValues) || sortedValues.count() == 0) return 0;
+    if (sortedValues.count() == 1) return sortedValues[0];
+
+    start = 0;
+    end = sortedValues.count();
+    mid = this.floorValue(sortedValues.count() / 2);
+    if (upper) start = sortedValues.count() % 2 == 0 ? mid : mid + 1;
+    else end = mid;
+
+    subset = [];
+    for (i = start; i < end; i = i + 1) subset.add(sortedValues[i]);
+    return this.median(subset);
+}
+
+absoluteDeviations = func(values, center) {
+    out = [];
+    for (i = 0; i < values.count(); i = i + 1) {
+        diff = values[i] - center;
+        out.add(this.utils.abs(diff));
+    }
+    return out;
+}
+
+medianAbsoluteDeviation = func(sortedValues, center) {
+    deviations = this.absoluteDeviations(sortedValues, center);
+    deviations = this.sortedNumbers(deviations);
+    return this.median(deviations);
+}
+
+frequencyMap = func(values) {
+    counts = {};
+    order = [];
+    if (!defined(values) || values == null) return {counts: counts, order: order};
+
+    for (i = 0; i < values.count(); i = i + 1) {
+        value = values[i];
+        if (!defined(value) || value == null) continue;
+        key = this.utils.keyOf(value);
+        if (!defined(counts[key])) {
+            counts[key] = { value: value, count: 0 };
+            order.add(key);
+        }
+        counts[key].count = counts[key].count + 1;
+    }
+
+    return {counts: counts, order: order};
+}
+
+modeSummary = func(values) {
+    freq = this.frequencyMap(values);
+    bestValue = null;
+    bestCount = 0;
+    total = 0;
+
+    foreach(key in freq.counts.props) {
+        entry = freq.counts[key];
+        total = total + entry.count;
+        if (entry.count > bestCount) {
+            bestCount = entry.count;
+            bestValue = entry.value;
+        }
+    }
+
+    return {
+        value: bestValue,
+        count: bestCount,
+        ratio: total > 0 ? bestCount / total : 0,
+        countMap: freq.counts,
+        order: freq.order
+    };
+}
+
+detectSeries = func(values, config) {
+    cfg = this.normalizeConfig(config);
+    sourceValues = this.copyValues(values);
+    numbers = this.numericValues(sourceValues);
+    sorted = this.sortedNumbers(numbers);
+    totalCount = sourceValues.count();
+    missingCount = 0;
+    for (i = 0; i < sourceValues.count(); i = i + 1) {
+        if (!defined(sourceValues[i]) || sourceValues[i] == null) missingCount = missingCount + 1;
+    }
+
+    result = {
+        count: totalCount,
+        missingCount: missingCount,
+        numericCount: numbers.count(),
+        categoricalCount: totalCount - missingCount - numbers.count(),
+        modeValue: null,
+        modeCount: 0,
+        modeRatio: 0,
+        min: 0,
+        max: 0,
+        mean: 0,
+        median: 0,
+        q1: 0,
+        q3: 0,
+        iqr: 0,
+        mad: 0,
+        outliers: [],
+        rareValues: []
+    };
+
+    mode = this.modeSummary(sourceValues);
+    result.modeValue = mode.value;
+    result.modeCount = mode.count;
+    result.modeRatio = mode.ratio;
+
+    if (numbers.count() == 0) return result;
+
+    result.min = sorted[0];
+    result.max = sorted[sorted.count() - 1];
+    result.mean = this.mean(numbers);
+    result.median = this.median(sorted);
+    result.q1 = this.quartile(sorted, false);
+    result.q3 = this.quartile(sorted, true);
+    result.iqr = result.q3 - result.q1;
+    result.mad = this.medianAbsoluteDeviation(sorted, result.median);
+
+    canFlag = numbers.count() >= cfg.minSamples;
+    lowerFence = result.q1 - (cfg.iqrMultiplier * result.iqr);
+    upperFence = result.q3 + (cfg.iqrMultiplier * result.iqr);
+
+    for (i = 0; i < sourceValues.count(); i = i + 1) {
+        value = sourceValues[i];
+        if (!this.utils.isNumber(value)) continue;
+
+        beyondFence = value < lowerFence || value > upperFence;
+        modifiedZ = 0;
+        if (result.mad > 0) {
+            modifiedZ = 0.6745 * this.utils.abs(value - result.median) / result.mad;
+        }
+        beyondMad = result.mad > 0 && modifiedZ >= cfg.madThreshold;
+
+        if (canFlag && (beyondFence || beyondMad)) {
+            result.outliers.add({
+                index: i,
+                value: value,
+                lowerFence: lowerFence,
+                upperFence: upperFence,
+                modifiedZ: modifiedZ,
+                reason: beyondFence && beyondMad ? "iqr+mad" : (beyondFence ? "iqr" : "mad")
+            });
+        }
+    }
+
+    return result;
+}
+
+profileRows = func(rows, streamNames, config) {
+    safeRows = defined(rows) && rows != null ? rows : [];
+    cfg = this.normalizeConfig(config);
+    report = {
+        streams: {},
+        flagged: [],
+        rowCount: safeRows.count()
+    };
+
+    if (!defined(streamNames) || streamNames == null) return report;
+
+    for (si = 0; si < streamNames.count(); si = si + 1) {
+        stream = streamNames[si];
+        values = [];
+        for (ri = 0; ri < safeRows.count(); ri = ri + 1) {
+            row = safeRows[ri];
+            value = defined(row) && defined(row[stream]) ? row[stream] : null;
+            values.add(value);
+        }
+
+        series = this.detectSeries(values, cfg);
+        report.streams[stream] = series;
+
+        for (oi = 0; oi < series.outliers.count(); oi = oi + 1) {
+            item = series.outliers[oi];
+            report.flagged.add({
+                stream: stream,
+                kind: "outlier",
+                index: item.index,
+                value: item.value,
+                reason: item.reason,
+                modifiedZ: item.modifiedZ
+            });
+        }
+
+        if (series.numericCount == 0) {
+            freq = this.frequencyMap(values);
+            nonMissing = series.count - series.missingCount;
+            if (nonMissing > 0) {
+                foreach(key in freq.counts.props) {
+                    entry = freq.counts[key];
+                    ratio = entry.count / nonMissing;
+                    if (ratio <= cfg.rareThreshold) {
+                        rare = {
+                            value: entry.value,
+                            count: entry.count,
+                            ratio: ratio
+                        };
+                        series.rareValues.add(rare);
+                        report.flagged.add({
+                            stream: stream,
+                            kind: "rare_value",
+                            value: entry.value,
+                            count: entry.count,
+                            ratio: ratio
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    return report;
+}
+
+profileHistory = func(history, config) {
+    if (!defined(history) || history == null) {
+        return {
+            streams: {},
+            flagged: [],
+            rowCount: 0
+        };
+    }
+    return this.profileRows(history.rows, history.streamNames, config);
+}
+
+compareRows = func(expectedRow, actualRow, streamNames, config) {
+    cfg = this.normalizeConfig(config);
+    report = [];
+    matches = 0;
+    comparisons = 0;
+
+    for (si = 0; si < streamNames.count(); si = si + 1) {
+        stream = streamNames[si];
+        expected = defined(expectedRow) && defined(expectedRow[stream]) ? expectedRow[stream] : null;
+        actual = defined(actualRow) && defined(actualRow[stream]) ? actualRow[stream] : null;
+
+        item = {
+            stream: stream,
+            expected: expected,
+            actual: actual,
+            matches: false,
+            delta: null,
+            difference: null
+        };
+
+        if (!defined(expected) || !defined(actual)) {
+            item.difference = "missing";
+        } else if (this.utils.isNumber(expected) && this.utils.isNumber(actual)) {
+            item.delta = actual - expected;
+            item.difference = this.utils.abs(item.delta);
+            item.matches = this.utils.abs(item.delta) <= cfg.tolerance;
+        } else {
+            item.matches = this.utils.keyOf(expected) == this.utils.keyOf(actual);
+            item.difference = item.matches ? 0 : 1;
+        }
+
+        if (item.matches) matches = matches + 1;
+        comparisons = comparisons + 1;
+        report.add(item);
+    }
+
+    return {
+        report: report,
+        matches: matches,
+        comparisons: comparisons,
+        score: comparisons == 0 ? 0 : matches / comparisons
+    };
+}
+
+compareProfiles = func(baselineReport, currentReport, streamNames, config) {
+    cfg = this.normalizeConfig(config);
+    report = [];
+
+    for (si = 0; si < streamNames.count(); si = si + 1) {
+        stream = streamNames[si];
+        baseline = defined(baselineReport) && defined(baselineReport.streams) ? baselineReport.streams[stream] : null;
+        current = defined(currentReport) && defined(currentReport.streams) ? currentReport.streams[stream] : null;
+
+        item = {
+            stream: stream,
+            kind: "missing",
+            baseline: baseline,
+            current: current,
+            meanDelta: null,
+            medianDelta: null,
+            modeChanged: false,
+            modeRatioDelta: null,
+            outlierDelta: null,
+            rareAdded: 0,
+            rareRemoved: 0,
+            score: 0
+        };
+
+        if (!defined(baseline) || !defined(current)) {
+            report.add(item);
+            continue;
+        }
+
+        item.kind = baseline.numericCount > 0 && current.numericCount > 0 ? "numeric" : "categorical";
+        item.modeChanged = this.utils.keyOf(baseline.modeValue) != this.utils.keyOf(current.modeValue);
+        item.modeRatioDelta = current.modeRatio - baseline.modeRatio;
+
+        baseRare = {};
+        currRare = {};
+        for (ri = 0; ri < baseline.rareValues.count(); ri = ri + 1) {
+            baseRare[this.utils.keyOf(baseline.rareValues[ri].value)] = true;
+        }
+        for (ri = 0; ri < current.rareValues.count(); ri = ri + 1) {
+            currRare[this.utils.keyOf(current.rareValues[ri].value)] = true;
+        }
+
+        foreach(key in currRare.props) {
+            if (!defined(baseRare[key])) item.rareAdded = item.rareAdded + 1;
+        }
+        foreach(key in baseRare.props) {
+            if (!defined(currRare[key])) item.rareRemoved = item.rareRemoved + 1;
+        }
+
+        if (item.kind == "numeric") {
+            item.meanDelta = current.mean - baseline.mean;
+            item.medianDelta = current.median - baseline.median;
+            item.outlierDelta = current.outliers.count() - baseline.outliers.count();
+            item.score = this.utils.abs(item.meanDelta) + this.utils.abs(item.medianDelta) + this.utils.abs(item.outlierDelta);
+            if (this.utils.abs(item.meanDelta) >= cfg.meanShiftThreshold || this.utils.abs(item.medianDelta) >= cfg.medianShiftThreshold || item.modeChanged || item.outlierDelta != 0) {
+                report.add(item);
+            } else {
+                report.add(item);
+            }
+        } else {
+            item.score = this.utils.abs(item.modeRatioDelta) + item.rareAdded + item.rareRemoved;
+            if (this.utils.abs(item.modeRatioDelta) >= cfg.ratioShiftThreshold || item.modeChanged || item.rareAdded > 0 || item.rareRemoved > 0) {
+                report.add(item);
+            } else {
+                report.add(item);
+            }
+        }
+    }
+
+    return report;
+}
+
+detectDrift = func(baselineHistory, currentHistory, config) {
+    if (!defined(baselineHistory) || baselineHistory == null || !defined(currentHistory) || currentHistory == null) {
+        return {
+            streams: [],
+            flagged: [],
+            baseline: null,
+            current: null
+        };
+    }
+
+    baselineProfile = this.profileHistory(baselineHistory, config);
+    currentProfile = this.profileHistory(currentHistory, config);
+    cfg = this.normalizeConfig(config);
+    streamNames = baselineHistory.streamNames;
+    if (!defined(streamNames) || streamNames == null) streamNames = currentHistory.streamNames;
+    driftRows = this.compareProfiles(baselineProfile, currentProfile, streamNames, cfg);
+    flagged = [];
+
+    for (i = 0; i < driftRows.count(); i = i + 1) {
+        row = driftRows[i];
+        if (row.kind == "numeric") {
+            if (this.utils.abs(row.meanDelta) >= cfg.meanShiftThreshold || this.utils.abs(row.medianDelta) >= cfg.medianShiftThreshold || row.modeChanged || row.outlierDelta != 0) {
+                flagged.add(row);
+            }
+        } else if (this.utils.abs(row.modeRatioDelta) >= cfg.ratioShiftThreshold || row.modeChanged || row.rareAdded > 0 || row.rareRemoved > 0) {
+            flagged.add(row);
+        }
+    }
+
+    return {
+        streams: driftRows,
+        flagged: flagged,
+        baseline: baselineProfile,
+        current: currentProfile
+    };
+}

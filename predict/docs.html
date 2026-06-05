@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>predict Documentation</title>
+  <style>
+    :root {
+      --bg: #f4f7f9;
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --accent3: #b45309;
+      --soft: #f8fbfc;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+
+    body { padding: 28px 16px 48px; }
+
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background:
+        linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)),
+        var(--panel);
+    }
+
+    .section {
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      letter-spacing: 0;
+    }
+
+    h1 { font-size: 2.4rem; margin-bottom: 8px; }
+    h2 {
+      font-size: 1.5rem;
+      margin: 24px 0 12px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    h3 { font-size: 1.12rem; margin: 18px 0 8px; color: var(--accent); }
+    h4 { font-size: 1rem; margin: 12px 0 6px; color: var(--accent2); }
+
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .muted { color: var(--muted); }
+
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+
+    .note {
+      background: #fff7ed;
+      border-left: 4px solid var(--accent3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+    }
+
+    .prop {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+
+    .prop strong {
+      color: var(--accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>predict Documentation</h1>
+      <p class="muted">Multi-stream prediction, explanation, and backtesting for ns.</p>
+      <p>Start with <a href="examples/beginner_guide.ns">examples/beginner_guide.ns</a>. It walks through the objects one by one and prints the most important fields in plain language.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Package Does</h2>
+      <p>The package learns one small tree-based model per stream. A <em>stream</em> is just one named column in a time-ordered table. The package then predicts the next value for each stream, checks whether the forecast is self-consistent, shows which features mattered, and compares two windows to spot outliers or drift.</p>
+      <p class="note">If you only want one entrypoint, use <code>predict.ns</code>. It exposes <code>history</code>, <code>features</code>, <code>tree</code>, <code>predictor</code>, <code>explain</code>, <code>backtest</code>, <code>streams</code>, and <code>utils</code>. For outlier detection and drift checks, use the sibling <code>discrep/</code> package.</p>
+    </div>
+
+    <div class="section">
+      <h2>Quick Start</h2>
+      <div class="code"><code>predict = import("./predict.ns");
+system = predict.streams.train(["A", "B", "C"], rows, {
+    feature: {lags: 2, rolling: 3, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+forecast = predict.streams.forecast(system, rows);</code></div>
+      <p><strong>What you get back:</strong> <code>system</code> is a trained model bundle. <code>forecast</code> contains the predicted next row, the full per-stream predictions, and a consistency report.</p>
+    </div>
+
+    <div class="section">
+      <h2>Module Guide</h2>
+
+      <h3>history</h3>
+      <div class="prop"><strong>create(streamNames)</strong> builds an empty history object. It returns <code>{ streamNames, rows }</code>.</div>
+      <div class="prop"><strong>fromRows(streamNames, rows)</strong> copies a list of row objects into a history.</div>
+      <div class="prop"><strong>addRow(history, row)</strong> returns a new history with one extra row added.</div>
+      <div class="prop"><strong>lastRow(history)</strong> returns the newest row, or <code>{}</code> if the history is empty.</div>
+      <div class="prop"><strong>window(history, maxRows)</strong> keeps only the newest rows. This is useful when you want a short recent context.</div>
+      <div class="prop"><strong>withCounterfactual(history, streamName, value)</strong> copies the history and changes only the last row for one stream.</div>
+
+      <h3>features</h3>
+      <div class="prop"><strong>extractAt(history, index, config, categories)</strong> builds the feature map used by the tree model.</div>
+      <div class="prop">The returned object has <code>values</code> and <code>categories</code>. <code>values</code> is the feature map. <code>categories</code> stores the numeric codes used for non-numeric values.</div>
+      <div class="prop">Common feature names include <code>A.current</code>, <code>A.lag.1</code>, <code>A.delta.1</code>, <code>A.rolling.3</code>, <code>A.timeSinceChange</code>, and <code>A.pattern.2</code>.</div>
+      <div class="prop"><strong>buildTrainingSet(history, targetStream, config)</strong> returns <code>{ rows, categories }</code>. Each training row has <code>features</code> and the next-step <code>target</code>.</div>
+
+      <h3>tree</h3>
+      <div class="prop"><strong>train(trainingRows, config)</strong> learns a compact decision tree from feature rows. The returned model has <code>kind</code> and <code>root</code>.</div>
+      <div class="prop"><strong>predict(model, features)</strong> returns a leaf result with <code>value</code>, <code>path</code>, <code>samples</code>, and <code>depth</code>.</div>
+      <div class="prop"><strong>value</strong> is the predicted output. <strong>path</strong> is the list of split decisions. <strong>samples</strong> is how many training rows reached the leaf. <strong>depth</strong> tells you how deep that leaf sits in the tree.</div>
+
+      <h3>predictor</h3>
+      <div class="prop"><strong>train(history, config)</strong> builds one model per stream. The returned system has <code>streamNames</code>, <code>config</code>, <code>models</code>, and <code>categories</code>.</div>
+      <div class="prop"><strong>predictOne(system, history, targetStream)</strong> returns one forecast object with <code>stream</code>, <code>value</code>, <code>support</code>, <code>samples</code>, <code>depth</code>, <code>path</code>, and <code>features</code>.</div>
+      <div class="prop"><strong>support</strong> is a simple confidence signal. Higher means the prediction came from a larger leaf.</div>
+      <div class="prop"><strong>predictAll(system, history)</strong> returns an object keyed by stream name, where each value is the same prediction object returned by <code>predictOne</code>.</div>
+      <div class="prop"><strong>predictNextState(system, history)</strong> returns <code>{ row, predictions, consistency }</code>. <code>row</code> is the full next-state forecast. <code>predictions</code> is the per-stream detail. <code>consistency</code> is the self-check report.</div>
+      <div class="prop"><strong>checkForecastConsistency(system, history, forecastRow)</strong> returns <code>{ report, comparisons, matches, score }</code>. <code>score</code> is the fraction of direct and counterfactual checks that agree.</div>
+      <div class="prop"><strong>counterfactualInfluence(system, history, changes)</strong> returns <code>{ base, report }</code>. <code>base</code> is the normal prediction. <code>report</code> shows how each source change affects every target stream.</div>
+
+      <h3>explain</h3>
+      <div class="prop"><strong>summarizePrediction(predictions)</strong> turns detailed prediction objects into short rows with <code>stream</code>, <code>value</code>, and <code>factors</code>.</div>
+      <div class="prop"><strong>factors</strong> is a small list of the strongest tree splits that led to the prediction.</div>
+      <div class="prop"><strong>summarizeInfluence(influence)</strong> returns rows with <code>source</code>, <code>from</code>, <code>to</code>, <code>strongestTarget</code>, <code>strongestDelta</code>, and <code>effects</code>.</div>
+
+      <h3>backtest</h3>
+      <div class="prop"><strong>run(streamNames, allRows, config, minTrainSize, windowSize)</strong> does walk-forward backtesting.</div>
+      <div class="prop">The result has <code>folds</code>, <code>stats</code>, and <code>foldCount</code>. Numeric streams report <code>mae</code>. Categorical streams report <code>accuracy</code>.</div>
+
+      <h3>streams</h3>
+      <div class="prop"><strong>train</strong> wraps the low-level predictor and keeps the stream names with the model.</div>
+      <div class="prop"><strong>predict</strong>, <strong>predictAll</strong>, <strong>forecast</strong>, <strong>consistency</strong>, <strong>influence</strong>, and <strong>backtestRun</strong> are the beginner-friendly entrypoints.</div>
+
+      <div class="note">The discrepancy tools live in the sibling <a href="../discrep/docs.html">discrep documentation</a>. Use them when you want outlier detection, row comparison, or drift analysis alongside predict.</div>
+    </div>
+
+    <div class="section">
+      <h2>Returned Shapes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Object</th>
+            <th>Main fields</th>
+            <th>What they mean</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>history</code></td>
+            <td><code>streamNames</code>, <code>rows</code></td>
+            <td>The data you train and forecast from.</td>
+          </tr>
+          <tr>
+            <td><code>features.extractAt</code></td>
+            <td><code>values</code>, <code>categories</code></td>
+            <td>The derived numbers that feed the tree.</td>
+          </tr>
+          <tr>
+            <td><code>predictor.predictOne</code></td>
+            <td><code>stream</code>, <code>value</code>, <code>support</code>, <code>samples</code>, <code>depth</code>, <code>path</code></td>
+            <td>The next value for one stream plus a simple explanation.</td>
+          </tr>
+          <tr>
+            <td><code>predictor.predictNextState</code></td>
+            <td><code>row</code>, <code>predictions</code>, <code>consistency</code></td>
+            <td>A full next-step forecast and its self-check report.</td>
+          </tr>
+          <tr>
+            <td><code>predictor.checkForecastConsistency</code></td>
+            <td><code>report</code>, <code>comparisons</code>, <code>matches</code>, <code>score</code></td>
+            <td>How often the direct forecast agrees with counterfactual checks.</td>
+          </tr>
+          <tr>
+            <td><code>predictor.counterfactualInfluence</code></td>
+            <td><code>base</code>, <code>report</code></td>
+            <td>What changes when one source stream is perturbed.</td>
+          </tr>
+          <tr>
+            <td><code>backtest.run</code></td>
+            <td><code>folds</code>, <code>stats</code>, <code>foldCount</code></td>
+            <td>Walk-forward evaluation across time.</td>
+          </tr>
+          <tr>
+            <td colspan="3">For discrepancy analysis, see the sibling <a href="../discrep/docs.html">discrep package</a>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Beginner Example</h2>
+      <p>Run <a href="examples/beginner_guide.ns">examples/beginner_guide.ns</a> to see all of this in one place.</p>
+      <div class="code"><code>system = predict.streams.train(["A", "B", "C"], rows, {
+    feature: {lags: 2, rolling: 3, pattern: 2},
+    tree: {maxDepth: 3, minSamples: 2}
+});
+
+forecast = predict.streams.forecast(system, rows);
+printline(forecast.row);
+printline(forecast.consistency.score);</code></div>
+      <p>The first line predicts the next row. The second line tells you how many of the direct and counterfactual checks agreed. A higher score means the forecast is more internally consistent.</p>
+    </div>
+  </div>
+</body>
+</html>
