@@ -29,3 +29,105 @@ builds_drift_and_evaluation_reports = func(t) {
     t.equal(driftReport.sections[0].rows.count(), 1, "drift report keeps the drift rows");
     t.equal(evalReport.sections[0].rows[0].metric, "mae", "evaluation report keeps the metric");
 };
+
+[test]
+renders_ascii_table_with_alignment = func(t) {
+    report = import("./report.ns").report;
+    rows = [
+        {name: "Alpha", score: 12},
+        {name: "Beta", score: 3}
+    ];
+
+    lines = report.table(rows, {style: "ascii"});
+
+    t.equal(lines[0], "+-------+-------+", "ascii table top border");
+    t.equal(lines[1], "| name  | score |", "ascii table header");
+    t.equal(lines[2], "+-------+-------+", "ascii table header separator");
+    t.equal(lines[3], "| Alpha |    12 |", "ascii table numeric alignment");
+    t.equal(lines[4], "| Beta  |     3 |", "ascii table second row");
+    t.equal(lines[5], "+-------+-------+", "ascii table bottom border");
+};
+
+[test]
+renders_box_and_double_tables = func(t) {
+    report = import("./report.ns").report;
+    rows = [
+        {name: "Alpha", score: 12},
+        {name: "Beta", score: 3}
+    ];
+
+    boxLines = report.table(rows, {style: "box"});
+    doubleLines = report.table(rows, {style: "double"});
+
+    t.equal(boxLines[0], "┌───────┬───────┐", "box table top border");
+    t.equal(boxLines[2], "├───────┼───────┤", "box table header separator");
+    t.equal(boxLines[5], "└───────┴───────┘", "box table bottom border");
+
+    t.equal(doubleLines[0], "╔═══════╦═══════╗", "double table top border");
+    t.equal(doubleLines[2], "╠═══════╬═══════╣", "double table header separator");
+    t.equal(doubleLines[5], "╚═══════╩═══════╝", "double table bottom border");
+};
+
+[test]
+renderTable_wraps_report_sections_in_tables = func(t) {
+    report = import("./report.ns").report;
+    built = report.create("Table Report");
+    built = report.addSection(built, "Metrics", [
+        {name: "Alpha", score: 12},
+        {name: "Beta", score: 3}
+    ]);
+
+    lines = report.renderTable(built, {style: "box"});
+
+    t.equal(lines[0], "Table Report", "renderTable keeps the report title");
+    t.equal(lines[2], "Metrics", "renderTable keeps the section title");
+    t.equal(lines[3], "┌───────┬───────┐", "renderTable renders a table border");
+};
+
+[test]
+renders_heatmaps_in_ascii_and_block_styles = func(t) {
+    report = import("./report.ns").report;
+    grid = [
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+        [2, 2, 3, 3],
+        [2, 2, 3, 3]
+    ];
+
+    asciiLines = report.heatmapAscii(grid, {width: 2, height: 2, scale: "auto"});
+    blockLines = report.heatmapBlocks(grid, {width: 2, height: 2, scale: "auto"});
+
+    t.equal(asciiLines[0], " -", "ascii heatmap top row");
+    t.equal(asciiLines[1], "*@", "ascii heatmap bottom row");
+    t.equal(blockLines[0], "░▒", "block heatmap top row");
+    t.equal(blockLines[1], "▓█", "block heatmap bottom row");
+};
+
+[test]
+renders_colour_heatmap_with_ansi_sequences = func(t) {
+    report = import("./report.ns").report;
+    grid = [
+        [0, 0, 1, 1],
+        [0, 0, 1, 1],
+        [2, 2, 3, 3],
+        [2, 2, 3, 3]
+    ];
+
+    lines = report.heatmapColour(grid, {width: 2, height: 2, scale: {min: 0, max: 3}});
+
+    t.truthy(lines[0].length > 0, "colour heatmap returns printable text");
+    t.equal(substring(lines[0], 0, 1), char([27]), "colour heatmap starts with an ANSI escape");
+    t.equal(substring(lines[0], 1, 7), "[38;2;", "colour heatmap uses truecolor foreground codes");
+    t.truthy(substring(lines[0], lines[0].length - 1, lines[0].length) != "", "colour heatmap ends with content");
+};
+
+[test]
+renders_heatmap_legend_with_labels = func(t) {
+    report = import("./report.ns").report;
+    lines = report.heatmapLegend({min: 0, max: 99}, {width: 24, style: "colour"});
+
+    t.equal(lines.count(), 3, "heatmap legend renders three lines");
+    t.equal(substring(lines[0], 0, 1), char([27]), "heatmap legend starts with an ANSI escape");
+    t.truthy(lines[1].length > 0, "heatmap legend includes scale labels");
+    t.truthy(lines[2].length > 0, "heatmap legend includes a midpoint label");
+};

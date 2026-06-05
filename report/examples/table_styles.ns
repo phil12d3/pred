@@ -1,0 +1,36 @@
+report = import("./report.ns").report;
+
+rows = [
+    {name: "Alpha", score: 12, status: "ok"},
+    {name: "Beta", score: 3, status: "watch"},
+    {name: "Gamma", score: 25, status: "ok"}
+];
+
+printline("=== ASCII table ===");
+asciiLines = report.table(rows, {style: "ascii"});
+for (i = 0; i < asciiLines.count(); i = i + 1) {
+    printline(asciiLines[i]);
+}
+
+printline("");
+printline("=== Box table ===");
+boxLines = report.table(rows, {style: "box"});
+for (i = 0; i < boxLines.count(); i = i + 1) {
+    printline(boxLines[i]);
+}
+
+printline("");
+printline("=== Double table ===");
+doubleLines = report.table(rows, {style: "double"});
+for (i = 0; i < doubleLines.count(); i = i + 1) {
+    printline(doubleLines[i]);
+}
+
+printline("");
+printline("=== Report table view ===");
+built = report.create("Status Table");
+built = report.addSection(built, "Current Status", rows);
+rendered = report.renderTable(built, {style: "box"});
+for (i = 0; i < rendered.count(); i = i + 1) {
+    printline(rendered[i]);
+}

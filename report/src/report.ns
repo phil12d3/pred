@@ -8,6 +8,182 @@ copyArray = func(values) {
     return out;
 }
 
+containsValue = func(values, needle) {
+    if (!defined(values) || values == null) return false;
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (values[i] == needle) return true;
+    }
+    return false;
+}
+
+pushUnique = func(values, item) {
+    if (!this.containsValue(values, item)) values.add(item);
+    return values;
+}
+
+repeatChar = func(ch, count) {
+    text = "";
+    for (i = 0; i < count; i = i + 1) text = text + ch;
+    return text;
+}
+
+padRight = func(text, width) {
+    value = defined(text) ? text : "";
+    if (value.length >= width) return value;
+    return value + this.repeatChar(" ", width - value.length);
+}
+
+padLeft = func(text, width) {
+    value = defined(text) ? text : "";
+    if (value.length >= width) return value;
+    return this.repeatChar(" ", width - value.length) + value;
+}
+
+cellText = func(value) {
+    if (!defined(value) || value == null) return "";
+    kind = type(value).typename;
+    if (kind == "String") return value;
+    if (kind == "Array") return "[array]";
+    if (kind == "Object") return "[object]";
+    return stringify(value);
+}
+
+tableStyles = {
+    ascii: {
+        tl: "+", tr: "+", bl: "+", br: "+",
+        h: "-", v: "|",
+        top: "+", mid: "+", bottom: "+",
+        left: "+", right: "+"
+    },
+    box: {
+        tl: "┌", tr: "┐", bl: "└", br: "┘",
+        h: "─", v: "│",
+        top: "┬", mid: "┼", bottom: "┴",
+        left: "├", right: "┤"
+    },
+    double: {
+        tl: "╔", tr: "╗", bl: "╚", br: "╝",
+        h: "═", v: "║",
+        top: "╦", mid: "╬", bottom: "╩",
+        left: "╠", right: "╣"
+    }
+}
+
+resolveStyle = func(name) {
+    if (defined(name) && name != null && defined(this.tableStyles[name])) return this.tableStyles[name];
+    return this.tableStyles.ascii;
+}
+
+normalizeColumns = func(columns) {
+    out = [];
+    if (!defined(columns) || columns == null) return out;
+    for (i = 0; i < columns.count(); i = i + 1) {
+        col = columns[i];
+        if (type(col).typename == "String") {
+            out.add({name: col, label: col, align: "auto"});
+        } else {
+            out.add({
+                name: defined(col.name) ? col.name : "",
+                label: defined(col.label) ? col.label : (defined(col.name) ? col.name : ""),
+                align: defined(col.align) ? col.align : "auto"
+            });
+        }
+    }
+    return out;
+}
+
+detectColumns = func(rows) {
+    names = [];
+    if (!defined(rows) || rows == null) return names;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        row = rows[i];
+        if (!defined(row) || row == null) continue;
+        if (type(row).typename == "Object") {
+            foreach(name in row.props) this.pushUnique(names, name);
+        } else {
+            this.pushUnique(names, "value");
+        }
+    }
+    return names;
+}
+
+resolveColumns = func(rows, config) {
+    if (defined(config) && config != null && defined(config.columns) && config.columns != null) {
+        return this.normalizeColumns(config.columns);
+    }
+
+    names = this.detectColumns(rows);
+    columns = [];
+    for (i = 0; i < names.count(); i = i + 1) columns.add({name: names[i], label: names[i], align: "auto"});
+    return columns;
+}
+
+normalizeRow = func(row, columns) {
+    if (defined(row) && row != null && type(row).typename == "Object") return row;
+    out = {};
+    if (columns.count() > 0) out[columns[0].name] = row;
+    else out.value = row;
+    return out;
+}
+
+columnAlign = func(column, rows) {
+    if (defined(column) && defined(column.align) && column.align != null && column.align != "auto") return column.align;
+    if (!defined(rows) || rows == null || rows.count() == 0) return "left";
+    numeric = true;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        row = rows[i];
+        if (!defined(row) || row == null) continue;
+        value = defined(row[column.name]) ? row[column.name] : null;
+        if (!defined(value) || value == null) continue;
+        if (type(value).typename != "Number") {
+            numeric = false;
+            break;
+        }
+    }
+    return numeric ? "right" : "left";
+}
+
+columnWidth = func(column, rows) {
+    width = column.label.length;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        row = rows[i];
+        if (!defined(row) || row == null) continue;
+        valueText = this.cellText(defined(row[column.name]) ? row[column.name] : "");
+        if (valueText.length > width) width = valueText.length;
+    }
+    return width;
+}
+
+buildBorder = func(left, fill, middle, right, widths) {
+    line = left;
+    for (i = 0; i < widths.count(); i = i + 1) {
+        line = line + this.repeatChar(fill, widths[i] + 2);
+        if (i < widths.count() - 1) line = line + middle;
+    }
+    line = line + right;
+    return line;
+}
+
+buildRow = func(left, separator, right, columns, widths, row, sampleRows) {
+    line = left;
+    for (i = 0; i < columns.count(); i = i + 1) {
+        column = columns[i];
+        align = this.columnAlign(column, sampleRows);
+        value = defined(row[column.name]) ? row[column.name] : "";
+        text = this.cellText(value);
+        if (align == "right") text = this.padLeft(text, widths[i]);
+        else text = this.padRight(text, widths[i]);
+        line = line + " " + text + " ";
+        if (i < columns.count() - 1) line = line + separator;
+    }
+    line = line + right;
+    return line;
+}
+
+heatmapAsciiRamp = [" ", ".", ":", "-", "=", "+", "*", "#", "%", "@"];
+heatmapBlockRamp = ["░", "▒", "▓", "█"];
+heatmapColourSteps = 100;
+
 create = func(title) {
     return {
         title: defined(title) ? title : "Analysis Report",
@@ -73,6 +249,55 @@ renderRow = func(row) {
     return text;
 }
 
+table = func(rows, config) {
+    lines = [];
+    if (!defined(rows) || rows == null || rows.count() == 0) return lines;
+
+    settings = defined(config) && config != null ? config : {};
+    style = this.resolveStyle(defined(settings.style) ? settings.style : "ascii");
+    columns = this.resolveColumns(rows, settings);
+    if (columns.count() == 0) return lines;
+
+    normalizedRows = [];
+    for (i = 0; i < rows.count(); i = i + 1) normalizedRows.add(this.normalizeRow(rows[i], columns));
+
+    widths = [];
+    for (i = 0; i < columns.count(); i = i + 1) widths.add(this.columnWidth(columns[i], normalizedRows));
+
+    lines.add(this.buildBorder(style.tl, style.h, style.top, style.tr, widths));
+
+    headerRow = {};
+    for (i = 0; i < columns.count(); i = i + 1) headerRow[columns[i].name] = columns[i].label;
+    lines.add(this.buildRow(style.v, style.v, style.v, columns, widths, headerRow, null));
+
+    lines.add(this.buildBorder(style.left, style.h, style.mid, style.right, widths));
+
+    for (i = 0; i < normalizedRows.count(); i = i + 1) {
+        lines.add(this.buildRow(style.v, style.v, style.v, columns, widths, normalizedRows[i], normalizedRows));
+    }
+
+    lines.add(this.buildBorder(style.bl, style.h, style.bottom, style.br, widths));
+    return lines;
+}
+
+renderTable = func(report, config) {
+    lines = [];
+    if (!defined(report) || report == null) return lines;
+    if (defined(report.title)) lines.add(report.title);
+    for (i = 0; i < report.sections.count(); i = i + 1) {
+        section = report.sections[i];
+        lines.add("");
+        lines.add(section.title);
+        tableLines = this.table(section.rows, config);
+        if (tableLines.count() > 0) {
+            for (j = 0; j < tableLines.count(); j = j + 1) lines.add(tableLines[j]);
+        } else {
+            for (j = 0; j < section.rows.count(); j = j + 1) lines.add(this.renderRow(section.rows[j]));
+        }
+    }
+    return lines;
+}
+
 render = func(report) {
     lines = [];
     if (!defined(report) || report == null) return lines;
@@ -85,5 +310,436 @@ render = func(report) {
             lines.add(this.renderRow(section.rows[j]));
         }
     }
+    return lines;
+}
+
+colourBaseCode = func(name) {
+    if (name == "black") return 0;
+    if (name == "red") return 1;
+    if (name == "green") return 2;
+    if (name == "yellow") return 3;
+    if (name == "blue") return 4;
+    if (name == "magenta") return 5;
+    if (name == "cyan") return 6;
+    if (name == "white") return 7;
+    return -1;
+}
+
+colourToSgr = func(colour, background) {
+    if (!defined(colour) || colour == null) return -1;
+    if (colour == "reset") return background ? 49 : 39;
+    if (colour == "default") return background ? 49 : 39;
+
+    c = colour;
+    bright = false;
+    if (c.length >= 6 && substring(c, 0, 6) == "light_") {
+        bright = true;
+        c = substring(c, 6, c.length);
+    } else if (c.length >= 7 && substring(c, 0, 7) == "bright_") {
+        bright = true;
+        c = substring(c, 7, c.length);
+    } else if (c.length >= 5 && substring(c, 0, 5) == "dark_") {
+        bright = false;
+        c = substring(c, 5, c.length);
+    } else if (c.length >= 7 && substring(c, 0, 7) == "normal_") {
+        bright = false;
+        c = substring(c, 7, c.length);
+    }
+
+    base = this.colourBaseCode(c);
+    if (base < 0) return -1;
+    return background ? ((bright ? 100 : 40) + base) : ((bright ? 90 : 30) + base);
+}
+
+ansiCode = func(code) {
+    return char([27]) + "[" + stringify(code) + "m";
+}
+
+ansiSequence = func(codes) {
+    return char([27]) + "[" + codes + "m";
+}
+
+ansi256Colour = func(fgCode, bgCode) {
+    codes = "";
+    if (defined(fgCode) && fgCode != null) codes = "38;5;" + stringify(fgCode);
+    if (defined(bgCode) && bgCode != null) {
+        if (codes != "") codes = codes + ";";
+        codes = codes + "48;5;" + stringify(bgCode);
+    }
+    if (codes == "") return "";
+    return this.ansiSequence(codes);
+}
+
+lerpInt = func(a, b, t) {
+    return floor(a + ((b - a) * t) + 0.5);
+}
+
+clampByte = func(value) {
+    if (value < 0) return 0;
+    if (value > 255) return 255;
+    return floor(value + 0.5);
+}
+
+rgb = func(r, g, b) {
+    return {r: this.clampByte(r), g: this.clampByte(g), b: this.clampByte(b)};
+}
+
+scaleRgb = func(colour, factor) {
+    return this.rgb(colour.r * factor, colour.g * factor, colour.b * factor);
+}
+
+ansiRgbColour = func(fg, bg) {
+    codes = "";
+    if (defined(fg) && fg != null) {
+        codes = "38;2;" + stringify(fg.r) + ";" + stringify(fg.g) + ";" + stringify(fg.b);
+    }
+    if (defined(bg) && bg != null) {
+        if (codes != "") codes = codes + ";";
+        codes = codes + "48;2;" + stringify(bg.r) + ";" + stringify(bg.g) + ";" + stringify(bg.b);
+    }
+    if (codes == "") return "";
+    return this.ansiSequence(codes);
+}
+
+heatmapColourRgb = func(level) {
+    if (level < 0) level = 0;
+    if (level > 1) level = 1;
+
+    if (level <= 0.12) {
+        t = level / 0.12;
+        return this.rgb(
+            this.lerpInt(8, 0, t),
+            this.lerpInt(22, 110, t),
+            this.lerpInt(118, 214, t)
+        );
+    }
+    if (level <= 0.28) {
+        t = (level - 0.12) / 0.16;
+        return this.rgb(
+            this.lerpInt(0, 0, t),
+            this.lerpInt(110, 190, t),
+            this.lerpInt(214, 90, t)
+        );
+    }
+    if (level <= 0.64) {
+        t = (level - 0.28) / 0.36;
+        return this.rgb(
+            this.lerpInt(0, 150, t),
+            this.lerpInt(190, 230, t),
+            this.lerpInt(90, 50, t)
+        );
+    }
+    if (level <= 0.82) {
+        t = (level - 0.64) / 0.18;
+        return this.rgb(
+            this.lerpInt(150, 255, t),
+            this.lerpInt(230, 175, t),
+            this.lerpInt(50, 30, t)
+        );
+    }
+    if (level <= 0.93) {
+        t = (level - 0.82) / 0.11;
+        return this.rgb(
+            this.lerpInt(255, 255, t),
+            this.lerpInt(175, 80, t),
+            this.lerpInt(30, 10, t)
+        );
+    }
+
+    t = (level - 0.93) / 0.07;
+    return this.rgb(
+        this.lerpInt(255, 255, t),
+        this.lerpInt(80, 35, t),
+        this.lerpInt(10, 35, t)
+    );
+}
+
+heatmapColourStyle = func(index) {
+    style = {fg: this.rgb(0, 0, 0), bg: this.rgb(0, 0, 0), cell: "░"};
+    if (index < 0) index = 0;
+    if (index > 99) index = 99;
+
+    level = index / 99;
+    base = this.heatmapColourRgb(level);
+    shadow = this.scaleRgb(base, 0.32);
+
+    style.fg = base;
+    style.bg = shadow;
+    if (level < 0.22) style.cell = "░";
+    else if (level < 0.48) style.cell = "▒";
+    else if (level < 0.75) style.cell = "▓";
+    else style.cell = "█";
+    return style;
+}
+
+normalizeHeatmapGrid = func(grid) {
+    out = [];
+    if (!defined(grid) || grid == null || type(grid).typename != "Array") return out;
+    if (grid.count() == 0) return out;
+
+    first = grid[0];
+    if (defined(first) && first != null && type(first).typename == "Array") {
+        for (i = 0; i < grid.count(); i = i + 1) {
+            row = grid[i];
+            if (defined(row) && row != null && type(row).typename == "Array") out.add(row);
+            else if (defined(row) && row != null) out.add([row]);
+            else out.add([]);
+        }
+        return out;
+    }
+
+    out.add(this.copyArray(grid));
+    return out;
+}
+
+heatmapSourceWidth = func(grid) {
+    width = 0;
+    for (i = 0; i < grid.count(); i = i + 1) {
+        row = grid[i];
+        if (!defined(row) || row == null || type(row).typename != "Array") continue;
+        if (row.count() > width) width = row.count();
+    }
+    return width;
+}
+
+sampleHeatmap = func(grid, width, height) {
+    sampled = [];
+    if (!defined(grid) || grid == null || width <= 0 || height <= 0) return sampled;
+    rows = this.normalizeHeatmapGrid(grid);
+    srcH = rows.count();
+    srcW = this.heatmapSourceWidth(rows);
+    if (srcH == 0 || srcW == 0) return sampled;
+
+    for (y = 0; y < height; y = y + 1) {
+        y0 = floor((y * srcH) / height);
+        y1 = floor(((y + 1) * srcH) / height) - 1;
+        if (y1 < y0) y1 = y0;
+        outRow = [];
+        for (x = 0; x < width; x = x + 1) {
+            x0 = floor((x * srcW) / width);
+            x1 = floor(((x + 1) * srcW) / width) - 1;
+            if (x1 < x0) x1 = x0;
+            sum = 0;
+            count = 0;
+            for (sy = y0; sy <= y1; sy = sy + 1) {
+                row = rows[sy];
+                if (!defined(row) || row == null || type(row).typename != "Array") continue;
+                for (sx = x0; sx <= x1; sx = sx + 1) {
+                    if (sx < 0 || sx >= row.count()) continue;
+                    value = row[sx];
+                    if (defined(value) && value != null && type(value).typename == "Number") {
+                        sum = sum + value;
+                        count = count + 1;
+                    }
+                }
+            }
+            outRow.add(count > 0 ? (sum / count) : null);
+        }
+        sampled.add(outRow);
+    }
+    return sampled;
+}
+
+heatmapBounds = func(sampled, config) {
+    bounds = {min: 0, max: 1};
+    if (defined(config) && config != null) {
+        if (defined(config.min) && defined(config.max) && type(config.min).typename == "Number" && type(config.max).typename == "Number") {
+            bounds.min = config.min;
+            bounds.max = config.max;
+            return bounds;
+        }
+        if (defined(config.scale) && config.scale != null) {
+            scale = config.scale;
+            if (type(scale).typename == "Object" && defined(scale.min) && defined(scale.max) && type(scale.min).typename == "Number" && type(scale.max).typename == "Number") {
+                bounds.min = scale.min;
+                bounds.max = scale.max;
+                return bounds;
+            }
+            if (type(scale).typename == "Array" && scale.count() >= 2 && type(scale[0]).typename == "Number" && type(scale[1]).typename == "Number") {
+                bounds.min = scale[0];
+                bounds.max = scale[1];
+                return bounds;
+            }
+            if (scale == "auto") {
+                // fall through to auto detection
+            }
+        }
+    }
+
+    have = false;
+    for (y = 0; y < sampled.count(); y = y + 1) {
+        row = sampled[y];
+        for (x = 0; x < row.count(); x = x + 1) {
+            value = row[x];
+            if (!defined(value) || value == null || type(value).typename != "Number") continue;
+            if (!have) {
+                bounds.min = value;
+                bounds.max = value;
+                have = true;
+            } else {
+                if (value < bounds.min) bounds.min = value;
+                if (value > bounds.max) bounds.max = value;
+            }
+        }
+    }
+    if (!have) {
+        bounds.min = 0;
+        bounds.max = 1;
+    }
+    return bounds;
+}
+
+heatmapNormalizedLevel = func(value, bounds) {
+    if (!defined(value) || value == null || type(value).typename != "Number") return null;
+    if (bounds.max == bounds.min) return 0.5;
+    level = (value - bounds.min) / (bounds.max - bounds.min);
+    if (level < 0) level = 0;
+    if (level > 1) level = 1;
+    return level;
+}
+
+heatmapRampIndex = func(level, count) {
+    if (count <= 1) return 0;
+    index = floor(level * (count - 1) + 0.5);
+    if (index < 0) index = 0;
+    if (index > count - 1) index = count - 1;
+    return index;
+}
+
+heatmapCell = func(level, style) {
+    if (!defined(level) || level == null) return " ";
+    if (style == "ascii") {
+        idx10 = this.heatmapRampIndex(level, this.heatmapAsciiRamp.count());
+        return this.heatmapAsciiRamp[idx10];
+    }
+    if (style == "blocks") {
+        idx10 = this.heatmapRampIndex(level, this.heatmapAsciiRamp.count());
+        idx = 0;
+        if (idx10 <= 1) idx = 0;
+        else if (idx10 <= 4) idx = 1;
+        else if (idx10 <= 7) idx = 2;
+        else idx = 3;
+        return this.heatmapBlockRamp[idx];
+    }
+
+    idxColour = this.heatmapRampIndex(level, this.heatmapColourSteps);
+    styleInfo = this.heatmapColourStyle(idxColour);
+    return this.ansiRgbColour(styleInfo.fg, styleInfo.bg) + styleInfo.cell + this.ansiCode(0);
+}
+
+resolveHeatmapStyle = func(style) {
+    if (!defined(style) || style == null) return "ascii";
+    if (style == "ascii") return "ascii";
+    if (style == "blocks") return "blocks";
+    if (style == "block") return "blocks";
+    if (style == "colour") return "colour";
+    if (style == "color") return "colour";
+    return "ascii";
+}
+
+heatmapLines = func(grid, config) {
+    lines = [];
+    settings = defined(config) && config != null ? config : {};
+    style = this.resolveHeatmapStyle(defined(settings.style) ? settings.style : "ascii");
+
+    normalized = this.normalizeHeatmapGrid(grid);
+    srcH = normalized.count();
+    srcW = this.heatmapSourceWidth(normalized);
+    if (srcH == 0 || srcW == 0) return lines;
+
+    targetW = defined(settings.width) && settings.width > 0 ? settings.width : srcW;
+    targetH = defined(settings.height) && settings.height > 0 ? settings.height : srcH;
+    sampled = this.sampleHeatmap(normalized, targetW, targetH);
+    bounds = this.heatmapBounds(sampled, settings);
+
+    for (y = 0; y < sampled.count(); y = y + 1) {
+        row = sampled[y];
+        line = "";
+        for (x = 0; x < row.count(); x = x + 1) {
+            level = this.heatmapNormalizedLevel(row[x], bounds);
+            line = line + this.heatmapCell(level, style);
+        }
+        lines.add(line);
+    }
+    return lines;
+}
+
+heatmap = func(grid, config) {
+    return this.heatmapLines(grid, config);
+}
+
+heatmapAscii = func(grid, config) {
+    settings = defined(config) && config != null ? config : {};
+    next = {
+        width: defined(settings.width) ? settings.width : null,
+        height: defined(settings.height) ? settings.height : null,
+        scale: defined(settings.scale) ? settings.scale : "auto",
+        style: "ascii"
+    };
+    if (defined(settings.min)) next.min = settings.min;
+    if (defined(settings.max)) next.max = settings.max;
+    return this.heatmapLines(grid, next);
+}
+
+heatmapBlocks = func(grid, config) {
+    settings = defined(config) && config != null ? config : {};
+    next = {
+        width: defined(settings.width) ? settings.width : null,
+        height: defined(settings.height) ? settings.height : null,
+        scale: defined(settings.scale) ? settings.scale : "auto",
+        style: "blocks"
+    };
+    if (defined(settings.min)) next.min = settings.min;
+    if (defined(settings.max)) next.max = settings.max;
+    return this.heatmapLines(grid, next);
+}
+
+heatmapColour = func(grid, config) {
+    settings = defined(config) && config != null ? config : {};
+    next = {
+        width: defined(settings.width) ? settings.width : null,
+        height: defined(settings.height) ? settings.height : null,
+        scale: defined(settings.scale) ? settings.scale : "auto",
+        style: "colour"
+    };
+    if (defined(settings.min)) next.min = settings.min;
+    if (defined(settings.max)) next.max = settings.max;
+    return this.heatmapLines(grid, next);
+}
+
+heatmapLegend = func(bounds, config) {
+    lines = [];
+    settings = defined(config) && config != null ? config : {};
+    style = this.resolveHeatmapStyle(defined(settings.style) ? settings.style : "colour");
+
+    width = defined(settings.width) && settings.width > 0 ? settings.width : 48;
+    if (width < 8) width = 8;
+
+    minValue = 0;
+    maxValue = 1;
+    if (defined(bounds) && bounds != null) {
+        if (defined(bounds.min) && type(bounds.min).typename == "Number") minValue = bounds.min;
+        if (defined(bounds.max) && type(bounds.max).typename == "Number") maxValue = bounds.max;
+    }
+    if (maxValue == minValue) maxValue = minValue + 1;
+
+    bar = "";
+    for (x = 0; x < width; x = x + 1) {
+        level = width == 1 ? 1 : (x / (width - 1));
+        bar = bar + this.heatmapCell(level, style);
+    }
+    lines.add(bar);
+
+    minText = defined(settings.minLabel) ? stringify(settings.minLabel) : stringify(minValue);
+    midText = defined(settings.midLabel) ? stringify(settings.midLabel) : stringify((minValue + maxValue) / 2);
+    maxText = defined(settings.maxLabel) ? stringify(settings.maxLabel) : stringify(maxValue);
+
+    gap = width - minText.length - maxText.length;
+    if (gap < 1) gap = 1;
+    lines.add(minText + this.repeatChar(" ", gap) + maxText);
+
+    midPad = floor((width - midText.length) / 2);
+    if (midPad < 0) midPad = 0;
+    lines.add(this.repeatChar(" ", midPad) + midText);
     return lines;
 }

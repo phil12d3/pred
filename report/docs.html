@@ -207,6 +207,58 @@ r = report.addSection(r, "Summary", [{stream: "A", value: 10}]);</code></div>
 // lines[0] = "Evaluation Report"
 // lines[1] = ""
 // lines[2] = "Backtest Summary"</code></div>
+
+      <h3>table(rows, config)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> rendering a plain row array as a bordered table.
+        <br><strong>Output:</strong> an array of strings containing a header row, separators, and one body row per input row.
+      </div>
+      <p>The table renderer supports three border styles out of the box:</p>
+      <ul>
+        <li><code>ascii</code> uses <code>+ - |</code> and stays safe for older terminals and logs.</li>
+        <li><code>box</code> uses <code>┌ ┐ └ ┘ ─ │ ├ ┤ ┬ ┴ ┼</code>.</li>
+        <li><code>double</code> uses <code>╔ ╗ ╚ ╝ ═ ║ ╠ ╣ ╦ ╩ ╬</code>.</li>
+      </ul>
+      <p>You can also pass <code>config.columns</code> to fix the column order or override labels. Each entry may be a string column name or an object with <code>name</code>, <code>label</code>, and <code>align</code> fields.</p>
+      <p>Columns are detected from row object properties when you do not pass <code>config.columns</code>. Strings render as plain text, numbers right-align automatically, and arrays or nested objects render as <code>[array]</code> and <code>[object]</code>.</p>
+      <div class="code"><code>lines = report.table([
+    {name: "Alpha", score: 12},
+    {name: "Beta", score: 3}
+], {style: "box"});
+
+// lines becomes a boxed table block.</code></div>
+
+      <h3>renderTable(report, config)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> rendering a whole report with each section displayed as a table when possible.
+        <br><strong>Output:</strong> an array of strings with titles, section headers, and table blocks.
+      </div>
+      <p>This is the report-level version of <code>table()</code>. It keeps the report title and section titles, then renders each section body as a table using the selected border style.</p>
+
+      <h3>heatmap(grid, config)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> rendering numeric matrices as compact density maps.
+        <br><strong>Output:</strong> an array of strings, one per rendered row.
+      </div>
+      <p>The heatmap helpers accept a two-dimensional array of numbers. Use <code>width</code> and <code>height</code> to resample the input to a new output size. Use <code>scale: "auto"</code> to derive the minimum and maximum from the rendered data, or pass <code>scale: {min, max}</code> to lock the range.</p>
+      <ul>
+        <li><code>heatmapAscii(grid, config)</code> uses a pure ASCII ramp.</li>
+        <li><code>heatmapBlocks(grid, config)</code> uses <code>░ ▒ ▓ █</code>.</li>
+        <li><code>heatmapColour(grid, config)</code> uses the block ramp plus foreground/background ANSI colour combinations.</li>
+        <li><code>heatmapLegend(bounds, config)</code> renders a matching colour bar with min, midpoint, and max labels.</li>
+      </ul>
+      <p>The coloured version is intended for terminal output via <code>printline()</code>. Its palette now fades across a wider ladder than the original stats tool by blending foreground and background ANSI colours across the block glyphs. The progression still starts in dark blue and ends in red, but it moves through more intermediate shades before reaching the top end.</p>
+      <div class="code"><code>heat = [
+    [0, 0, 1, 1],
+    [0, 1, 2, 2],
+    [1, 2, 3, 3],
+    [2, 2, 3, 4]
+];
+
+ascii = report.heatmapAscii(heat, {width: 4, height: 4, scale: "auto"});
+blocks = report.heatmapBlocks(heat, {width: 4, height: 4, scale: "auto"});
+colour = report.heatmapColour(heat, {width: 4, height: 4, scale: "auto"});
+legend = report.heatmapLegend({min: 0, max: 4}, {width: 32, style: "colour"});</code></div>
     </div>
 
     <div class="section">
@@ -243,6 +295,8 @@ evaluationLines = report.render(
         <li><a href="examples/manual_report.ns">examples/manual_report.ns</a> shows manual report assembly with <code>create()</code> and <code>addSection()</code>.</li>
         <li><a href="examples/drift_report.ns">examples/drift_report.ns</a> shows the rendered output of <code>driftReport()</code>.</li>
         <li><a href="examples/evaluation_report.ns">examples/evaluation_report.ns</a> shows the rendered output of <code>evaluationReport()</code>.</li>
+        <li><a href="examples/table_styles.ns">examples/table_styles.ns</a> demonstrates the ASCII, box, and double table styles plus <code>renderTable()</code>.</li>
+        <li><a href="examples/heatmap_demo.ns">examples/heatmap_demo.ns</a> demonstrates ASCII, block, colour heatmaps, and a matching colour legend with resampling.</li>
       </ul>
     </div>
   </div>

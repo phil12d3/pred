@@ -1,0 +1,53 @@
+report = import("./report.ns").report;
+
+grid = [
+    [0, 0, 1, 1, 2, 2],
+    [0, 1, 1, 2, 2, 3],
+    [1, 1, 2, 2, 3, 3],
+    [1, 2, 2, 3, 3, 4],
+    [2, 2, 3, 3, 4, 4],
+    [2, 3, 3, 4, 4, 5]
+];
+
+printline("=== ASCII heatmap ===");
+asciiLines = report.heatmapAscii(grid, {width: 12, height: 6, scale: "auto"});
+for (i = 0; i < asciiLines.count(); i = i + 1) {
+    printline(asciiLines[i]);
+}
+
+printline("");
+printline("=== Block heatmap ===");
+blockLines = report.heatmapBlocks(grid, {width: 12, height: 6, scale: "auto"});
+for (i = 0; i < blockLines.count(); i = i + 1) {
+    printline(blockLines[i]);
+}
+
+printline("");
+printline("=== Colour heatmap ===");
+colourLines = report.heatmapColour(grid, {width: 12, height: 6, scale: "auto"});
+for (i = 0; i < colourLines.count(); i = i + 1) {
+    printline(colourLines[i]);
+}
+
+printline("");
+printline("=== Colour heatmap full range sweep ===");
+fullRange = [];
+for (r = 0; r < 4; r = r + 1) {
+    row = [];
+    for (c = 0; c < 100; c = c + 1) {
+        row.add(c);
+    }
+    fullRange.add(row);
+}
+
+fullRangeLines = report.heatmapColour(fullRange, {width: 100, height: 4, scale: {min: 0, max: 99}});
+for (i = 0; i < fullRangeLines.count(); i = i + 1) {
+    printline(fullRangeLines[i]);
+}
+
+printline("");
+printline("=== Colour heatmap legend ===");
+legendLines = report.heatmapLegend({min: 0, max: 99}, {width: 100, style: "colour"});
+for (i = 0; i < legendLines.count(); i = i + 1) {
+    printline(legendLines[i]);
+}
