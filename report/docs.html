@@ -244,10 +244,10 @@ r = report.addSection(r, "Summary", [{stream: "A", value: 10}]);</code></div>
       <ul>
         <li><code>heatmapAscii(grid, config)</code> uses a pure ASCII ramp.</li>
         <li><code>heatmapBlocks(grid, config)</code> uses <code>░ ▒ ▓ █</code>.</li>
-        <li><code>heatmapColour(grid, config)</code> uses the block ramp plus foreground/background ANSI colour combinations.</li>
+        <li><code>heatmapColour(grid, config)</code> uses full blocks plus foreground/background ANSI colour combinations.</li>
         <li><code>heatmapLegend(bounds, config)</code> renders a matching colour bar with min, midpoint, and max labels.</li>
       </ul>
-      <p>The coloured version is intended for terminal output via <code>printline()</code>. Its palette now fades across a wider ladder than the original stats tool by blending foreground and background ANSI colours across the block glyphs. The progression still starts in dark blue and ends in red, but it moves through more intermediate shades before reaching the top end.</p>
+      <p>The coloured version is intended for terminal output via <code>printline()</code>. Its palette now fades across a wider ladder than the original stats tool by blending foreground and background ANSI colours across full block glyphs. The progression still starts in dark blue and ends in red, but it moves through more intermediate shades before reaching the top end.</p>
       <div class="code"><code>heat = [
     [0, 0, 1, 1],
     [0, 1, 2, 2],

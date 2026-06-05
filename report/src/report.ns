@@ -455,7 +455,7 @@ heatmapColourRgb = func(level) {
 }
 
 heatmapColourStyle = func(index) {
-    style = {fg: this.rgb(0, 0, 0), bg: this.rgb(0, 0, 0), cell: "░"};
+    style = {fg: this.rgb(0, 0, 0), bg: this.rgb(0, 0, 0), cell: "█"};
     if (index < 0) index = 0;
     if (index > 99) index = 99;
 
@@ -465,10 +465,7 @@ heatmapColourStyle = func(index) {
 
     style.fg = base;
     style.bg = shadow;
-    if (level < 0.22) style.cell = "░";
-    else if (level < 0.48) style.cell = "▒";
-    else if (level < 0.75) style.cell = "▓";
-    else style.cell = "█";
+    style.cell = "█";
     return style;
 }
 
