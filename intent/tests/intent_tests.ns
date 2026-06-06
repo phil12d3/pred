@@ -1,0 +1,98 @@
+[test]
+topics_are_learned_from_large_corpus_text = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = "
+    how do reset password use reset link now
+    forgot password use reset link now
+    where see invoices open billing page now
+    download invoice pdf open billing page now
+    ";
+
+    system = intent.train(corpus, {
+        resultLimit: 4,
+        keywordLimit: 6,
+        relationshipLimit: 3,
+        semanticWeight: 0.65,
+        intentWeight: 0.20,
+        utteranceWeight: 0.15,
+        chunkSize: 5,
+        chunkStride: 5,
+        maxLabelWords: 2,
+        minPatternCount: 2,
+        queryLikeThreshold: 1.25
+    });
+
+    result = intent.analyze(system, "change password reset", 3);
+
+    t.truthy(system.rows.count() >= 4, "corpus training should produce chunk rows");
+    t.truthy(result.matches.count() == 3, "analysis should return requested number of matches");
+    t.equal(result.intent.label, result.matches[0].intent, "predicted intent should match top learned topic");
+    t.truthy(result.matches[0].overlap.count() > 0, "top match should expose semantic overlap");
+};
+
+[test]
+utterance_types_work_without_question_marks = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = "
+    donde ver facturas abrir pagina cobros ahora
+    donde descargar recibos abrir pagina cobros ahora
+    como resetear clave usar enlace reset ahora
+    como cambiar correo abrir ajustes perfil ahora
+    error clave bloqueada soporte revisa caso ahora
+    ";
+
+    system = intent.train(corpus, {
+        resultLimit: 4,
+        keywordLimit: 6,
+        relationshipLimit: 3,
+        semanticWeight: 0.65,
+        intentWeight: 0.20,
+        utteranceWeight: 0.15,
+        chunkSize: 6,
+        chunkStride: 6,
+        maxLabelWords: 2,
+        minPatternCount: 2,
+        queryLikeThreshold: 1.25
+    });
+
+    whereLike = intent.analyze(system, "donde ver recibos cobros", 2);
+    howLike = intent.analyze(system, "como resetear correo", 2);
+    statementLike = intent.analyze(system, "error clave bloqueada soporte", 2);
+
+    t.truthy(whereLike.question.isQuestion, "reused donde-pattern should be learned as question-like");
+    t.truthy(howLike.question.isQuestion, "reused como-pattern should be learned as question-like");
+    t.truthy(!statementLike.question.isQuestion, "single-topic error pattern should stay statement-like");
+    t.truthy(whereLike.question.type != howLike.question.type, "different repeated forms should learn different utterance types");
+};
+
+[test]
+responses_are_drawn_from_neighboring_corpus_context = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = [
+        "reset password account use reset link email inbox now",
+        "invoice download billing open billing page download pdf now"
+    ];
+
+    system = intent.train(corpus, {
+        resultLimit: 4,
+        keywordLimit: 6,
+        relationshipLimit: 3,
+        semanticWeight: 0.65,
+        intentWeight: 0.20,
+        utteranceWeight: 0.15,
+        chunkSize: 4,
+        chunkStride: 4,
+        maxLabelWords: 2,
+        minPatternCount: 2,
+        queryLikeThreshold: 1.25
+    });
+
+    replies = intent.responses(system, "download invoice pdf", 3);
+
+    t.truthy(replies.count() > 0, "responses should return corpus-derived candidates");
+    t.truthy(replies[0].response != "", "response rows should include response text");
+    t.truthy(replies[0].matchedText != "", "response rows should include matched corpus text");
+};

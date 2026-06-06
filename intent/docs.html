@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>intent Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .prop, .note {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { background: #f7fafc; font-family: "Trebuchet MS", Verdana, sans-serif; }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>intent Documentation</h1>
+      <p class="muted">Corpus-driven intent and utterance-type discovery.</p>
+      <p>The module trains from raw text, not labeled question/answer rows. It turns a corpus into chunk-level semantic profiles, then uses those profiles to infer topic, utterance form, and response candidates for new input.</p>
+    </div>
+
+    <div class="section">
+      <h2>Overview</h2>
+      <p>The pipeline has five main stages:</p>
+      <ol>
+        <li>Normalize the corpus input into documents.</li>
+        <li>Chunk each document into overlapping windows of tokens.</li>
+        <li>Build semantic topic profiles from keywords, clusters, and word families.</li>
+        <li>Build utterance-type profiles from repeated structural patterns.</li>
+        <li>Score new input against both profile sets and return nearby corpus context as responses.</li>
+      </ol>
+      <div class="note">Nothing in this stage requires hardcoded English question words like <code>what</code> or <code>how</code>. The learner depends on repeated patterns and semantic evidence inside the corpus itself.</div>
+    </div>
+
+    <div class="section">
+      <h2>Input</h2>
+      <table>
+        <thead>
+          <tr><th>Input form</th><th>How it is handled</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>"large text..."</code></td><td>Trained as one corpus source. If it contains several non-empty lines, each line becomes a separate corpus unit first.</td></tr>
+          <tr><td><code>["doc one", "doc two"]</code></td><td>Each string is treated as its own document.</td></tr>
+          <tr><td>multi-line string</td><td>Preferred when you already have one utterance or one response block per line.</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><code>corpus = "
+como resetear clave usar enlace reset ahora
+como cambiar correo abrir ajustes perfil ahora
+donde ver facturas abrir pagina cobros ahora
+donde descargar recibos abrir pagina cobros ahora
+error clave bloqueada soporte revisa caso ahora
+";</code></div>
+      <p>In that example, the trainer sees five separate corpus units because there are five non-empty lines.</p>
+    </div>
+
+    <div class="section">
+      <h2>Stage 1: Normalization</h2>
+      <p><code>intent.train(...)</code> first converts the input to a list of plain text documents.</p>
+      <ul>
+        <li>If the caller passes a list, each element is stringified and kept as one document.</li>
+        <li>If the caller passes one string with several non-empty lines, each line becomes a document.</li>
+        <li>If the caller passes one string with no useful line breaks, it stays as one document and later chunking handles the segmentation.</li>
+      </ul>
+      <div class="code"><code>// Input
+"a line about passwords
+a line about invoices"
+
+// After normalization
+[
+  "a line about passwords",
+  "a line about invoices"
+]</code></div>
+      <p>This step matters because later response extraction uses local neighborhood inside each document. If the corpus already has natural line boundaries, preserving them gives cleaner context windows.</p>
+    </div>
+
+    <div class="section">
+      <h2>Stage 2: Chunking</h2>
+      <p>Each normalized document is tokenized and then split into chunks. The config controls this with <code>chunkSize</code> and <code>chunkStride</code>.</p>
+      <div class="code"><code>// Example tokens
+["how", "do", "reset", "password", "use", "reset", "link", "now"]
+
+// chunkSize = 4, chunkStride = 2
+chunk 0 = ["how", "do", "reset", "password"]
+chunk 1 = ["reset", "password", "use", "reset"]
+chunk 2 = ["use", "reset", "link", "now"]</code></div>
+      <p>Each chunk becomes a training row with these kinds of fields:</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>text</code></td><td>The chunk joined back into text.</td></tr>
+          <tr><td><code>tokens</code></td><td>The token array for the chunk.</td></tr>
+          <tr><td><code>lead1</code>, <code>lead2</code></td><td>The first one or two tokens. These capture repeated openers.</td></tr>
+          <tr><td><code>tail1</code>, <code>tail2</code></td><td>The last one or two tokens. These capture repeated endings.</td></tr>
+          <tr><td><code>length</code></td><td>A coarse size bucket: short, medium, or long.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Stage 3: Topic / Intent Learning</h2>
+      <p>The module learns topic labels from chunk content in three layers.</p>
+
+      <h3>3a. Keywords</h3>
+      <p>Each chunk gets TF-IDF-like keyword rows from <code>text-stat</code>. These highlight chunk-specific content words.</p>
+      <div class="code"><code>chunk text:
+"download invoice pdf open billing page now"
+
+possible keyword rows:
+download
+invoice
+pdf
+billing</code></div>
+
+      <h3>3b. Ignore-word discovery</h3>
+      <p>Before building topic labels, the learner removes words that are probably structural rather than topical.</p>
+      <ul>
+        <li>Connector-like words from <code>ts.semantic.connectors(...)</code></li>
+        <li>Repeated leading tokens</li>
+        <li>Repeated trailing tokens</li>
+      </ul>
+      <p>The point is to stop general frame words from dominating the learned topic label.</p>
+
+      <h3>3c. Word families and semantic clusters</h3>
+      <p>Two corpus-derived grouping signals then compete:</p>
+      <ul>
+        <li>Word families: words with strong form similarity such as <code>invoice</code> and <code>invoices</code>.</li>
+        <li>Semantic clusters: words grouped by co-occurrence patterns from the semantic module.</li>
+      </ul>
+      <div class="code"><code>// Example family signal
+invoice, invoices  -> one family
+reset, resetear    -> one family if the corpus supports the spelling overlap
+
+// Example semantic signal
+password, reset, link  -> one semantic neighborhood
+billing, invoice, pdf  -> another semantic neighborhood</code></div>
+      <p>Each chunk is assigned to the strongest family or cluster. The final learned intent label is built from the strongest remaining content words in that group.</p>
+      <div class="note">The learned intent label is not a predefined taxonomy entry. It is just a compact summary of the strongest content words in that learned topic group.</div>
+    </div>
+
+    <div class="section">
+      <h2>Stage 4: Utterance-Type Learning</h2>
+      <p>This is the part that tries to infer whether a form is query-like or statement-like without relying on punctuation or English question stems.</p>
+
+      <h3>4a. Pattern keys</h3>
+      <p>For each chunk, the learner builds structural signatures such as:</p>
+      <ul>
+        <li>first two tokens</li>
+        <li>last two tokens</li>
+        <li>length bucket</li>
+      </ul>
+      <div class="code"><code>"donde ver facturas abrir pagina cobros ahora"
+lead2 = "donde_ver"
+tail2 = "cobros_ahora"
+length = "medium"</code></div>
+
+      <h3>4b. Repeated-form grouping</h3>
+      <p>Chunks that share repeated openers or endings are grouped into the same utterance-type candidate. If there is no repeated pattern, the learner falls back to the chunk’s top keyword plus length bucket.</p>
+
+      <h3>4c. Question-like scoring</h3>
+      <p>Each utterance-type group gets a <code>queryLikeScore</code>. The score rises when the same structural frame is reused across different semantic content.</p>
+      <div class="code"><code>// Example query-like family
+donde ver facturas abrir pagina cobros ahora
+donde descargar recibos abrir pagina cobros ahora
+
+same frame, different content -> high queryLikeScore</code></div>
+      <div class="code"><code>// Example statement-like singleton
+error clave bloqueada soporte revisa caso ahora
+
+one pattern, one topic -> low queryLikeScore</code></div>
+      <p>If that score crosses <code>queryLikeThreshold</code>, the group is treated as question-like. Otherwise it stays statement-like.</p>
+      <div class="note">This is not “question detection” in the grammar-school sense. It is closer to “does this chunk look like a reusable request/query frame in this corpus?”</div>
+    </div>
+
+    <div class="section">
+      <h2>Stage 5: Input Analysis</h2>
+      <p>When you call <code>intent.analyze(system, inputText, limit)</code>, the input goes through the same representation pipeline:</p>
+      <ol>
+        <li>tokenize input</li>
+        <li>extract keywords against the training corpus</li>
+        <li>expand related terms using semantic relationships</li>
+        <li>build structural keys: <code>lead1</code>, <code>lead2</code>, <code>tail1</code>, <code>tail2</code>, <code>length</code></li>
+      </ol>
+
+      <h3>5a. Intent classification</h3>
+      <p>The expanded input vector is scored against each learned intent profile. The highest score becomes <code>analysis.intent.label</code>.</p>
+
+      <h3>5b. Utterance-type classification</h3>
+      <p>The same input is scored against each learned utterance profile using:</p>
+      <ul>
+        <li>semantic similarity</li>
+        <li>leading-pattern similarity</li>
+        <li>trailing-pattern similarity</li>
+        <li>length-bucket similarity</li>
+      </ul>
+      <p>The winning profile becomes <code>analysis.question.type</code>, and its learned question-likeness becomes <code>analysis.question.isQuestion</code>.</p>
+    </div>
+
+    <div class="section">
+      <h2>Final Match Scoring</h2>
+      <p>Each stored chunk gets a final score against the new input using three components:</p>
+      <table>
+        <thead>
+          <tr><th>Component</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>semanticScore</code></td><td>Weighted overlap between input terms and chunk terms.</td></tr>
+          <tr><td><code>intentScore</code></td><td>How strongly the input matches the chunk’s learned topic group.</td></tr>
+          <tr><td><code>utteranceScore</code></td><td>Whether the input and chunk share the same utterance-type behavior.</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><code>final score =
+  semanticScore   * semanticWeight +
+  intentScore     * intentWeight +
+  utteranceScore  * utteranceWeight</code></div>
+      <p>The top-ranked rows become <code>analysis.matches</code>.</p>
+    </div>
+
+    <div class="section">
+      <h2>How Responses Are Chosen</h2>
+      <p><code>intent.responses(...)</code> does not generate new text. It reuses neighboring corpus context.</p>
+      <ul>
+        <li>If the best matching chunk has a next chunk in the same document, that next chunk becomes the response candidate.</li>
+        <li>If there is no next chunk, the matched chunk text itself is returned as fallback.</li>
+      </ul>
+      <div class="code"><code>document:
+chunk 0 = "reset password account"
+chunk 1 = "use reset link email inbox"
+
+input matches chunk 0
+response candidate = chunk 1</code></div>
+      <p>This is why corpus layout matters. If prompt-like material and answer-like material sit close together in the source text, response extraction works much better.</p>
+    </div>
+
+    <div class="section">
+      <h2>API</h2>
+      <div class="prop"><strong>intent.defaultConfig()</strong><br>Return the default training and scoring config.</div>
+      <div class="prop"><strong>intent.train(corpusInput, config)</strong><br>Normalize documents, chunk them, learn intent profiles, and learn utterance-type profiles.</div>
+      <div class="prop"><strong>intent.analyze(system, inputText, limit)</strong><br>Return learned intent, learned utterance type, question-likeness, semantic evidence, and ranked matches.</div>
+      <div class="prop"><strong>intent.responses(system, inputText, limit)</strong><br>Return ranked response candidates from neighboring corpus context.</div>
+    </div>
+
+    <div class="section">
+      <h2>Example</h2>
+      <div class="code"><code>intent = import("./intent.ns").intent;
+
+corpus = "
+como resetear clave usar enlace reset ahora
+como cambiar correo abrir ajustes perfil ahora
+donde ver facturas abrir pagina cobros ahora
+donde descargar recibos abrir pagina cobros ahora
+error clave bloqueada soporte revisa caso ahora
+";
+
+system = intent.train(corpus, intent.defaultConfig());
+analysis = intent.analyze(system, "como resetear correo", 3);
+replies = intent.responses(system, "como resetear correo", 3);</code></div>
+      <p>Likely behavior:</p>
+      <ul>
+        <li>The input gets mapped near the <code>como ...</code> utterance family.</li>
+        <li>The learned topic will land near <code>clave/reset/correo</code>-like content rather than the billing group.</li>
+        <li>The top response candidate will usually be neighboring corpus context from one of the best matching chunks.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Practical Guidance</h2>
+      <ul>
+        <li>Put related prompt/answer material near each other in the corpus.</li>
+        <li>Use line breaks if you already know natural utterance boundaries.</li>
+        <li>Use a smaller <code>chunkSize</code> when corpus lines are dense and multi-topic.</li>
+        <li>Use a larger <code>chunkStride</code> if you want fewer overlapping chunks.</li>
+        <li>Expect better question-like detection when a query form repeats across several topics.</li>
+      </ul>
+      <div class="note">If the corpus has no repeated structural forms, the module can still learn topics, but utterance-type learning becomes weaker because there is less evidence for reusable query frames.</div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,28 @@
+intent = import("./intent.ns").intent;
+
+corpus = "
+how do reset password use reset link now
+forgot password use reset link now
+where see invoices open billing page now
+download invoice pdf open billing page now
+hello there welcome help desk now
+change account card open billing page now
+";
+
+system = intent.train(corpus, intent.defaultConfig());
+analysis = intent.analyze(system, "change password reset", 3);
+
+printline("Input: ", analysis.input);
+printline("Question? ", analysis.question.isQuestion);
+printline("Utterance type: ", analysis.question.type);
+printline("Predicted intent: ", analysis.intent.label);
+printline("");
+printline("Top matches:");
+
+for (i = 0; i < analysis.matches.count(); i = i + 1) {
+    row = analysis.matches[i];
+    printline("{i + 1}. {row.intent} score={row.score}  text={row.text}");
+    res = row.nextText != "" ? row.nextText : row.text;
+    printline("   response candidate: {res}");
+    printline("   overlap: {row.overlap}");
+}

@@ -1,0 +1,7 @@
+mod = import("../text-stat/src/tokenize.ns");
+
+normalize = mod.normalize;
+toLowerText = mod.toLowerText;
+tokens = mod.tokens;
+uniqueTokens = mod.uniqueTokens;
+lines = mod.lines;

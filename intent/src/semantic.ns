@@ -1,0 +1,26 @@
+mod = import("../text-stat/src/semantic.ns");
+tokenize = import("./src/tokenize.ns");
+stats = import("./src/stats.ns");
+utils = import("./src/utils.ns");
+
+abs = mod.abs;
+min = mod.min;
+max = mod.max;
+safeDiv = mod.safeDiv;
+splitSegments = mod.splitSegments;
+semanticCoOccurrence = mod.semanticCoOccurrence;
+termStats = mod.termStats;
+specificityFromDerived = mod.specificityFromDerived;
+specificity = mod.specificity;
+sharedNeighborRatio = mod.sharedNeighborRatio;
+directionalCoverage = mod.directionalCoverage;
+contextSimilarity = mod.contextSimilarity;
+connectorsFromDerived = mod.connectorsFromDerived;
+connectors = mod.connectors;
+connectorNeighbors = mod.connectorNeighbors;
+connectorEdgeGraph = mod.connectorEdgeGraph;
+hypernyms = mod.hypernyms;
+hyponyms = mod.hyponyms;
+relationships = mod.relationships;
+semanticClusters = mod.semanticClusters;
+taxonomy = mod.taxonomy;

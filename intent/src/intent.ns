@@ -1,0 +1,763 @@
+tokenize = import("./src/tokenize.ns");
+stats = import("./src/stats.ns");
+semantic = import("./src/semantic.ns");
+
+defaultConfig = func() {
+    return {
+        resultLimit: 5,
+        keywordLimit: 6,
+        relationshipLimit: 3,
+        semanticWeight: 0.65,
+        intentWeight: 0.20,
+        utteranceWeight: 0.15,
+        chunkSize: 10,
+        chunkStride: 5,
+        maxLabelWords: 2,
+        minPatternCount: 2,
+        queryLikeThreshold: 1.25
+    };
+}
+
+asText = func(value) {
+    if (!defined(value) || value == null) return "";
+    if (type(value).typename == "String") return value;
+    return stringify(value);
+}
+
+joinTokens = func(tokens, limit, separator) {
+    sep = defined(separator) ? separator : " ";
+    maxItems = defined(limit) ? limit : tokens.count();
+    out = "";
+    for (i = 0; i < tokens.count() && i < maxItems; i = i + 1) {
+        if (i > 0) out = out + sep;
+        out = out + tokens[i];
+    }
+    return out;
+}
+
+leadKey = func(tokens, size) {
+    if (!defined(tokens) || tokens.count() == 0) return "";
+    lim = size;
+    if (lim > tokens.count()) lim = tokens.count();
+    return this.joinTokens(tokens, lim, "_");
+}
+
+tailKey = func(tokens, size) {
+    if (!defined(tokens) || tokens.count() == 0) return "";
+    lim = size;
+    if (lim > tokens.count()) lim = tokens.count();
+    start = tokens.count() - lim;
+    out = "";
+    for (i = start; i < tokens.count(); i = i + 1) {
+        if (i > start) out = out + "_";
+        out = out + tokens[i];
+    }
+    return out;
+}
+
+lengthBucket = func(tokenCount) {
+    if (tokenCount <= 3) return "short";
+    if (tokenCount <= 8) return "medium";
+    return "long";
+}
+
+addWeight = func(map, key, amount) {
+    if (!defined(key) || key == "") return false;
+    if (!defined(map[key])) map[key] = 0;
+    map[key] = map[key] + amount;
+    return true;
+}
+
+topWordsFromMap = func(weights, limit) {
+    rows = [];
+    foreach(word in weights.props) rows.add({word: word, score: weights[word]});
+    rows = rows.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+    out = [];
+    for (i = 0; i < rows.count() && i < limit; i = i + 1) out.add(rows[i].word);
+    return out;
+}
+
+countDistinct = func(valuesMap) {
+    count = 0;
+    foreach(key in valuesMap.props) count = count + 1;
+    return count;
+}
+
+normalizeCorpusInput = func(corpusInput) {
+    docs = [];
+    if (!defined(corpusInput) || corpusInput == null) return docs;
+    if (defined(corpusInput.count) && type(corpusInput).typename != "String") {
+        for (i = 0; i < corpusInput.count(); i = i + 1) docs.add(this.asText(corpusInput[i]));
+        return docs;
+    }
+    text = this.asText(corpusInput);
+    lines = this.tokenize.lines(text);
+    nonEmpty = [];
+    for (i = 0; i < lines.count(); i = i + 1) {
+        line = this.asText(lines[i]);
+        toks = this.tokenize.tokens(line);
+        if (toks.count() == 0) continue;
+        nonEmpty.add(line);
+    }
+    if (nonEmpty.count() > 1) return nonEmpty;
+    docs.add(text);
+    return docs;
+}
+
+chunkDocuments = func(docs, config) {
+    rows = [];
+    chunkSize = config.chunkSize;
+    stride = config.chunkStride;
+    if (chunkSize < 2) chunkSize = 2;
+    if (stride < 1) stride = 1;
+
+    for (di = 0; di < docs.count(); di = di + 1) {
+        tokens = this.tokenize.tokens(docs[di]);
+        if (tokens.count() == 0) continue;
+
+        if (tokens.count() <= chunkSize) {
+            rows.add({
+                index: rows.count(),
+                docIndex: di,
+                chunkIndex: 0,
+                startToken: 0,
+                endToken: tokens.count() - 1,
+                tokens: tokens,
+                text: this.joinTokens(tokens, tokens.count(), " ")
+            });
+            continue;
+        }
+
+        chunkIndex = 0;
+        start = 0;
+        while (start < tokens.count()) {
+            end = start + chunkSize - 1;
+            if (end >= tokens.count()) end = tokens.count() - 1;
+            slice = [];
+            for (ti = start; ti <= end; ti = ti + 1) slice.add(tokens[ti]);
+            rows.add({
+                index: rows.count(),
+                docIndex: di,
+                chunkIndex: chunkIndex,
+                startToken: start,
+                endToken: end,
+                tokens: slice,
+                text: this.joinTokens(slice, slice.count(), " ")
+            });
+            if (end == tokens.count() - 1) break;
+            start = start + stride;
+            chunkIndex = chunkIndex + 1;
+        }
+    }
+    return rows;
+}
+
+keywordMap = func(keywordRows) {
+    map = {};
+    for (i = 0; i < keywordRows.count(); i = i + 1) map[keywordRows[i].word] = keywordRows[i].score;
+    return map;
+}
+
+tokenMap = func(tokens, weight) {
+    map = {};
+    w = defined(weight) ? weight : 1;
+    for (i = 0; i < tokens.count(); i = i + 1) map[tokens[i]] = w;
+    return map;
+}
+
+enrichChunks = func(chunks, corpus, keywordLimit) {
+    enriched = [];
+    for (i = 0; i < chunks.count(); i = i + 1) {
+        keywords = this.stats.keywords(chunks[i].text, corpus, keywordLimit);
+        enriched.add({
+            index: chunks[i].index,
+            docIndex: chunks[i].docIndex,
+            chunkIndex: chunks[i].chunkIndex,
+            startToken: chunks[i].startToken,
+            endToken: chunks[i].endToken,
+            text: chunks[i].text,
+            tokens: chunks[i].tokens,
+            tokenCount: chunks[i].tokens.count(),
+            lead1: this.leadKey(chunks[i].tokens, 1),
+            lead2: this.leadKey(chunks[i].tokens, 2),
+            tail1: this.tailKey(chunks[i].tokens, 1),
+            tail2: this.tailKey(chunks[i].tokens, 2),
+            length: this.lengthBucket(chunks[i].tokens.count()),
+            keywords: keywords,
+            keywordWeights: this.keywordMap(keywords),
+            tokenWeights: this.tokenMap(chunks[i].tokens, 1)
+        });
+    }
+    return enriched;
+}
+
+wordClusterMap = func(clusters) {
+    map = {};
+    for (i = 0; i < clusters.count(); i = i + 1) {
+        cluster = clusters[i];
+        for (j = 0; j < cluster.count(); j = j + 1) {
+            word = cluster[j];
+            if (!defined(map[word])) map[word] = i;
+        }
+    }
+    return map;
+}
+
+buildTopicIgnoreWords = func(rows, corpus, config) {
+    ignoreWords = {};
+    connectors = this.semantic.connectors(corpus, 12);
+    for (i = 0; i < connectors.count(); i = i + 1) ignoreWords[connectors[i].word] = true;
+
+    lead1Counts = {};
+    lead2Counts = {};
+    tail1Counts = {};
+    tail2Counts = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (rows[i].lead1 != "") this.addWeight(lead1Counts, rows[i].lead1, 1);
+        if (rows[i].lead2 != "") this.addWeight(lead2Counts, rows[i].lead2, 1);
+        if (rows[i].tail1 != "") this.addWeight(tail1Counts, rows[i].tail1, 1);
+        if (rows[i].tail2 != "") this.addWeight(tail2Counts, rows[i].tail2, 1);
+    }
+
+    foreach(word in lead1Counts.props) if (lead1Counts[word] >= config.minPatternCount) ignoreWords[word] = true;
+    foreach(word in tail1Counts.props) if (tail1Counts[word] >= config.minPatternCount) ignoreWords[word] = true;
+
+    foreach(pair in lead2Counts.props) {
+        if (lead2Counts[pair] < config.minPatternCount) continue;
+        parts = this.tokenize.tokens(pair);
+        for (pi = 0; pi < parts.count(); pi = pi + 1) ignoreWords[parts[pi]] = true;
+    }
+    foreach(pair in tail2Counts.props) {
+        if (tail2Counts[pair] < config.minPatternCount) continue;
+        parts = this.tokenize.tokens(pair);
+        for (pi = 0; pi < parts.count(); pi = pi + 1) ignoreWords[parts[pi]] = true;
+    }
+    return ignoreWords;
+}
+
+buildKeywordFamilies = func(rows, ignoreWords) {
+    seen = {};
+    words = [];
+    docCounts = {};
+
+    for (i = 0; i < rows.count(); i = i + 1) {
+        localSeen = {};
+        for (j = 0; j < rows[i].keywords.count(); j = j + 1) {
+            word = rows[i].keywords[j].word;
+            if (defined(ignoreWords[word])) continue;
+            if (!defined(seen[word])) {
+                seen[word] = true;
+                words.add(word);
+            }
+            if (!defined(localSeen[word])) {
+                localSeen[word] = true;
+                this.addWeight(docCounts, word, 1);
+            }
+        }
+    }
+
+    families = [];
+    wordToFamily = {};
+    for (i = 0; i < words.count(); i = i + 1) {
+        word = words[i];
+        assigned = false;
+        for (fi = 0; fi < families.count(); fi = fi + 1) {
+            rep = families[fi].representative;
+            if (this.stats.similarity(word, rep) >= 0.72) {
+                families[fi].words.add(word);
+                wordToFamily[word] = fi;
+                if (defined(docCounts[word]) && defined(docCounts[rep]) && docCounts[word] > docCounts[rep]) {
+                    families[fi].representative = word;
+                }
+                assigned = true;
+                break;
+            }
+        }
+        if (assigned) continue;
+        families.add({representative: word, words: [word]});
+        wordToFamily[word] = families.count() - 1;
+    }
+
+    familyDocCounts = {};
+    foreach(word in wordToFamily.props) {
+        familyKey = stringify(wordToFamily[word]);
+        if (!defined(familyDocCounts[familyKey])) familyDocCounts[familyKey] = 0;
+        familyDocCounts[familyKey] = familyDocCounts[familyKey] + docCounts[word];
+    }
+
+    return {wordToFamily: wordToFamily, familyDocCounts: familyDocCounts, families: families};
+}
+
+chooseTopicKey = func(row, wordToCluster, familyInfo, ignoreWords, config) {
+    familyScores = {};
+    for (i = 0; i < row.keywords.count(); i = i + 1) {
+        kw = row.keywords[i];
+        if (defined(ignoreWords[kw.word])) continue;
+        if (!defined(familyInfo.wordToFamily[kw.word])) continue;
+        familyKey = stringify(familyInfo.wordToFamily[kw.word]);
+        support = defined(familyInfo.familyDocCounts[familyKey]) ? familyInfo.familyDocCounts[familyKey] : 1;
+        this.addWeight(familyScores, familyKey, kw.score * support);
+    }
+
+    bestFamily = "";
+    bestFamilyScore = 0;
+    foreach(familyKey in familyScores.props) {
+        if (familyScores[familyKey] > bestFamilyScore) {
+            bestFamilyScore = familyScores[familyKey];
+            bestFamily = familyKey;
+        }
+    }
+    if (bestFamily != "") return "family_" + bestFamily;
+
+    clusterScores = {};
+    for (i = 0; i < row.keywords.count(); i = i + 1) {
+        kw = row.keywords[i];
+        if (defined(ignoreWords[kw.word])) continue;
+        if (!defined(wordToCluster[kw.word])) continue;
+        this.addWeight(clusterScores, stringify(wordToCluster[kw.word]), kw.score);
+    }
+
+    bestCluster = "";
+    bestClusterScore = 0;
+    foreach(clusterKey in clusterScores.props) {
+        if (clusterScores[clusterKey] > bestClusterScore) {
+            bestClusterScore = clusterScores[clusterKey];
+            bestCluster = clusterKey;
+        }
+    }
+    if (bestCluster != "") return "cluster_" + bestCluster;
+
+    labelTokens = [];
+    for (i = 0; i < row.keywords.count() && labelTokens.count() < config.maxLabelWords; i = i + 1) {
+        if (defined(ignoreWords[row.keywords[i].word])) continue;
+        labelTokens.add(row.keywords[i].word);
+    }
+    if (labelTokens.count() == 0) {
+        for (i = 0; i < row.tokens.count() && labelTokens.count() < config.maxLabelWords; i = i + 1) {
+            if (defined(ignoreWords[row.tokens[i]])) continue;
+            labelTokens.add(row.tokens[i]);
+        }
+    }
+    if (labelTokens.count() == 0) return "topic_" + row.index;
+    return "topic_" + this.joinTokens(labelTokens, config.maxLabelWords, "_");
+}
+
+aggregateWordProfile = func(rows) {
+    weights = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        foreach(word in rows[i].tokenWeights.props) this.addWeight(weights, word, rows[i].tokenWeights[word]);
+        foreach(word in rows[i].keywordWeights.props) this.addWeight(weights, word, rows[i].keywordWeights[word]);
+    }
+    denom = rows.count() > 0 ? rows.count() : 1;
+    foreach(word in weights.props) weights[word] = weights[word] / denom;
+    return weights;
+}
+
+buildProfileLabel = func(rows, config, ignoreWords) {
+    keywordTotals = {};
+    tokenTotals = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        foreach(word in rows[i].keywordWeights.props) {
+            if (defined(ignoreWords[word])) continue;
+            this.addWeight(keywordTotals, word, rows[i].keywordWeights[word]);
+        }
+        foreach(word in rows[i].tokenWeights.props) {
+            if (defined(ignoreWords[word])) continue;
+            this.addWeight(tokenTotals, word, rows[i].tokenWeights[word]);
+        }
+    }
+    words = this.topWordsFromMap(keywordTotals, config.maxLabelWords);
+    if (words.count() == 0) words = this.topWordsFromMap(tokenTotals, config.maxLabelWords);
+    if (words.count() == 0) return "empty";
+    return this.joinTokens(words, config.maxLabelWords, "_");
+}
+
+assignIntentLabels = func(rows, wordToCluster, familyInfo, ignoreWords, config) {
+    groups = {};
+    membership = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        key = this.chooseTopicKey(rows[i], wordToCluster, familyInfo, ignoreWords, config);
+        if (!defined(groups[key])) groups[key] = [];
+        groups[key].add(rows[i]);
+        membership[stringify(rows[i].index)] = key;
+    }
+
+    labels = {};
+    profiles = [];
+    foreach(key in groups.props) {
+        label = this.buildProfileLabel(groups[key], config, ignoreWords);
+        labels[key] = label;
+        profiles.add({key: key, label: label, rows: groups[key], wordProfile: this.aggregateWordProfile(groups[key])});
+    }
+
+    return {membership: membership, labels: labels, profiles: profiles};
+}
+
+buildUtterancePatternCounts = func(rows) {
+    lead1 = {};
+    lead2 = {};
+    tail1 = {};
+    tail2 = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (rows[i].lead1 != "") this.addWeight(lead1, rows[i].lead1, 1);
+        if (rows[i].lead2 != "") this.addWeight(lead2, rows[i].lead2, 1);
+        if (rows[i].tail1 != "") this.addWeight(tail1, rows[i].tail1, 1);
+        if (rows[i].tail2 != "") this.addWeight(tail2, rows[i].tail2, 1);
+    }
+    return {lead1: lead1, lead2: lead2, tail1: tail1, tail2: tail2};
+}
+
+chooseUtteranceTypeKey = func(row, patternCounts, config) {
+    if (row.lead2 != "" && defined(patternCounts.lead2[row.lead2]) && patternCounts.lead2[row.lead2] >= config.minPatternCount) return "lead2_" + row.lead2 + "|" + row.length;
+    if (row.tail2 != "" && defined(patternCounts.tail2[row.tail2]) && patternCounts.tail2[row.tail2] >= config.minPatternCount) return "tail2_" + row.tail2 + "|" + row.length;
+    if (row.lead1 != "" && defined(patternCounts.lead1[row.lead1]) && patternCounts.lead1[row.lead1] >= config.minPatternCount) return "lead1_" + row.lead1 + "|" + row.length;
+    if (row.tail1 != "" && defined(patternCounts.tail1[row.tail1]) && patternCounts.tail1[row.tail1] >= config.minPatternCount) return "tail1_" + row.tail1 + "|" + row.length;
+    if (row.keywords.count() > 0) return "keyword_" + row.keywords[0].word + "|" + row.length;
+    if (row.tokens.count() > 0) return "token_" + row.tokens[0] + "|" + row.length;
+    return "shape_" + row.length + "_" + row.index;
+}
+
+scoreLeadProfile = func(leadProfile, lead1, lead2) {
+    score = 0;
+    if (lead2 != "" && defined(leadProfile[lead2])) score = score + (leadProfile[lead2] * 1.5);
+    if (lead1 != "" && defined(leadProfile[lead1])) score = score + leadProfile[lead1];
+    return score;
+}
+
+scoreTailProfile = func(tailProfile, tail1, tail2) {
+    score = 0;
+    if (tail2 != "" && defined(tailProfile[tail2])) score = score + (tailProfile[tail2] * 1.5);
+    if (tail1 != "" && defined(tailProfile[tail1])) score = score + tailProfile[tail1];
+    return score;
+}
+
+assignUtteranceTypes = func(rows, config) {
+    patternCounts = this.buildUtterancePatternCounts(rows);
+    groups = {};
+    membership = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        key = this.chooseUtteranceTypeKey(rows[i], patternCounts, config);
+        if (!defined(groups[key])) groups[key] = [];
+        groups[key].add(rows[i]);
+        membership[stringify(rows[i].index)] = key;
+    }
+
+    labels = {};
+    profiles = [];
+    foreach(key in groups.props) {
+        rowsInGroup = groups[key];
+        label = "utterance_" + this.buildProfileLabel(rowsInGroup, {maxLabelWords: 1}, {}) + "_" + rowsInGroup[0].length;
+        labels[key] = label;
+
+        leadProfile = {};
+        tailProfile = {};
+        intentMembership = {};
+        contentWords = {};
+        for (i = 0; i < rowsInGroup.count(); i = i + 1) {
+            row = rowsInGroup[i];
+            if (row.lead1 != "") this.addWeight(leadProfile, row.lead1, 1);
+            if (row.lead2 != "") this.addWeight(leadProfile, row.lead2, 1.5);
+            if (row.tail1 != "") this.addWeight(tailProfile, row.tail1, 1);
+            if (row.tail2 != "") this.addWeight(tailProfile, row.tail2, 1.5);
+            intentMembership[row.intent] = true;
+            for (ki = 0; ki < row.keywords.count(); ki = ki + 1) contentWords[row.keywords[ki].word] = true;
+        }
+
+        rowCount = rowsInGroup.count() > 0 ? rowsInGroup.count() : 1;
+        structuralReuse = rowCount > 1 ? rowCount - 1 : 0;
+        distinctIntentCount = rowCount > 1 ? this.countDistinct(intentMembership) : 0;
+        distinctContentCount = rowCount > 1 ? this.countDistinct(contentWords) : 0;
+        queryLikeScore = structuralReuse + distinctIntentCount + (rowCount > 1 ? (distinctContentCount / rowCount) : 0);
+
+        profiles.add({
+            key: key,
+            label: label,
+            rows: rowsInGroup,
+            wordProfile: this.aggregateWordProfile(rowsInGroup),
+            leadProfile: leadProfile,
+            tailProfile: tailProfile,
+            length: rowsInGroup[0].length,
+            queryLikeScore: queryLikeScore,
+            isQuestionLike: queryLikeScore >= config.queryLikeThreshold
+        });
+    }
+
+    return {membership: membership, labels: labels, profiles: profiles};
+}
+
+buildSemanticExpansion = func(corpus, text, config) {
+    tokens = this.tokenize.uniqueTokens(text);
+    keywords = this.stats.keywords(text, corpus, config.keywordLimit);
+    weights = this.tokenMap(tokens, 1);
+
+    for (i = 0; i < keywords.count(); i = i + 1) this.addWeight(weights, keywords[i].word, 1 + keywords[i].score);
+
+    for (i = 0; i < tokens.count(); i = i + 1) {
+        rels = this.semantic.relationships(corpus, tokens[i], config.relationshipLimit);
+        for (j = 0; j < rels.hypernyms.count(); j = j + 1) this.addWeight(weights, rels.hypernyms[j].word, 0.40);
+        for (j = 0; j < rels.hyponyms.count(); j = j + 1) this.addWeight(weights, rels.hyponyms[j].word, 0.40);
+        for (j = 0; j < rels.peers.count(); j = j + 1) this.addWeight(weights, rels.peers[j].word, 0.30);
+        for (j = 0; j < rels.attributes.count(); j = j + 1) this.addWeight(weights, rels.attributes[j].word, 0.25);
+        for (j = 0; j < rels.behaviors.count(); j = j + 1) this.addWeight(weights, rels.behaviors[j].word, 0.25);
+    }
+
+    return {
+        text: text,
+        tokens: tokens,
+        keywords: keywords,
+        weights: weights,
+        lead1: this.leadKey(tokens, 1),
+        lead2: this.leadKey(tokens, 2),
+        tail1: this.tailKey(tokens, 1),
+        tail2: this.tailKey(tokens, 2),
+        length: this.lengthBucket(tokens.count())
+    };
+}
+
+scoreAgainstProfile = func(weights, profile) {
+    score = 0;
+    foreach(word in weights.props) {
+        if (!defined(profile[word])) continue;
+        score = score + (weights[word] * profile[word]);
+    }
+    return score;
+}
+
+classifyIntent = func(system, inputProfile) {
+    rows = [];
+    total = 0;
+    for (i = 0; i < system.intentProfiles.count(); i = i + 1) {
+        score = this.scoreAgainstProfile(inputProfile.weights, system.intentProfiles[i].wordProfile);
+        rows.add({label: system.intentProfiles[i].label, score: score});
+        total = total + score;
+    }
+    rows = rows.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+    probabilities = {};
+    if (rows.count() == 0) return {label: "", support: 0, probabilities: probabilities};
+    if (total > 0) {
+        for (i = 0; i < rows.count(); i = i + 1) probabilities[rows[i].label] = rows[i].score / total;
+    } else {
+        fallback = 1 / rows.count();
+        for (i = 0; i < rows.count(); i = i + 1) probabilities[rows[i].label] = fallback;
+    }
+    return {label: rows[0].label, support: probabilities[rows[0].label], probabilities: probabilities};
+}
+
+classifyUtteranceType = func(system, inputProfile) {
+    rows = [];
+    for (i = 0; i < system.utteranceProfiles.count(); i = i + 1) {
+        profile = system.utteranceProfiles[i];
+        semanticScore = this.scoreAgainstProfile(inputProfile.weights, profile.wordProfile);
+        leadScore = this.scoreLeadProfile(profile.leadProfile, inputProfile.lead1, inputProfile.lead2);
+        tailScore = this.scoreTailProfile(profile.tailProfile, inputProfile.tail1, inputProfile.tail2);
+        lengthScore = inputProfile.length == profile.length ? 0.5 : 0;
+        rows.add({
+            label: profile.label,
+            score: semanticScore + leadScore + tailScore + lengthScore,
+            isQuestionLike: profile.isQuestionLike,
+            queryLikeScore: profile.queryLikeScore
+        });
+    }
+    rows = rows.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+    if (rows.count() == 0) return {type: "utterance_" + inputProfile.length, isQuestion: false, support: 0, queryLikeScore: 0};
+    return {
+        type: rows[0].label,
+        isQuestion: rows[0].isQuestionLike,
+        support: rows[0].score,
+        queryLikeScore: rows[0].queryLikeScore
+    };
+}
+
+utteranceCompatibility = func(prediction, rowType, rowIsQuestionLike) {
+    if (prediction.type == rowType) return 1;
+    if (prediction.isQuestion == rowIsQuestionLike) return 0.5;
+    return 0;
+}
+
+scoreSemanticMatch = func(inputWeights, row) {
+    overlap = [];
+    score = 0;
+    foreach(word in inputWeights.props) {
+        rowWeight = 0;
+        if (defined(row.keywordWeights[word])) rowWeight = row.keywordWeights[word];
+        else if (defined(row.tokenWeights[word])) rowWeight = row.tokenWeights[word];
+        if (rowWeight <= 0) continue;
+        overlap.add(word);
+        score = score + (inputWeights[word] * rowWeight);
+    }
+    if (overlap.count() == 0) return {score: 0, overlap: overlap};
+    norm = row.tokenCount > 0 ? row.tokenCount : 1;
+    return {score: score / norm, overlap: overlap};
+}
+
+neighborText = func(rows, docIndex, chunkIndex, offset) {
+    target = chunkIndex + offset;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (rows[i].docIndex == docIndex && rows[i].chunkIndex == target) return rows[i].text;
+    }
+    return "";
+}
+
+train = func(corpusInput, config) {
+    cfg = defined(config) ? config : this.defaultConfig();
+    docs = this.normalizeCorpusInput(corpusInput);
+    chunks = this.chunkDocuments(docs, cfg);
+    corpusTexts = [];
+    for (i = 0; i < chunks.count(); i = i + 1) corpusTexts.add(chunks[i].text);
+    corpus = this.stats.from(corpusTexts);
+    enriched = this.enrichChunks(chunks, corpus, cfg.keywordLimit);
+
+    clusters = this.semantic.semanticClusters(corpus);
+    wordToCluster = this.wordClusterMap(clusters);
+    ignoreWords = this.buildTopicIgnoreWords(enriched, corpus, cfg);
+    familyInfo = this.buildKeywordFamilies(enriched, ignoreWords);
+    intentInfo = this.assignIntentLabels(enriched, wordToCluster, familyInfo, ignoreWords, cfg);
+
+    intentRows = [];
+    for (i = 0; i < enriched.count(); i = i + 1) {
+        rowId = stringify(enriched[i].index);
+        intentRows.add({
+            index: enriched[i].index,
+            docIndex: enriched[i].docIndex,
+            chunkIndex: enriched[i].chunkIndex,
+            startToken: enriched[i].startToken,
+            endToken: enriched[i].endToken,
+            text: enriched[i].text,
+            tokens: enriched[i].tokens,
+            tokenCount: enriched[i].tokenCount,
+            lead1: enriched[i].lead1,
+            lead2: enriched[i].lead2,
+            tail1: enriched[i].tail1,
+            tail2: enriched[i].tail2,
+            length: enriched[i].length,
+            keywords: enriched[i].keywords,
+            keywordWeights: enriched[i].keywordWeights,
+            tokenWeights: enriched[i].tokenWeights,
+            intent: intentInfo.labels[intentInfo.membership[rowId]]
+        });
+    }
+
+    utteranceInfo = this.assignUtteranceTypes(intentRows, cfg);
+    finalRows = [];
+    for (i = 0; i < intentRows.count(); i = i + 1) {
+        rowId = stringify(intentRows[i].index);
+        utteranceType = utteranceInfo.labels[utteranceInfo.membership[rowId]];
+        rowIsQuestion = false;
+        for (ui = 0; ui < utteranceInfo.profiles.count(); ui = ui + 1) {
+            if (utteranceInfo.profiles[ui].label == utteranceType) rowIsQuestion = utteranceInfo.profiles[ui].isQuestionLike;
+        }
+        finalRows.add({
+            index: intentRows[i].index,
+            docIndex: intentRows[i].docIndex,
+            chunkIndex: intentRows[i].chunkIndex,
+            startToken: intentRows[i].startToken,
+            endToken: intentRows[i].endToken,
+            text: intentRows[i].text,
+            tokens: intentRows[i].tokens,
+            tokenCount: intentRows[i].tokenCount,
+            lead1: intentRows[i].lead1,
+            lead2: intentRows[i].lead2,
+            tail1: intentRows[i].tail1,
+            tail2: intentRows[i].tail2,
+            length: intentRows[i].length,
+            keywords: intentRows[i].keywords,
+            keywordWeights: intentRows[i].keywordWeights,
+            tokenWeights: intentRows[i].tokenWeights,
+            intent: intentRows[i].intent,
+            utteranceType: utteranceType,
+            isQuestionLike: rowIsQuestion,
+            previousText: this.neighborText(intentRows, intentRows[i].docIndex, intentRows[i].chunkIndex, -1),
+            nextText: this.neighborText(intentRows, intentRows[i].docIndex, intentRows[i].chunkIndex, 1)
+        });
+    }
+
+    return {
+        config: cfg,
+        docs: docs,
+        corpus: corpus,
+        rows: finalRows,
+        semanticClusters: clusters,
+        intentProfiles: intentInfo.profiles,
+        utteranceProfiles: utteranceInfo.profiles
+    };
+}
+
+analyze = func(system, inputText, limit) {
+    lim = defined(limit) ? limit : system.config.resultLimit;
+    inputProfile = this.buildSemanticExpansion(system.corpus, inputText, system.config);
+    intentPrediction = this.classifyIntent(system, inputProfile);
+    utterancePrediction = this.classifyUtteranceType(system, inputProfile);
+
+    matches = [];
+    for (i = 0; i < system.rows.count(); i = i + 1) {
+        row = system.rows[i];
+        semanticResult = this.scoreSemanticMatch(inputProfile.weights, row);
+        intentScore = defined(intentPrediction.probabilities[row.intent]) ? intentPrediction.probabilities[row.intent] : 0;
+        utteranceScore = this.utteranceCompatibility(utterancePrediction, row.utteranceType, row.isQuestionLike);
+        total = (semanticResult.score * system.config.semanticWeight) +
+                (intentScore * system.config.intentWeight) +
+                (utteranceScore * system.config.utteranceWeight);
+
+        matches.add({
+            rank: 0,
+            score: total,
+            semanticScore: semanticResult.score,
+            intentScore: intentScore,
+            utteranceScore: utteranceScore,
+            overlap: semanticResult.overlap,
+            intent: row.intent,
+            utteranceType: row.utteranceType,
+            isQuestionLike: row.isQuestionLike,
+            text: row.text,
+            previousText: row.previousText,
+            nextText: row.nextText,
+            keywords: row.keywords
+        });
+    }
+
+    matches = matches.sort(func(indexA, itemA, indexB, itemB) => itemB.score - itemA.score);
+    top = [];
+    for (i = 0; i < matches.count() && i < lim; i = i + 1) {
+        row = matches[i];
+        row.rank = i + 1;
+        top.add(row);
+    }
+
+    return {
+        input: inputText,
+        question: {
+            isQuestion: utterancePrediction.isQuestion,
+            type: utterancePrediction.type,
+            support: utterancePrediction.support,
+            queryLikeScore: utterancePrediction.queryLikeScore
+        },
+        intent: intentPrediction,
+        semantics: {
+            tokens: inputProfile.tokens,
+            keywords: inputProfile.keywords,
+            relatedTerms: inputProfile.weights
+        },
+        matches: top
+    };
+}
+
+responses = func(system, inputText, limit) {
+    analysis = this.analyze(system, inputText, limit);
+    out = [];
+    for (i = 0; i < analysis.matches.count(); i = i + 1) {
+        match = analysis.matches[i];
+        responseText = match.nextText != "" ? match.nextText : match.text;
+        out.add({
+            rank: match.rank,
+            score: match.score,
+            intent: match.intent,
+            utteranceType: match.utteranceType,
+            isQuestionLike: match.isQuestionLike,
+            response: responseText,
+            matchedText: match.text,
+            contextBefore: match.previousText,
+            overlap: match.overlap
+        });
+    }
+    return out;
+}

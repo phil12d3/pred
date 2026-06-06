@@ -1,0 +1,9 @@
+mod = import("../text-stat/src/utils.ns");
+
+isNumber = mod.isNumber;
+copyArray = mod.copyArray;
+abs = mod.abs;
+min = mod.min;
+max = mod.max;
+clamp = mod.clamp;
+sortByNumberDesc = mod.sortByNumberDesc;
