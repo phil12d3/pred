@@ -11,7 +11,6 @@
       --muted: #5a6975;
       --line: #d7e1e8;
       --accent: #0f766e;
-      --accent2: #1d4ed8;
       --soft: #f8fbfc;
       --warn: #fff7ed;
       --radius: 12px;
@@ -38,7 +37,7 @@
     .hero {
       padding: 28px;
       margin-bottom: 18px;
-      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(15,118,110,0.02)), var(--panel);
     }
     .section { padding: 20px; margin-bottom: 14px; }
     h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; }
@@ -46,7 +45,7 @@
     h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
     h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
     p { margin: 10px 0; }
-    ul { margin: 8px 0 8px 22px; }
+    ul, ol { margin: 8px 0 8px 22px; }
     li { margin: 5px 0; }
     .muted { color: var(--muted); }
     .code {
@@ -64,16 +63,12 @@
       font-size: 0.92rem;
       color: #102a43;
     }
-    .prop, .note {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      margin: 10px 0;
-      background: #fff;
-    }
     .note {
       background: var(--warn);
       border-left: 4px solid #b45309;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
     }
     table {
       width: 100%;
@@ -89,7 +84,7 @@
       border-bottom: 1px solid var(--line);
       vertical-align: top;
     }
-    th { background: #f7fafc; font-family: "Trebuchet MS", Verdana, sans-serif; }
+    th { background: #f7fafc; }
     tr:last-child td { border-bottom: 0; }
   </style>
 </head>
@@ -97,231 +92,410 @@
   <div class="container">
     <div class="hero">
       <h1>intent Documentation</h1>
-      <p class="muted">Corpus-driven intent and utterance-type discovery.</p>
-      <p>The module trains from raw text, not labeled question/answer rows. It turns a corpus into chunk-level semantic profiles, then uses those profiles to infer topic, utterance form, and response candidates for new input.</p>
+      <p class="muted">Topic-first, relation-aware intent analysis from raw corpus text.</p>
+      <p>The module now focuses on what your example actually needs: learn a corpus model, find the main topic terms in new input, infer what relation family is being requested, and map that to a stable intent label.</p>
     </div>
 
     <div class="section">
-      <h2>Overview</h2>
-      <p>The pipeline has five main stages:</p>
+      <h2>Target Behavior</h2>
+      <div class="code"><code>"What is a poodle?"
+topics: ["poodle"]
+parentTopics: ["dogs", "animals"]
+relationsRequested: ["category_of"]
+intent: "define"
+
+"Can dogs swim?"
+topics: ["dogs", "swim"]
+parentTopics: ["animals"]
+relationsRequested: ["capability_of"]
+intent: "capability_check"</code></div>
+      <p>This is the contract the module is now built around.</p>
+    </div>
+
+    <div class="section">
+      <h2>Output Fields</h2>
+      <p><code>intent.analyze(...)</code> returns several layers of output. They are related, but they are not the same thing.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>What it means</th><th>What it is not</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>topics</code></td><td>The main terms from the input that the model believes the user is directly asking about.</td><td>Not the broader class. Not the final intent label.</td></tr>
+          <tr><td><code>parentTopics</code></td><td>Broader classes inherited from learned <code>category_of</code> links. These provide context above the direct topic.</td><td>Not replacements for the main topic. Not proof of the requested relation by themselves.</td></tr>
+          <tr><td><code>relationsRequested</code></td><td>The learned relation family that the input appears to be asking for, such as <code>category_of</code> or <code>capability_of</code>.</td><td>Not the same as the topic. Not the same as the user-facing intent label.</td></tr>
+          <tr><td><code>rulesMatched</code></td><td>Declarative rules that matched the input. These can override the relation-based intent.</td><td>Not the raw corpus evidence. These are rule hits, not learned bridge profiles.</td></tr>
+          <tr><td><code>matchedRule</code></td><td>The highest-ranked matched rule, if any.</td><td>Not the corpus-derived relation request.</td></tr>
+          <tr><td><code>intentSource</code></td><td>Tells you whether the final intent came from a rule or from the relation mapping fallback.</td><td>Not the intent label itself.</td></tr>
+          <tr><td><code>intent</code></td><td>The normalized public label produced from the strongest relation, such as <code>define</code> or <code>capability_check</code>.</td><td>Not directly learned as a word from the corpus. It is a configured label.</td></tr>
+          <tr><td><code>evidence.matchingSegments</code></td><td>Direct corpus segments that support the main topic match.</td><td>Not inherited parent evidence.</td></tr>
+          <tr><td><code>evidence.parentSegments</code></td><td>Corpus segments that explain why a parent topic was inherited.</td><td>Not the primary evidence for the direct topic match.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Topics Vs Parents Vs Relations</h2>
+      <p>The easiest way to read the output is:</p>
+      <ul>
+        <li><code>topics</code> answers: "what thing in the input is the user talking about?"</li>
+        <li><code>parentTopics</code> answers: "what broader class does that thing belong to?"</li>
+        <li><code>relationsRequested</code> answers: "what kind of information is being asked about that thing?"</li>
+        <li><code>intent</code> answers: "what public label do we want to expose for that relation?"</li>
+      </ul>
+      <div class="code"><code>Input: "what is a poodle"
+
+topics:
+- poodle
+
+parentTopics:
+- dogs
+- animals
+
+relationsRequested:
+- category_of
+
+intent:
+- define</code></div>
+      <p>In that example:</p>
+      <ul>
+        <li><code>poodle</code> is the direct topic because it is what the input is about.</li>
+        <li><code>dogs</code> and <code>animals</code> are parent topics because they are broader classes reached through learned category links.</li>
+        <li><code>category_of</code> is the requested relation because the input is asking for the class or kind of the topic.</li>
+        <li><code>define</code> is just the public label mapped from <code>category_of</code>.</li>
+      </ul>
+      <div class="code"><code>Input: "can dogs swim"
+
+topics:
+- dogs
+- swim
+
+parentTopics:
+- animals
+
+relationsRequested:
+- capability_of
+
+intent:
+- capability_check</code></div>
+      <p>Here the difference matters:</p>
+      <ul>
+        <li><code>dogs</code> is still the thing being asked about.</li>
+        <li><code>animals</code> is only inherited context.</li>
+        <li><code>capability_of</code> is the relation because the input is asking whether the topic can do something.</li>
+        <li><code>capability_check</code> is the public intent label for that relation.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Rule Layer</h2>
+      <p>Rules sit on top of the corpus learner. The corpus still learns topics, parents, bridge families, and relation requests. Rules only decide how to label an input when a shape matches.</p>
+      <p>This is the order of operations:</p>
       <ol>
-        <li>Normalize the corpus input into documents.</li>
-        <li>Chunk each document into overlapping windows of tokens.</li>
-        <li>Build semantic topic profiles from keywords, clusters, and word families.</li>
-        <li>Build utterance-type profiles from repeated structural patterns.</li>
-        <li>Score new input against both profile sets and return nearby corpus context as responses.</li>
+        <li>Train the corpus model.</li>
+        <li>Analyze the new input into topics, parent topics, and relation requests.</li>
+        <li>Try the declarative rules in <code>config.intentRules</code>.</li>
+        <li>If a rule matches, its <code>label</code> becomes the intent.</li>
+        <li>If no rule matches, fall back to the relation-to-intent mapping.</li>
       </ol>
-      <div class="note">Nothing in this stage requires hardcoded English question words like <code>what</code> or <code>how</code>. The learner depends on repeated patterns and semantic evidence inside the corpus itself.</div>
+      <h3>Rule Object Fields</h3>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>label</code></td><td>string</td><td>Required. The intent label to return if the rule matches, such as <code>question</code> or <code>help</code>.</td></tr>
+          <tr><td><code>priority</code></td><td>number</td><td>Optional. Higher values win when more than one rule matches. Default is <code>0</code>.</td></tr>
+          <tr><td><code>containsAny</code></td><td>string or array</td><td>Optional. At least one of these words must appear in the input.</td></tr>
+          <tr><td><code>containsAll</code></td><td>string or array</td><td>Optional. Every listed word must appear in the input.</td></tr>
+          <tr><td><code>containsNone</code></td><td>string or array</td><td>Optional. None of these words may appear in the input.</td></tr>
+          <tr><td><code>sequence</code></td><td>array</td><td>Optional. An ordered pattern the input must satisfy. The matcher can skip words between items.</td></tr>
+          <tr><td><code>relationAny</code></td><td>string or array</td><td>Optional. At least one learned relation request must match one of these relation kinds.</td></tr>
+          <tr><td><code>relationAll</code></td><td>string or array</td><td>Optional. Every listed relation kind must be present in the analyzed input.</td></tr>
+          <tr><td><code>topicCountMin</code></td><td>number</td><td>Optional. Minimum number of direct topics required.</td></tr>
+          <tr><td><code>topicCountMax</code></td><td>number</td><td>Optional. Maximum number of direct topics allowed.</td></tr>
+          <tr><td><code>parentTopicCountMin</code></td><td>number</td><td>Optional. Minimum number of inherited parent topics required.</td></tr>
+        </tbody>
+      </table>
+      <h3>Pattern Item Types</h3>
+      <p>The <code>sequence</code> array is made from pattern items. A string item means an exact word match. Objects let you describe richer shapes.</p>
+      <table>
+        <thead>
+          <tr><th>Pattern item</th><th>Meaning</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>"what"</code></td><td>Exact word match shorthand.</td><td>The input must contain the word <code>what</code>.</td></tr>
+          <tr><td><code>{ kind: "word", value: "what" }</code></td><td>Exact word match written explicitly.</td><td>Same as the string shorthand.</td></tr>
+          <tr><td><code>{ kind: "oneOf", words: ["what", "how", "why"] }</code></td><td>Matches any one word from the list.</td><td>Useful for cue-word groups.</td></tr>
+          <tr><td><code>{ kind: "topic" }</code></td><td>Matches any analyzed topic token.</td><td>Lets the rule refer to the thing being asked about.</td></tr>
+          <tr><td><code>{ kind: "parentTopic" }</code></td><td>Matches any inherited parent topic token.</td><td>Useful when a rule should fire on broader inherited classes.</td></tr>
+          <tr><td><code>{ kind: "any" }</code></td><td>Matches any token.</td><td>Useful as a free spacer position.</td></tr>
+          <tr><td><code>{ kind: "wildcard" }</code></td><td>Matches zero or more tokens.</td><td>Useful when you do not know how many filler words are in between.</td></tr>
+          <tr><td><code>{ kind: "optional", item: ... }</code></td><td>Matches either zero or one occurrence of the inner item.</td><td>Useful when a word may or may not be present.</td></tr>
+        </tbody>
+      </table>
+      <h3>How Matching Works</h3>
+      <ul>
+        <li><code>containsAny</code> and <code>containsAll</code> look for literal words in the input tokens.</li>
+        <li><code>sequence</code> items must appear in order, but the matcher can skip words between them.</li>
+        <li><code>wildcard</code> can absorb any number of words.</li>
+        <li><code>optional</code> can be omitted entirely or matched once.</li>
+        <li>Rules are ranked by <code>priority</code> first, then by how much structure they match.</li>
+      </ul>
+      <div class="code"><code>intentRules = [
+  {
+    label: "question",
+    priority: 100,
+    containsAny: ["what", "how", "why"],
+    sequence: [
+      { kind: "oneOf", words: ["what", "how", "why"] },
+      { kind: "topic" }
+    ]
+  }
+]</code></div>
+      <p>That rule means: if the input contains one of the cue words and then later contains a topic, label it <code>question</code>. It can match <code>what is a poodle</code> because the matcher is allowed to skip filler words between the cue word and the topic.</p>
+      <div class="code"><code>intentRules = [
+  {
+    label: "help",
+    priority: 50,
+    containsAny: ["help", "support"],
+    containsNone: ["error"],
+    sequence: [
+      { kind: "oneOf", words: ["help", "support"] },
+      { kind: "wildcard" },
+      { kind: "topic" }
+    ]
+  }
+]</code></div>
+      <p>If a rule matches, <code>intent</code> comes from the rule label and <code>intentSource</code> becomes <code>rule</code>. If no rule matches, the module falls back to the relation-to-intent mapping.</p>
+    </div>
+
+    <div class="section">
+      <h2>Pipeline</h2>
+      <ol>
+        <li>Normalize the input corpus into documents.</li>
+        <li>Split documents into sentence-like segments.</li>
+        <li>Split each corpus segment into a simple <code>left / bridge / right</code> pattern.</li>
+        <li>Learn bridge families from repeated segment patterns across the corpus.</li>
+        <li>Build a topic vocabulary from words that appear on the left or right side of those pairs.</li>
+        <li>When new text arrives, match input tokens to learned topic words.</li>
+        <li>Walk learned <code>category_of</code> links upward to collect broader parent topics.</li>
+        <li>Use the remaining cue tokens and the learned bridge families to infer which relation is being requested.</li>
+        <li>Map that learned relation kind to a stable intent label.</li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h2>What It Learns</h2>
+      <p>The module learns from corpus segments directly:</p>
+      <ul>
+        <li><strong>topics</strong>: words that repeatedly appear as the left or right side of corpus pairs</li>
+        <li><strong>parent topics</strong>: broader classes reached by walking learned <code>category_of</code> links</li>
+        <li><strong>bridge families</strong>: repeated middle patterns such as <code>are</code> or <code>can</code></li>
+        <li><strong>relation kinds</strong>: learned families normalized to labels like <code>category_of</code> and <code>capability_of</code></li>
+        <li><strong>evidence segments</strong>: corpus segments most relevant to the new input</li>
+      </ul>
+      <div class="note">The topic and relation learning are corpus-driven. The final normalized intent labels such as <code>define</code> and <code>capability_check</code> come from <code>config.intentLabels</code>. In other words, the corpus learns the relation family, and the config names that family.</div>
+    </div>
+
+    <div class="section">
+      <h2>Label Glossary</h2>
+      <p>The module uses two separate label layers. One layer names learned relation kinds. The other layer exposes public intent labels for callers.</p>
+      <h3>Relation Kinds</h3>
+      <table>
+        <thead>
+          <tr><th>Label</th><th>Meaning in the module</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>category_of</code></td><td>The corpus suggests that the topic belongs to a broader class. This is the relation used for definition-style queries and parent-topic inheritance.</td></tr>
+          <tr><td><code>capability_of</code></td><td>The corpus suggests an action or capability associated with the topic. This usually means the bridge repeats across multiple different subjects.</td></tr>
+          <tr><td><code>attribute_of</code></td><td>The corpus suggests a descriptive property, feature, or quality of the topic.</td></tr>
+          <tr><td><code>compare_topics</code></td><td>The input is treating two topics as the main items to compare.</td></tr>
+          <tr><td><code>related_to</code></td><td>The input points to a related concept, but not a stronger category, capability, or attribute relation.</td></tr>
+          <tr><td><code>explain_topic</code></td><td>A learned descriptive relation for repeated corpus rows that describe one topic through the same bridge pattern, rather than place it in a broader class. This usually means the same subject keeps repeating while the right side varies with descriptive details.</td></tr>
+        </tbody>
+      </table>
+      <h3>Public Intent Labels</h3>
+      <table>
+        <thead>
+          <tr><th>Label</th><th>Meaning for the caller</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>define</code></td><td>Category lookup. The input is asking what class or kind the topic belongs to.</td></tr>
+          <tr><td><code>capability_check</code></td><td>Capability lookup. The input is asking whether the topic can do something.</td></tr>
+          <tr><td><code>attribute_query</code></td><td>Attribute lookup. The input is asking about a property or feature of the topic.</td></tr>
+          <tr><td><code>compare</code></td><td>Comparison request. The input is centered on two topics and their differences or similarities.</td></tr>
+          <tr><td><code>relation_query</code></td><td>General relation lookup. The input is asking for a connection that is not stronger than the other labels.</td></tr>
+          <tr><td><code>explain</code></td><td>Explanation-style request. The input is asking for more context or detail about the topic.</td></tr>
+          <tr><td><code>explore</code></td><td>Fallback when the module cannot confidently map the input to a stronger relation.</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="section">
       <h2>Input</h2>
       <table>
         <thead>
-          <tr><th>Input form</th><th>How it is handled</th></tr>
+          <tr><th>Input form</th><th>Meaning</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>"large text..."</code></td><td>Trained as one corpus source. If it contains several non-empty lines, each line becomes a separate corpus unit first.</td></tr>
-          <tr><td><code>["doc one", "doc two"]</code></td><td>Each string is treated as its own document.</td></tr>
-          <tr><td>multi-line string</td><td>Preferred when you already have one utterance or one response block per line.</td></tr>
+          <tr><td><code>"large text..."</code></td><td>One corpus block.</td></tr>
+          <tr><td><code>["doc one", "doc two"]</code></td><td>Several corpus documents.</td></tr>
+          <tr><td>multi-line string</td><td>Each non-empty line becomes a separate corpus document first.</td></tr>
         </tbody>
       </table>
       <div class="code"><code>corpus = "
-como resetear clave usar enlace reset ahora
-como cambiar correo abrir ajustes perfil ahora
-donde ver facturas abrir pagina cobros ahora
-donde descargar recibos abrir pagina cobros ahora
-error clave bloqueada soporte revisa caso ahora
+poodles are dogs
+dogs are animals
+cats are animals
+poodles have curly coats
+dogs can swim
 ";</code></div>
-      <p>In that example, the trainer sees five separate corpus units because there are five non-empty lines.</p>
     </div>
 
     <div class="section">
-      <h2>Stage 1: Normalization</h2>
-      <p><code>intent.train(...)</code> first converts the input to a list of plain text documents.</p>
-      <ul>
-        <li>If the caller passes a list, each element is stringified and kept as one document.</li>
-        <li>If the caller passes one string with several non-empty lines, each line becomes a document.</li>
-        <li>If the caller passes one string with no useful line breaks, it stays as one document and later chunking handles the segmentation.</li>
-      </ul>
-      <div class="code"><code>// Input
-"a line about passwords
-a line about invoices"
+      <h2>Stage 1: Pair Learning</h2>
+      <p>Each training segment is reduced to a simple pattern:</p>
+      <div class="code"><code>poodles are dogs
+left   = poodles
+bridge = are
+right  = dogs
 
-// After normalization
-[
-  "a line about passwords",
-  "a line about invoices"
+dogs can swim
+left   = dogs
+bridge = can
+right  = swim</code></div>
+      <p>Those rows are then grouped by bridge text so the system can learn repeated relation families from the corpus itself.</p>
+    </div>
+
+    <div class="section">
+      <h2>Stage 2: Topic Detection</h2>
+      <p>At training time, the module builds a topic vocabulary from words that appear on the left or right side of learned pairs. At analysis time, each input token is scored against those topic words using:</p>
+      <ul>
+        <li>exact token overlap</li>
+        <li>keyword overlap</li>
+        <li>fuzzy word similarity</li>
+        <li>pair support in the corpus</li>
+      </ul>
+      <div class="code"><code>input: "what is a poodle"
+
+candidate topic scores:
+poodle   -> strong exact match
+dogs     -> weaker related term
+animals  -> weaker related term</code></div>
+      <p>The highest-scoring terms become <code>analysis.topics</code>.</p>
+    </div>
+
+    <div class="section">
+      <h2>Stage 3: Parent Topic Inference</h2>
+      <p>After direct topics are selected, the module walks upward through learned <code>category_of</code> links and returns broader classes separately in <code>analysis.parentTopics</code>.</p>
+      <div class="code"><code>poodles are dogs
+dogs are animals
+
+input topic: poodle
+parent topics:
+- dogs
+- animals</code></div>
+      <p>This keeps the queried topic as the main result while still exposing useful inherited context.</p>
+    </div>
+
+    <div class="section">
+      <h2>Stage 4: Relation Request Detection</h2>
+      <p>For each input, the module then looks at the non-topic cue tokens and checks which learned bridge family they match.</p>
+      <table>
+        <thead>
+          <tr><th>Learned relation</th><th>Typical meaning</th><th>How the corpus shape differs</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>category_of</code></td><td>A bridge family whose right-hand terms often reappear as left-hand terms elsewhere in the corpus.</td><td>Right side looks reusable as a broader class.</td></tr>
+          <tr><td><code>capability_of</code></td><td>A repeated bridge family that links many left-hand topics to action-like right-hand terms.</td><td>The same bridge appears across multiple subjects.</td></tr>
+          <tr><td><code>explain_topic</code></td><td>A repeated descriptive bridge family for one topic.</td><td>The same left side repeats while the right side varies with details.</td></tr>
+          <tr><td><code>attribute_of</code></td><td>A bridge family that tends to attach descriptive right-hand terms to a topic.</td><td>Usually a single descriptive row or a lighter pattern than explain.</td></tr>
+          <tr><td><code>compare_topics</code></td><td>The input strongly mentions two topics.</td><td>Two topics are both primary.</td></tr>
+          <tr><td><code>related_to</code></td><td>The input refers to peer or neighboring concepts.</td><td>No stronger family won.</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><code>corpus rows:
+dogs can swim
+birds can fly
+
+learned bridge family:
+bridge = can
+kind   = capability_of
+
+input: "can dogs swim"
+topic: dogs
+cue token match: can
+relation requested: capability_of</code></div>
+      <div class="code"><code>corpus rows:
+poodles are known for curly coats
+poodles are known for intelligence
+poodles are known for elegance
+
+learned bridge family:
+bridge = are known for
+kind   = explain_topic
+
+input: "poodles"
+topic: poodles
+relation requested: explain_topic</code></div>
+    </div>
+
+    <div class="section">
+      <h2>Stage 5: Intent Mapping</h2>
+      <p>The module then maps the strongest learned relation to a stable intent label. In practice, <code>explain_topic</code> is produced when the corpus contains repeated descriptive rows for one topic and no stronger category/capability/attribute relation wins. This mapping only runs when no declarative rule matched first.</p>
+      <table>
+        <thead>
+          <tr><th>Relation</th><th>Intent</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>category_of</code></td><td><code>define</code></td></tr>
+          <tr><td><code>capability_of</code></td><td><code>capability_check</code></td></tr>
+          <tr><td><code>attribute_of</code></td><td><code>attribute_query</code></td></tr>
+          <tr><td><code>compare_topics</code></td><td><code>compare</code></td></tr>
+          <tr><td><code>related_to</code></td><td><code>relation_query</code></td></tr>
+          <tr><td><code>explain_topic</code></td><td><code>explain</code></td></tr>
+        </tbody>
+      </table>
+      <p>This is the fallback label mapping. The public intent labels are configured in <code>intent.defaultConfig().intentLabels</code>, so you can rename them if your application wants different vocabulary.</p>
+    </div>
+
+    <div class="section">
+      <h2>Evidence</h2>
+      <p>The module returns both direct and inherited evidence.</p>
+      <div class="code"><code>analysis.evidence.matchingSegments = [
+  { text: "poodles are dogs", score: ... },
+  { text: "poodles have curly coats", score: ... }
+]
+
+analysis.evidence.parentSegments = [
+  { topic: "dogs", fromTopic: "poodle", text: "poodles are dogs", ... },
+  { topic: "animals", fromTopic: "poodle", text: "dogs are animals", ... }
 ]</code></div>
-      <p>This step matters because later response extraction uses local neighborhood inside each document. If the corpus already has natural line boundaries, preserving them gives cleaner context windows.</p>
-    </div>
-
-    <div class="section">
-      <h2>Stage 2: Chunking</h2>
-      <p>Each normalized document is tokenized and then split into chunks. The config controls this with <code>chunkSize</code> and <code>chunkStride</code>.</p>
-      <div class="code"><code>// Example tokens
-["how", "do", "reset", "password", "use", "reset", "link", "now"]
-
-// chunkSize = 4, chunkStride = 2
-chunk 0 = ["how", "do", "reset", "password"]
-chunk 1 = ["reset", "password", "use", "reset"]
-chunk 2 = ["use", "reset", "link", "now"]</code></div>
-      <p>Each chunk becomes a training row with these kinds of fields:</p>
+      <p>The direct rows explain the primary match. The parent rows explain inherited broader classes.</p>
       <table>
         <thead>
-          <tr><th>Field</th><th>Meaning</th></tr>
+          <tr><th>Evidence field</th><th>Purpose</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>text</code></td><td>The chunk joined back into text.</td></tr>
-          <tr><td><code>tokens</code></td><td>The token array for the chunk.</td></tr>
-          <tr><td><code>lead1</code>, <code>lead2</code></td><td>The first one or two tokens. These capture repeated openers.</td></tr>
-          <tr><td><code>tail1</code>, <code>tail2</code></td><td>The last one or two tokens. These capture repeated endings.</td></tr>
-          <tr><td><code>length</code></td><td>A coarse size bucket: short, medium, or long.</td></tr>
+          <tr><td><code>matchingSegments</code></td><td>Show the best segments for the input itself and the direct topic match.</td></tr>
+          <tr><td><code>parentSegments</code></td><td>Show which corpus statements caused a parent topic to be inherited.</td></tr>
         </tbody>
       </table>
-    </div>
-
-    <div class="section">
-      <h2>Stage 3: Topic / Intent Learning</h2>
-      <p>The module learns topic labels from chunk content in three layers.</p>
-
-      <h3>3a. Keywords</h3>
-      <p>Each chunk gets TF-IDF-like keyword rows from <code>text-stat</code>. These highlight chunk-specific content words.</p>
-      <div class="code"><code>chunk text:
-"download invoice pdf open billing page now"
-
-possible keyword rows:
-download
-invoice
-pdf
-billing</code></div>
-
-      <h3>3b. Ignore-word discovery</h3>
-      <p>Before building topic labels, the learner removes words that are probably structural rather than topical.</p>
-      <ul>
-        <li>Connector-like words from <code>ts.semantic.connectors(...)</code></li>
-        <li>Repeated leading tokens</li>
-        <li>Repeated trailing tokens</li>
-      </ul>
-      <p>The point is to stop general frame words from dominating the learned topic label.</p>
-
-      <h3>3c. Word families and semantic clusters</h3>
-      <p>Two corpus-derived grouping signals then compete:</p>
-      <ul>
-        <li>Word families: words with strong form similarity such as <code>invoice</code> and <code>invoices</code>.</li>
-        <li>Semantic clusters: words grouped by co-occurrence patterns from the semantic module.</li>
-      </ul>
-      <div class="code"><code>// Example family signal
-invoice, invoices  -> one family
-reset, resetear    -> one family if the corpus supports the spelling overlap
-
-// Example semantic signal
-password, reset, link  -> one semantic neighborhood
-billing, invoice, pdf  -> another semantic neighborhood</code></div>
-      <p>Each chunk is assigned to the strongest family or cluster. The final learned intent label is built from the strongest remaining content words in that group.</p>
-      <div class="note">The learned intent label is not a predefined taxonomy entry. It is just a compact summary of the strongest content words in that learned topic group.</div>
-    </div>
-
-    <div class="section">
-      <h2>Stage 4: Utterance-Type Learning</h2>
-      <p>This is the part that tries to infer whether a form is query-like or statement-like without relying on punctuation or English question stems.</p>
-
-      <h3>4a. Pattern keys</h3>
-      <p>For each chunk, the learner builds structural signatures such as:</p>
-      <ul>
-        <li>first two tokens</li>
-        <li>last two tokens</li>
-        <li>length bucket</li>
-      </ul>
-      <div class="code"><code>"donde ver facturas abrir pagina cobros ahora"
-lead2 = "donde_ver"
-tail2 = "cobros_ahora"
-length = "medium"</code></div>
-
-      <h3>4b. Repeated-form grouping</h3>
-      <p>Chunks that share repeated openers or endings are grouped into the same utterance-type candidate. If there is no repeated pattern, the learner falls back to the chunk’s top keyword plus length bucket.</p>
-
-      <h3>4c. Question-like scoring</h3>
-      <p>Each utterance-type group gets a <code>queryLikeScore</code>. The score rises when the same structural frame is reused across different semantic content.</p>
-      <div class="code"><code>// Example query-like family
-donde ver facturas abrir pagina cobros ahora
-donde descargar recibos abrir pagina cobros ahora
-
-same frame, different content -> high queryLikeScore</code></div>
-      <div class="code"><code>// Example statement-like singleton
-error clave bloqueada soporte revisa caso ahora
-
-one pattern, one topic -> low queryLikeScore</code></div>
-      <p>If that score crosses <code>queryLikeThreshold</code>, the group is treated as question-like. Otherwise it stays statement-like.</p>
-      <div class="note">This is not “question detection” in the grammar-school sense. It is closer to “does this chunk look like a reusable request/query frame in this corpus?”</div>
-    </div>
-
-    <div class="section">
-      <h2>Stage 5: Input Analysis</h2>
-      <p>When you call <code>intent.analyze(system, inputText, limit)</code>, the input goes through the same representation pipeline:</p>
-      <ol>
-        <li>tokenize input</li>
-        <li>extract keywords against the training corpus</li>
-        <li>expand related terms using semantic relationships</li>
-        <li>build structural keys: <code>lead1</code>, <code>lead2</code>, <code>tail1</code>, <code>tail2</code>, <code>length</code></li>
-      </ol>
-
-      <h3>5a. Intent classification</h3>
-      <p>The expanded input vector is scored against each learned intent profile. The highest score becomes <code>analysis.intent.label</code>.</p>
-
-      <h3>5b. Utterance-type classification</h3>
-      <p>The same input is scored against each learned utterance profile using:</p>
-      <ul>
-        <li>semantic similarity</li>
-        <li>leading-pattern similarity</li>
-        <li>trailing-pattern similarity</li>
-        <li>length-bucket similarity</li>
-      </ul>
-      <p>The winning profile becomes <code>analysis.question.type</code>, and its learned question-likeness becomes <code>analysis.question.isQuestion</code>.</p>
-    </div>
-
-    <div class="section">
-      <h2>Final Match Scoring</h2>
-      <p>Each stored chunk gets a final score against the new input using three components:</p>
-      <table>
-        <thead>
-          <tr><th>Component</th><th>Meaning</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>semanticScore</code></td><td>Weighted overlap between input terms and chunk terms.</td></tr>
-          <tr><td><code>intentScore</code></td><td>How strongly the input matches the chunk’s learned topic group.</td></tr>
-          <tr><td><code>utteranceScore</code></td><td>Whether the input and chunk share the same utterance-type behavior.</td></tr>
-        </tbody>
-      </table>
-      <div class="code"><code>final score =
-  semanticScore   * semanticWeight +
-  intentScore     * intentWeight +
-  utteranceScore  * utteranceWeight</code></div>
-      <p>The top-ranked rows become <code>analysis.matches</code>.</p>
-    </div>
-
-    <div class="section">
-      <h2>How Responses Are Chosen</h2>
-      <p><code>intent.responses(...)</code> does not generate new text. It reuses neighboring corpus context.</p>
-      <ul>
-        <li>If the best matching chunk has a next chunk in the same document, that next chunk becomes the response candidate.</li>
-        <li>If there is no next chunk, the matched chunk text itself is returned as fallback.</li>
-      </ul>
-      <div class="code"><code>document:
-chunk 0 = "reset password account"
-chunk 1 = "use reset link email inbox"
-
-input matches chunk 0
-response candidate = chunk 1</code></div>
-      <p>This is why corpus layout matters. If prompt-like material and answer-like material sit close together in the source text, response extraction works much better.</p>
     </div>
 
     <div class="section">
       <h2>API</h2>
-      <div class="prop"><strong>intent.defaultConfig()</strong><br>Return the default training and scoring config.</div>
-      <div class="prop"><strong>intent.train(corpusInput, config)</strong><br>Normalize documents, chunk them, learn intent profiles, and learn utterance-type profiles.</div>
-      <div class="prop"><strong>intent.analyze(system, inputText, limit)</strong><br>Return learned intent, learned utterance type, question-likeness, semantic evidence, and ranked matches.</div>
-      <div class="prop"><strong>intent.responses(system, inputText, limit)</strong><br>Return ranked response candidates from neighboring corpus context.</div>
+      <table>
+        <thead>
+          <tr><th>Function</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>intent.defaultConfig()</code></td><td>Return default limits and thresholds.</td></tr>
+          <tr><td><code>intent.train(corpusInput, config)</code></td><td>Build the corpus model.</td></tr>
+          <tr><td><code>intent.analyze(system, inputText, limit)</code></td><td>Return topics, parent topics, relations requested, intent, and evidence.</td></tr>
+          <tr><td><code>intent.responses(system, inputText, limit)</code></td><td>Return evidence segments in a flatter response-oriented shape.</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="section">
@@ -329,34 +503,32 @@ response candidate = chunk 1</code></div>
       <div class="code"><code>intent = import("./intent.ns").intent;
 
 corpus = "
-como resetear clave usar enlace reset ahora
-como cambiar correo abrir ajustes perfil ahora
-donde ver facturas abrir pagina cobros ahora
-donde descargar recibos abrir pagina cobros ahora
-error clave bloqueada soporte revisa caso ahora
+poodles are dogs
+dogs are animals
+cats are animals
+poodles have curly coats
+dogs can swim
 ";
 
 system = intent.train(corpus, intent.defaultConfig());
-analysis = intent.analyze(system, "como resetear correo", 3);
-replies = intent.responses(system, "como resetear correo", 3);</code></div>
-      <p>Likely behavior:</p>
+
+defineQuery = intent.analyze(system, "what is a poodle", 3);
+capabilityQuery = intent.analyze(system, "can dogs swim", 3);</code></div>
+      <p>Expected style of output:</p>
       <ul>
-        <li>The input gets mapped near the <code>como ...</code> utterance family.</li>
-        <li>The learned topic will land near <code>clave/reset/correo</code>-like content rather than the billing group.</li>
-        <li>The top response candidate will usually be neighboring corpus context from one of the best matching chunks.</li>
+        <li><code>what is a poodle</code> -> topic <code>poodle</code>, parent topics <code>dogs</code> then <code>animals</code>, relation <code>category_of</code>, intent <code>define</code></li>
+        <li><code>can dogs swim</code> -> topics <code>dogs</code>, <code>swim</code>, parent topic <code>animals</code>, relation <code>capability_of</code>, intent <code>capability_check</code></li>
       </ul>
     </div>
 
     <div class="section">
-      <h2>Practical Guidance</h2>
+      <h2>Current Gaps</h2>
       <ul>
-        <li>Put related prompt/answer material near each other in the corpus.</li>
-        <li>Use line breaks if you already know natural utterance boundaries.</li>
-        <li>Use a smaller <code>chunkSize</code> when corpus lines are dense and multi-topic.</li>
-        <li>Use a larger <code>chunkStride</code> if you want fewer overlapping chunks.</li>
-        <li>Expect better question-like detection when a query form repeats across several topics.</li>
+        <li>Stable intent labels still require a small explicit mapping layer.</li>
+        <li>Definition detection works best when the corpus contains category statements like <code>X are Y</code>.</li>
+        <li>Capability detection works best when the corpus contains behavior statements like <code>dogs can swim</code>.</li>
+        <li>The module is topic-first; it is not a general conversational intent engine yet.</li>
       </ul>
-      <div class="note">If the corpus has no repeated structural forms, the module can still learn topics, but utterance-type learning becomes weaker because there is less evidence for reusable query frames.</div>
     </div>
   </div>
 </body>

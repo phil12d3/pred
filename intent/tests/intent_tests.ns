@@ -1,98 +1,158 @@
 [test]
-topics_are_learned_from_large_corpus_text = func(t) {
+define_intent_can_be_inferred_from_topic_lookup = func(t) {
     intent = import("./intent.ns").intent;
 
     corpus = "
-    how do reset password use reset link now
-    forgot password use reset link now
-    where see invoices open billing page now
-    download invoice pdf open billing page now
+    poodles are dogs
+    dogs are animals
+    cats are animals
+    poodles have curly coats
+    dogs can swim
     ";
 
-    system = intent.train(corpus, {
-        resultLimit: 4,
-        keywordLimit: 6,
-        relationshipLimit: 3,
-        semanticWeight: 0.65,
-        intentWeight: 0.20,
-        utteranceWeight: 0.15,
-        chunkSize: 5,
-        chunkStride: 5,
-        maxLabelWords: 2,
-        minPatternCount: 2,
-        queryLikeThreshold: 1.25
-    });
+    system = intent.train(corpus, intent.defaultConfig());
+    result = intent.analyze(system, "what is a poodle", 3);
 
-    result = intent.analyze(system, "change password reset", 3);
-
-    t.truthy(system.rows.count() >= 4, "corpus training should produce chunk rows");
-    t.truthy(result.matches.count() == 3, "analysis should return requested number of matches");
-    t.equal(result.intent.label, result.matches[0].intent, "predicted intent should match top learned topic");
-    t.truthy(result.matches[0].overlap.count() > 0, "top match should expose semantic overlap");
+    t.truthy(result.topics.count() > 0, "analysis should return topics");
+    t.equal(result.topics[0].word, "poodle", "top topic should be poodle");
+    t.equal(result.intent, "define", "definition-like input should map to define");
+    t.truthy(result.relationsRequested.count() > 0, "analysis should return relation requests");
+    t.equal(result.relationsRequested[0].relation, "category_of", "poodle query should request category relation");
+    t.truthy(result.parentTopics.count() > 0, "analysis should return parent topics");
+    t.equal(result.parentTopics[0].word, "dogs", "poodle should inherit dog as its first parent");
 };
 
 [test]
-utterance_types_work_without_question_marks = func(t) {
+capability_queries_can_be_inferred_from_behavior_relations = func(t) {
     intent = import("./intent.ns").intent;
 
     corpus = "
-    donde ver facturas abrir pagina cobros ahora
-    donde descargar recibos abrir pagina cobros ahora
-    como resetear clave usar enlace reset ahora
-    como cambiar correo abrir ajustes perfil ahora
-    error clave bloqueada soporte revisa caso ahora
+    dogs are animals
+    fish are animals
+    dogs can swim
+    fish can swim
+    birds can fly
     ";
 
-    system = intent.train(corpus, {
-        resultLimit: 4,
-        keywordLimit: 6,
-        relationshipLimit: 3,
-        semanticWeight: 0.65,
-        intentWeight: 0.20,
-        utteranceWeight: 0.15,
-        chunkSize: 6,
-        chunkStride: 6,
-        maxLabelWords: 2,
-        minPatternCount: 2,
-        queryLikeThreshold: 1.25
-    });
+    system = intent.train(corpus, intent.defaultConfig());
+    result = intent.analyze(system, "can dogs swim", 3);
 
-    whereLike = intent.analyze(system, "donde ver recibos cobros", 2);
-    howLike = intent.analyze(system, "como resetear correo", 2);
-    statementLike = intent.analyze(system, "error clave bloqueada soporte", 2);
-
-    t.truthy(whereLike.question.isQuestion, "reused donde-pattern should be learned as question-like");
-    t.truthy(howLike.question.isQuestion, "reused como-pattern should be learned as question-like");
-    t.truthy(!statementLike.question.isQuestion, "single-topic error pattern should stay statement-like");
-    t.truthy(whereLike.question.type != howLike.question.type, "different repeated forms should learn different utterance types");
+    t.truthy(result.topics.count() >= 1, "analysis should return at least one topic");
+    t.equal(result.topics[0].word, "dogs", "top topic should be dogs");
+    t.equal(result.intent, "capability_check", "behavior question should map to capability_check");
+    t.equal(result.relationsRequested[0].relation, "capability_of", "behavior query should request capability relation");
 };
 
 [test]
-responses_are_drawn_from_neighboring_corpus_context = func(t) {
+demo_corpus_should_keep_dogs_as_the_primary_topic_for_can_dogs_swim = func(t) {
     intent = import("./intent.ns").intent;
 
-    corpus = [
-        "reset password account use reset link email inbox now",
-        "invoice download billing open billing page download pdf now"
-    ];
+    corpus = "
+    poodles are dogs
+    dogs are animals
+    cats are animals
+    poodles have curly coats
+    dogs can swim
+    birds can fly
+    ";
 
-    system = intent.train(corpus, {
-        resultLimit: 4,
-        keywordLimit: 6,
-        relationshipLimit: 3,
-        semanticWeight: 0.65,
-        intentWeight: 0.20,
-        utteranceWeight: 0.15,
-        chunkSize: 4,
-        chunkStride: 4,
-        maxLabelWords: 2,
-        minPatternCount: 2,
-        queryLikeThreshold: 1.25
-    });
+    system = intent.train(corpus, intent.defaultConfig());
+    result = intent.analyze(system, "can dogs swim", 3);
 
-    replies = intent.responses(system, "download invoice pdf", 3);
+    t.equal(result.topics[0].word, "dogs", "demo corpus should keep dogs as the main topic");
+    t.equal(result.intent, "capability_check", "demo corpus should infer capability intent");
+    t.equal(result.relationsRequested[0].relation, "capability_of", "demo corpus should request capability relation");
+    t.truthy(result.parentTopics.count() > 0, "demo corpus should expose inherited parents");
+    t.equal(result.parentTopics[0].word, "animals", "dogs should inherit animals as a parent");
+};
 
-    t.truthy(replies.count() > 0, "responses should return corpus-derived candidates");
-    t.truthy(replies[0].response != "", "response rows should include response text");
-    t.truthy(replies[0].matchedText != "", "response rows should include matched corpus text");
+[test]
+parent_topics_should_follow_multiple_category_hops = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = "
+    poodles are dogs
+    dogs are animals
+    animals are organisms
+    poodles have curly coats
+    ";
+
+    system = intent.train(corpus, intent.defaultConfig());
+    result = intent.analyze(system, "can poodles swim", 3);
+
+    t.truthy(result.parentTopics.count() >= 2, "parent topics should include multiple hops");
+    t.equal(result.parentTopics[0].word, "dogs", "first inherited parent should be dogs");
+    t.equal(result.parentTopics[1].word, "animals", "second inherited parent should be animals");
+    t.equal(result.parentTopics[0].fromTopic, "poodles", "parent rows should keep the source topic");
+};
+
+[test]
+explain_intent_can_be_learned_from_repeated_descriptive_bridges = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = "
+    poodles are known for curly coats
+    poodles are known for intelligence
+    poodles are known for elegance
+    ";
+
+    system = intent.train(corpus, intent.defaultConfig());
+    result = intent.analyze(system, "poodles", 3);
+
+    t.truthy(result.topics.count() > 0, "analysis should return a topic");
+    t.equal(result.topics[0].word, "poodles", "top topic should be poodles");
+    t.equal(result.relationsRequested[0].relation, "explain_topic", "descriptive corpus should request explain_topic");
+    t.equal(result.intent, "explain", "descriptive corpus should map to explain");
+};
+
+[test]
+question_intent_can_be_defined_with_a_rule_pattern = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = "
+    poodles are dogs
+    dogs are animals
+    poodles have curly coats
+    dogs can swim
+    ";
+
+    config = intent.defaultConfig();
+    config.intentRules = [{
+        label: "question",
+        priority: 100,
+        containsAny: ["what", "how", "why"],
+        sequence: [
+            {kind: "oneOf", words: ["what", "how", "why"]},
+            {kind: "topic"}
+        ]
+    }];
+
+    system = intent.train(corpus, config);
+    result = intent.analyze(system, "what is a poodle", 3);
+
+    t.equal(result.intent, "question", "rule-based question should override relation mapping");
+    t.truthy(result.rulesMatched.count() > 0, "analysis should return matched rules");
+    t.equal(result.matchedRule.label, "question", "matched rule should be question");
+    t.equal(result.intentSource, "rule", "rule should be the intent source");
+};
+
+[test]
+topic_and_intent_can_be_retrieved_from_large_corpus_text = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = "
+    poodles are dogs and dogs are animals
+    poodles have curly coats and poodles are friendly
+    dogs can swim and dogs can run
+    invoices belong to billing and receipts belong to billing
+    billing pages let users download invoices
+    ";
+
+    system = intent.train(corpus, intent.defaultConfig());
+    result = intent.analyze(system, "tell me about invoices", 3);
+
+    t.truthy(system.topicRows.count() > 0, "training should build topic rows");
+    t.truthy(result.topics.count() > 0, "analysis should return topics");
+    t.truthy(result.evidence.matchingSegments.count() > 0, "analysis should return evidence segments");
+    t.truthy(result.intent == "define" || result.intent == "explain" || result.intent == "relation_query", "intent should map to a stable label");
 };
