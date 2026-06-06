@@ -1,5 +1,5 @@
-evaluation = import("/home/phil/dev/pred/eval/src/eval.ns");
-explain = import("/home/phil/dev/pred/explain/src/explain.ns");
+evaluation = import("../eval/src/eval.ns");
+explain = import("../explain/src/explain.ns");
 
 copyArray = func(values) {
     out = [];
