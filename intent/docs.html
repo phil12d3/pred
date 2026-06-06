@@ -253,6 +253,7 @@ intent:
   }
 ]</code></div>
       <p>That rule means: if the input contains one of the cue words and then later contains a topic, label it <code>question</code>. It can match <code>what is a poodle</code> because the matcher is allowed to skip filler words between the cue word and the topic.</p>
+      <p><code>containsAny</code> and <code>{ kind: "oneOf", ... }</code> may look redundant, but they operate at different levels. <code>containsAny</code> is a top-level lexical gate: at least one listed word must appear somewhere in the input. The <code>oneOf</code> item is part of the ordered <code>sequence</code>: one of those words must appear at that point in the rule shape. If your <code>sequence</code> already spells out the same cue words, <code>containsAny</code> is often optional. It becomes more useful when the <code>sequence</code> only describes structure such as <code>topic</code>, <code>parentTopic</code>, or <code>wildcard</code> and you still want a separate cue-word requirement.</p>
       <div class="code"><code>intentRules = [
   {
     label: "help",

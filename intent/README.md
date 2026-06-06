@@ -109,6 +109,20 @@ config.intentRules = [{
 }];
 ```
 
+In that example, `containsAny` and the `oneOf` item overlap on purpose, but they
+do different jobs:
+
+- `containsAny` is a top-level lexical gate. It says at least one of those cue
+  words must appear somewhere in the input.
+- `oneOf` inside `sequence` is a positional match. It says one of those cue
+  words must appear at that point in the ordered rule shape.
+
+If your `sequence` already includes the same cue words, `containsAny` is often
+redundant and the rule will usually still work without it. It is still useful
+when you want a clearer top-level cue-word check, or when your `sequence` only
+describes structure such as `topic`, `parentTopic`, or `wildcard` without
+spelling out the cue words directly.
+
 If a rule matches, `analysis.intent` comes from the rule label and
 `analysis.intentSource` is `rule`. Otherwise the module falls back to the
 relation-based intent mapping.
