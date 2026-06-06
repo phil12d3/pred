@@ -22,8 +22,6 @@ exp     = func(x) {
     return result;
 };
 
-sqrt = func(v) { return this.core.stddev(v); };
-
 // ── Binomial distribution ─────────────────────────────────────────────────────
 
 // P(X = k) for X ~ Binomial(n, p)
@@ -48,7 +46,7 @@ binomialCDF = func(n, k, p) {
 binomialStats = func(n, p) {
     mean = n * p;
     variance = n * p * (1 - p);
-    return { mean: mean, variance: variance, stddev: this.sqrt(variance) };
+    return { mean: mean, variance: variance, stddev: sqrt(variance) };
 };
 
 // ── Poisson distribution ─────────────────────────────────────────────────────
@@ -73,7 +71,7 @@ poissonCDF = func(lambda, k) {
 
 // Mean and variance of Poisson(lambda): both equal lambda.
 poissonStats = func(lambda) {
-    return { mean: lambda, variance: lambda, stddev: this.sqrt(lambda) };
+    return { mean: lambda, variance: lambda, stddev: sqrt(lambda) };
 };
 
 // ── Normal (Gaussian) distribution ───────────────────────────────────────────
@@ -83,7 +81,7 @@ normalPDF = func(x, mean, sd) {
     if (sd <= 0) return 0;
     pi = 3.141592653589793;
     z = this.safeDiv(x - mean, sd);
-    return this.safeDiv(1, sd * this.sqrt(2 * pi)) * this.exp(-0.5 * z * z);
+    return this.safeDiv(1, sd * sqrt(2 * pi)) * this.exp(-0.5 * z * z);
 };
 
 // CDF approximation of N(0,1) at z using Horner form (max error ~1.5e-7).
@@ -94,7 +92,7 @@ standardNormalCDF = func(z) {
            t * (1.781477937 +
            t * (-1.821255978 +
            t * 1.330274429))));
-    pdf = this.safeDiv(1, this.sqrt(2 * 3.141592653589793)) *
+    pdf = this.safeDiv(1, sqrt(2 * 3.141592653589793)) *
           this.exp(-0.5 * z * z);
     p = 1 - pdf * poly;
     if (z < 0) p = 1 - p;
@@ -135,7 +133,7 @@ uniformCDF = func(x, a, b) {
 uniformStats = func(a, b) {
     mean = this.safeDiv(a + b, 2);
     variance = this.safeDiv((b - a) * (b - a), 12);
-    return { mean: mean, variance: variance, stddev: this.sqrt(variance) };
+    return { mean: mean, variance: variance, stddev: sqrt(variance) };
 };
 
 // ── Geometric distribution ────────────────────────────────────────────────────
@@ -156,5 +154,5 @@ geometricCDF = func(k, p) {
 geometricStats = func(p) {
     mean = this.safeDiv(1, p);
     variance = this.safeDiv(1 - p, p * p);
-    return { mean: mean, variance: variance, stddev: this.sqrt(variance) };
+    return { mean: mean, variance: variance, stddev: sqrt(variance) };
 };
