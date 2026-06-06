@@ -68,6 +68,22 @@ questionConfig.intentRules = [questionRule];
 questionSystem = intent.train(coreCorpus, questionConfig);
 questionResult = intent.analyze(questionSystem, "what is a poodle", 3);
 
+helpConfig = intent.defaultConfig();
+helpRule = {
+    label: "help",
+    priority: 90,
+    containsAny: ["help", "support"],
+    sequence: [
+        {kind: "oneOf", words: ["help", "support"]},
+        {kind: "wildcard"},
+        {kind: "topic"}
+    ]
+};
+helpConfig.intentRules = [helpRule];
+
+helpSystem = intent.train(coreCorpus, helpConfig);
+helpResult = intent.analyze(helpSystem, "help me with poodles", 3);
+
 printline("Intent labels: ", coreSystem.config.intentLabels);
 printline("");
 
@@ -78,6 +94,7 @@ showAnalysis("Compare example", compareResult);
 showAnalysis("Relation example", relatedResult);
 showAnalysis("Explain example", explainResult);
 showAnalysis("Question example", questionResult);
+showAnalysis("Help example", helpResult);
 showAnalysis("Explore example", exploreResult);
 
 printline("Evidence segments for define:");
@@ -109,3 +126,10 @@ printline("Label: ", questionRule.label);
 printline("Priority: ", questionRule.priority);
 printline("Cue words: what, how, why");
 printline("Sequence: cue word -> topic");
+
+printline("");
+printline("Help rule:");
+printline("Label: ", helpRule.label);
+printline("Priority: ", helpRule.priority);
+printline("Cue words: help, support");
+printline("Sequence: cue word -> wildcard -> topic");

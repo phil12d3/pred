@@ -137,6 +137,38 @@ question_intent_can_be_defined_with_a_rule_pattern = func(t) {
 };
 
 [test]
+help_intent_can_be_defined_with_a_wildcard_pattern = func(t) {
+    intent = import("./intent.ns").intent;
+
+    corpus = "
+    poodles are dogs
+    dogs are animals
+    poodles have curly coats
+    dogs can swim
+    ";
+
+    config = intent.defaultConfig();
+    config.intentRules = [{
+        label: "help",
+        priority: 90,
+        containsAny: ["help", "support"],
+        sequence: [
+            {kind: "oneOf", words: ["help", "support"]},
+            {kind: "wildcard"},
+            {kind: "topic"}
+        ]
+    }];
+
+    system = intent.train(corpus, config);
+    result = intent.analyze(system, "help me with poodles", 3);
+
+    t.equal(result.intent, "help", "rule-based help should override relation mapping");
+    t.truthy(result.rulesMatched.count() > 0, "analysis should return matched rules");
+    t.equal(result.matchedRule.label, "help", "matched rule should be help");
+    t.equal(result.intentSource, "rule", "rule should be the intent source");
+};
+
+[test]
 topic_and_intent_can_be_retrieved_from_large_corpus_text = func(t) {
     intent = import("./intent.ns").intent;
 
