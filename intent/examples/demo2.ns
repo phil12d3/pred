@@ -1,0 +1,92 @@
+intent = import("./intent.ns").intent;
+
+showAnalysis = func(title, result) {
+    printline(title);
+    printline("Input: ", result.input);
+    printline("Intent: ", result.intent);
+    printline("Intent Source: ", result.intentSource);
+    printline("Matched Rule: ", result.matchedRule);
+    printline("Topics: ", result.topics);
+    printline("Parent Topics: ", result.parentTopics);
+    printline("Relations: ", result.relationsRequested);
+    printline("");
+};
+
+combinedCorpus = "
+poodles are dogs
+dogs are animals
+cats are animals
+fish are animals
+poodles have curly coats
+dogs can swim
+fish can swim
+birds can fly
+poodles dogs
+poodles are known for curly coats
+poodles are known for intelligence
+poodles are known for elegance
+otters prefer rivers
+otters prefer shellfish
+otters prefer teamwork
+satellites orbit earth
+moons orbit earth
+probes orbit earth
+invoices belong to billing
+receipts belong to billing
+billing pages let users download invoices
+";
+
+baseSystem = intent.train(combinedCorpus, intent.defaultConfig());
+
+defineResult = intent.analyze(baseSystem, "what is a poodle", 3);
+capabilityResult = intent.analyze(baseSystem, "can dogs swim", 3);
+attributeResult = intent.analyze(baseSystem, "what do poodles have", 3);
+compareResult = intent.analyze(baseSystem, "poodles cats", 3);
+relationResult = intent.analyze(baseSystem, "satellites", 3);
+explainResult = intent.analyze(baseSystem, "otters", 3);
+exploreResult = intent.analyze(baseSystem, "xylophone nebula", 3);
+
+questionConfig = intent.defaultConfig();
+questionRule = {
+    label: "question",
+    priority: 100,
+    containsAny: ["what", "how", "why"],
+    sequence: [
+        {kind: "oneOf", words: ["what", "how", "why"]},
+        {kind: "topic"}
+    ]
+};
+questionConfig.intentRules = [questionRule];
+questionSystem = intent.train(combinedCorpus, questionConfig);
+questionResult = intent.analyze(questionSystem, "what is a poodle", 3);
+
+helpConfig = intent.defaultConfig();
+helpRule = {
+    label: "help",
+    priority: 90,
+    containsAny: ["help", "support"],
+    sequence: [
+        {kind: "oneOf", words: ["help", "support"]},
+        {kind: "wildcard"},
+        {kind: "topic"}
+    ]
+};
+helpConfig.intentRules = [helpRule];
+helpSystem = intent.train(combinedCorpus, helpConfig);
+helpResult = intent.analyze(helpSystem, "help me with poodles", 3);
+
+printline("Combined corpus labels: ", baseSystem.config.intentLabels);
+printline("");
+
+showAnalysis("Define example", defineResult);
+showAnalysis("Capability example", capabilityResult);
+showAnalysis("Attribute example", attributeResult);
+showAnalysis("Compare example", compareResult);
+showAnalysis("Relation example", relationResult);
+showAnalysis("Explain example", explainResult);
+showAnalysis("Question example", questionResult);
+showAnalysis("Help example", helpResult);
+showAnalysis("Explore example", exploreResult);
+
+printline("Combined corpus:");
+printline(combinedCorpus);
