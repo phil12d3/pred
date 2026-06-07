@@ -508,6 +508,7 @@ buildSegmentRows = func(segments, system) {
     for (i = 0; i < segments.count(); i = i + 1) {
         row = segments[i];
         rows.add({
+            id: i,
             docIndex: row.docIndex,
             segmentIndex: row.segmentIndex,
             text: this.asText(row.text),
@@ -517,6 +518,70 @@ buildSegmentRows = func(segments, system) {
         });
     }
     return rows;
+}
+
+addUniqueNumber = func(values, value) {
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (values[i] == value) return false;
+    }
+    values.add(value);
+    return true;
+}
+
+buildTokenIndex = func(segmentRows) {
+    index = {};
+    for (i = 0; i < segmentRows.count(); i = i + 1) {
+        tokens = this.uniqueTokens(segmentRows[i].normalizedTokens);
+        for (j = 0; j < tokens.count(); j = j + 1) {
+            token = tokens[j];
+            if (!defined(index[token])) index[token] = [];
+            index[token].add(i);
+        }
+    }
+    return index;
+}
+
+buildAllSegmentIds = func(segmentRows) {
+    ids = [];
+    for (i = 0; i < segmentRows.count(); i = i + 1) ids.add(i);
+    return ids;
+}
+
+buildRelationIndex = func(relations, config) {
+    index = {};
+    labels = defined(config.intentLabels) ? config.intentLabels : {};
+
+    defineLabel = defined(labels.category_of) ? labels.category_of : "define";
+    capabilityLabel = defined(labels.capability_of) ? labels.capability_of : "capability_check";
+    attributeLabel = defined(labels.attribute_of) ? labels.attribute_of : "attribute_query";
+
+    index[defineLabel] = {};
+    index[capabilityLabel] = {};
+    index[attributeLabel] = {};
+
+    for (i = 0; i < relations.categoryRows.count(); i = i + 1) {
+        row = relations.categoryRows[i];
+        if (!defined(index[defineLabel][row.topic])) index[defineLabel][row.topic] = row.text;
+    }
+    for (i = 0; i < relations.capabilityRows.count(); i = i + 1) {
+        row = relations.capabilityRows[i];
+        if (!defined(index[capabilityLabel][row.topic])) index[capabilityLabel][row.topic] = row.text;
+    }
+    for (i = 0; i < relations.attributeRows.count(); i = i + 1) {
+        row = relations.attributeRows[i];
+        if (!defined(index[attributeLabel][row.topic])) index[attributeLabel][row.topic] = row.text;
+    }
+
+    return index;
+}
+
+ensureSystemIndexes = func(system) {
+    if (!defined(system.answerCache) || system.answerCache == null) system.answerCache = {};
+    if (!defined(system.segments) || system.segments == null) system.segments = [];
+    if (!defined(system.tokenIndex) || system.tokenIndex == null) system.tokenIndex = this.buildTokenIndex(system.segments);
+    if (!defined(system.allSegmentIds) || system.allSegmentIds == null) system.allSegmentIds = this.buildAllSegmentIds(system.segments);
+    if (!defined(system.relationIndex) || system.relationIndex == null) system.relationIndex = this.buildRelationIndex(system.relations, system.config);
+    return system;
 }
 
 pairRows = func(segmentRows) {
@@ -1047,27 +1112,77 @@ sliceRows = func(rows, limit) {
     return out;
 }
 
+collectCandidateSegmentIds = func(system, queryTokens, topics, parentTopics) {
+    system = this.ensureSystemIndexes(system);
+    ids = [];
+    normalized = this.uniqueTokens(this.normalizeTokens(queryTokens));
+    topicRows = defined(topics) && topics != null ? topics : [];
+    parentRows = defined(parentTopics) && parentTopics != null ? parentTopics : [];
+
+    for (i = 0; i < normalized.count(); i = i + 1) {
+        token = normalized[i];
+        if (!defined(system.tokenIndex[token])) continue;
+        matches = system.tokenIndex[token];
+        for (j = 0; j < matches.count(); j = j + 1) this.addUniqueNumber(ids, matches[j]);
+    }
+
+    for (i = 0; i < topicRows.count(); i = i + 1) {
+        topic = defined(topicRows[i].corpusWord) ? topicRows[i].corpusWord : topicRows[i].word;
+        if (!defined(system.tokenIndex[topic])) continue;
+        matches = system.tokenIndex[topic];
+        for (j = 0; j < matches.count(); j = j + 1) this.addUniqueNumber(ids, matches[j]);
+    }
+
+    for (i = 0; i < parentRows.count(); i = i + 1) {
+        topic = defined(parentRows[i].corpusWord) ? parentRows[i].corpusWord : parentRows[i].word;
+        if (!defined(system.tokenIndex[topic])) continue;
+        matches = system.tokenIndex[topic];
+        for (j = 0; j < matches.count(); j = j + 1) this.addUniqueNumber(ids, matches[j]);
+    }
+
+    if (ids.count() == 0) return system.allSegmentIds;
+    return ids;
+}
+
+pushTopRow = func(rows, row, limit) {
+    out = [];
+    inserted = false;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        currentScore = rows[i].score;
+        nextScore = row.score;
+        if (inserted == false && nextScore > currentScore) {
+            out.add(row);
+            inserted = true;
+        }
+        if (out.count() < limit) out.add(rows[i]);
+    }
+    if (inserted == false && out.count() < limit) out.add(row);
+    return out;
+}
+
 buildEvidence = func(system, topics, queryTokens, limit) {
     topicWords = this.topicWordMap(topics);
+    candidateIds = this.collectCandidateSegmentIds(system, queryTokens, topics, []);
     rows = [];
-    for (i = 0; i < system.segments.count(); i = i + 1) {
-        segment = system.segments[i];
+    for (i = 0; i < candidateIds.count(); i = i + 1) {
+        segment = system.segments[candidateIds[i]];
         overlap = this.tokenOverlap(queryTokens, segment.tokens);
         topicScore = this.topicHitScore(segment.tokens, topicWords, {});
         score = (overlap * 0.6) + (topicScore * 0.4);
         if (score <= 0) continue;
-        rows.add({
+        rows = this.pushTopRow(rows, {
+            segmentId: segment.id,
             text: segment.text,
             score: score,
             overlap: overlap,
             topicScore: topicScore
-        });
+        }, limit);
     }
-    rows = this.sortRowsDesc(rows, "score");
-    return this.sliceRows(rows, limit);
+    return rows;
 }
 
 analyze = func(system, inputText, limit) {
+    system = this.ensureSystemIndexes(system);
     maxTopics = defined(limit) ? limit : system.config.topicLimit;
     inputTokens = this.tokens(inputText);
     normalizedInputTokens = this.uniqueTokens(this.normalizeTokens(inputTokens));
@@ -1112,14 +1227,16 @@ clamp01 = func(value) {
 }
 
 rankSegments = func(system, analysis, queryTokens, queryEmbedding, limit) {
+    system = this.ensureSystemIndexes(system);
     weights = system.config.scoreWeights;
     topicWords = this.topicWordMap(analysis.topics);
     parentWords = this.topicWordMap(analysis.parentTopics);
     evidenceScores = this.evidenceScoreMap(analysis.evidence.matchingSegments);
+    candidateIds = this.collectCandidateSegmentIds(system, queryTokens, analysis.topics, analysis.parentTopics);
 
     ranked = [];
-    for (i = 0; i < system.segments.count(); i = i + 1) {
-        segment = system.segments[i];
+    for (i = 0; i < candidateIds.count(); i = i + 1) {
+        segment = system.segments[candidateIds[i]];
         lexical = this.tokenOverlap(queryTokens, segment.tokens);
         topicScore = this.topicHitScore(segment.tokens, topicWords, parentWords);
         embedScore = (this.cosineSimilarity(queryEmbedding, segment.embedding) + 1) / 2;
@@ -1130,7 +1247,8 @@ rankSegments = func(system, analysis, queryTokens, queryEmbedding, limit) {
                      (weights.lexical * lexical) +
                      (weights.topic * topicScore);
 
-        ranked.add({
+        ranked = this.pushTopRow(ranked, {
+            segmentId: segment.id,
             text: segment.text,
             score: finalScore,
             lexicalScore: lexical,
@@ -1139,10 +1257,9 @@ rankSegments = func(system, analysis, queryTokens, queryEmbedding, limit) {
             topicScore: topicScore,
             docIndex: segment.docIndex,
             segmentIndex: segment.segmentIndex
-        });
+        }, limit);
     }
 
-    ranked = this.sortRowsDesc(ranked, "score");
     out = [];
     for (i = 0; i < ranked.count() && i < limit; i = i + 1) {
         row = ranked[i];
@@ -1176,28 +1293,12 @@ topicLabel = func(analysis) {
 }
 
 findRelationAnswer = func(system, analysis) {
+    system = this.ensureSystemIndexes(system);
     topic = this.topicLabel(analysis);
     if (topic == "") return "";
 
-    if (analysis.intent == "define") {
-        for (i = 0; i < system.relations.categoryRows.count(); i = i + 1) {
-            row = system.relations.categoryRows[i];
-            if (row.topic == topic) return this.ensureSentence(row.text);
-        }
-    }
-
-    if (analysis.intent == "capability_check") {
-        for (i = 0; i < system.relations.capabilityRows.count(); i = i + 1) {
-            row = system.relations.capabilityRows[i];
-            if (row.topic == topic) return this.ensureSentence(row.text);
-        }
-    }
-
-    if (analysis.intent == "attribute_query") {
-        for (i = 0; i < system.relations.attributeRows.count(); i = i + 1) {
-            row = system.relations.attributeRows[i];
-            if (row.topic == topic) return this.ensureSentence(row.text);
-        }
+    if (defined(system.relationIndex[analysis.intent]) && defined(system.relationIndex[analysis.intent][topic])) {
+        return this.ensureSentence(system.relationIndex[analysis.intent][topic]);
     }
 
     return "";
@@ -1276,9 +1377,16 @@ train = func(corpusInput, config) {
         relations: relations,
         topicIndex: topicIndex,
         parentIndex: parentIndex,
-        segments: []
+        segments: [],
+        tokenIndex: {},
+        allSegmentIds: [],
+        relationIndex: {},
+        answerCache: {}
     };
     system.segments = this.buildSegmentRows(rawSegments, system);
+    system.tokenIndex = this.buildTokenIndex(system.segments);
+    system.allSegmentIds = this.buildAllSegmentIds(system.segments);
+    system.relationIndex = this.buildRelationIndex(system.relations, system.config);
     return system;
 }
 
@@ -1320,6 +1428,8 @@ loadSystem = func(path) {
 }
 
 answer = func(system, inputText, limit) {
+    system = this.ensureSystemIndexes(system);
+    if (defined(system.answerCache[inputText])) return system.answerCache[inputText];
     maxItems = defined(limit) ? limit : system.config.segmentLimit;
     analysis = this.analyze(system, inputText, system.config.topicLimit);
     queryTokens = this.tokens(inputText);
@@ -1335,6 +1445,7 @@ answer = func(system, inputText, limit) {
         answer: ""
     };
     result.answer = this.composeAnswer(system, result);
+    system.answerCache[inputText] = result;
     return result;
 }
 
