@@ -1,0 +1,128 @@
+respond = import("./respond.ns").respond;
+
+read_text_file = func(path) {
+    f = open(path, filemode.read);
+    text = "";
+    while (true) {
+        ch = f.read_char();
+        if (ch == null || ch == "") break;
+        text = text + ch;
+    }
+    f.close();
+    return text;
+}
+
+decode_cli_text = func(text) {
+    s = stringify(text);
+    out = "";
+    i = 0;
+    while (i < s.length) {
+        ch = s[i];
+        if (ch == "\\" && i + 1 < s.length) {
+            next = s[i + 1];
+            if (next == "n") {
+                out = out + "\n";
+                i = i + 2;
+                continue;
+            }
+            if (next == "t") {
+                out = out + "\t";
+                i = i + 2;
+                continue;
+            }
+            if (next == "\"" || next == "'") {
+                out = out + next;
+                i = i + 2;
+                continue;
+            }
+        }
+        out = out + ch;
+        i = i + 1;
+    }
+    if (out.length >= 2) {
+        first = out[0];
+        last = out[out.length - 1];
+        if ((first == "\"" && last == "\"") || (first == "'" && last == "'")) {
+            trimmed = "";
+            for (ti = 1; ti < out.length - 1; ti = ti + 1) trimmed = trimmed + out[ti];
+            out = trimmed;
+        }
+    }
+    return out;
+}
+
+usage = func() {
+    printline("Usage:");
+    printline("  ../ns/bin/ns train.ns -text \"dogs are animals\\ndogs can swim\" -modelPath ./tmp/respond_model.bin");
+    printline("  ../ns/bin/ns train.ns -corpusPath ./examples/corpus.txt -modelPath ./tmp/respond_model.bin");
+    printline("");
+    printline("Optional config overrides:");
+    printline("  -dimensions 12");
+    printline("  -semanticWindow 2");
+    printline("  -vocabLimit 128");
+    printline("  -segmentLimit 5");
+    printline("  -topicLimit 3");
+    printline("  -evidenceLimit 5");
+}
+
+stage = func(text) {
+    printline("[train] ", text);
+}
+
+readNumberArg = func(name, currentValue) {
+    if (!defined(args[name]) || args[name] == null || args[name] == "") return currentValue;
+    return number.parseFloat(stringify(args[name]));
+}
+
+buildConfig = func() {
+    config = respond.defaultConfig();
+    config.dimensions = readNumberArg("dimensions", config.dimensions);
+    config.semanticWindow = readNumberArg("semanticWindow", config.semanticWindow);
+    config.vocabLimit = readNumberArg("vocabLimit", config.vocabLimit);
+    config.segmentLimit = readNumberArg("segmentLimit", config.segmentLimit);
+    config.evidenceLimit = readNumberArg("evidenceLimit", config.evidenceLimit);
+    config.topicLimit = readNumberArg("topicLimit", config.topicLimit);
+    config.parentTopicLimit = readNumberArg("parentTopicLimit", config.parentTopicLimit);
+    config.parentDepth = readNumberArg("parentDepth", config.parentDepth);
+    config.answerEvidenceLimit = readNumberArg("answerEvidenceLimit", config.answerEvidenceLimit);
+    if (defined(args.fuzzyThreshold) && args.fuzzyThreshold != null && args.fuzzyThreshold != "") {
+        config.fuzzyThreshold = number.parseFloat(stringify(args.fuzzyThreshold));
+    }
+    return config;
+}
+
+corpusText = "";
+if (defined(args.help) || defined(args.h)) {
+    usage();
+    exit(0);
+}
+
+if (defined(args.text) && args.text != null && args.text != "") {
+    stage("reading inline corpus text");
+    corpusText = decode_cli_text(args.text);
+} else if (defined(args.corpusPath) && args.corpusPath != null && args.corpusPath != "") {
+    stage("reading corpus file: " + stringify(args.corpusPath));
+    corpusText = read_text_file(args.corpusPath);
+} else {
+    printline("Missing corpus input. Provide -text or -corpusPath.");
+    usage();
+    exit(1);
+}
+
+modelPath = defined(args.modelPath) && args.modelPath != null && args.modelPath != "" ? args.modelPath : "./tmp/respond_model.bin";
+stage("building config");
+config = buildConfig();
+stage("training respond model");
+system = respond.train(corpusText, config);
+stage("saving model to " + modelPath);
+saved = respond.saveSystem(system, modelPath);
+stage("done");
+
+printline("Saved respond model:");
+printline("path = ", saved.path);
+printline("kind = ", saved.kind);
+printline("version = ", saved.version);
+printline("documents = ", saved.metadata.documents);
+printline("segments = ", saved.metadata.segments);
+printline("vocab terms = ", saved.metadata.vocabTerms);
+printline("bridge profiles = ", saved.metadata.bridgeProfiles);

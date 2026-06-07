@@ -113,3 +113,32 @@ rules_can_override_the_relation_kind = func(t) {
     t.equal(analysis.relationsRequested[0].relation, "attribute_of", "rule relation should override the top relation request");
     t.equal(analysis.intentSource, "rule", "relation override from a rule should mark the source as rule");
 };
+
+[test]
+trained_systems_can_be_saved_and_loaded = func(t) {
+    respond = import("./respond.ns").respond;
+
+    mkdir("./tmp");
+    path = "./tmp/respond_model_test.bin";
+    if (exists(path)) deleteFile(path);
+
+    corpus = "
+    dogs are animals
+    birds can fly
+    dogs can swim
+    ";
+
+    system = respond.train(corpus, respond.defaultConfig());
+    saved = respond.saveSystem(system, path);
+    restored = respond.loadSystem(path);
+    result = respond.answer(restored, "can dogs swim", 3);
+
+    t.truthy(exists(path), "saveSystem should write the requested model file");
+    t.equal(saved.kind, "respond.system", "saveSystem should write the respond model kind");
+    t.equal(restored.docs.count(), system.docs.count(), "loadSystem should restore the corpus documents");
+    t.equal(restored.segments.count(), system.segments.count(), "loadSystem should restore segments");
+    t.equal(result.intent, "capability_check", "loaded model should still answer capability requests");
+    t.truthy(regex_test(result.answer, "dogs can swim"), "loaded model should preserve grounded answers");
+
+    if (exists(path)) deleteFile(path);
+};

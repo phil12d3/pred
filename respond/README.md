@@ -40,6 +40,34 @@ printline(result.answer);
 - `respond.answer(system, inputText, limit)`
 - `respond.reply(system, inputText, limit)` alias of `answer`
 - `respond.render(result)`
+- `respond.saveSystem(system, path)`
+- `respond.loadSystem(path)`
+
+## Saved Models
+
+`respond` can persist a trained system to disk and load it back later.
+
+```ns
+respond = import("./respond.ns").respond;
+
+system = respond.train(corpus, respond.defaultConfig());
+respond.saveSystem(system, "./tmp/respond_model.bin");
+
+restored = respond.loadSystem("./tmp/respond_model.bin");
+result = respond.answer(restored, "can dogs swim", 3);
+```
+
+The package root also includes CLI helpers:
+
+- `train.ns`
+- `load.ns`
+
+Examples:
+
+```text
+../ns/bin/ns train.ns -text "dogs are animals\ndogs can swim" -modelPath ./tmp/respond_model.bin
+../ns/bin/ns load.ns -modelPath ./tmp/respond_model.bin -query "can dogs swim"
+```
 
 ## Rules
 

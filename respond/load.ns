@@ -1,0 +1,72 @@
+respond = import("./respond.ns").respond;
+
+decode_cli_text = func(text) {
+    s = stringify(text);
+    out = "";
+    i = 0;
+    while (i < s.length) {
+        ch = s[i];
+        if (ch == "\\" && i + 1 < s.length) {
+            next = s[i + 1];
+            if (next == "n") {
+                out = out + "\n";
+                i = i + 2;
+                continue;
+            }
+            if (next == "t") {
+                out = out + "\t";
+                i = i + 2;
+                continue;
+            }
+            if (next == "\"" || next == "'") {
+                out = out + next;
+                i = i + 2;
+                continue;
+            }
+        }
+        out = out + ch;
+        i = i + 1;
+    }
+    if (out.length >= 2) {
+        first = out[0];
+        last = out[out.length - 1];
+        if ((first == "\"" && last == "\"") || (first == "'" && last == "'")) {
+            trimmed = "";
+            for (ti = 1; ti < out.length - 1; ti = ti + 1) trimmed = trimmed + out[ti];
+            out = trimmed;
+        }
+    }
+    return out;
+}
+
+usage = func() {
+    printline("Usage:");
+    printline("  ../ns/bin/ns load.ns -modelPath ./tmp/respond_model.bin -query \"can dogs swim\"");
+    printline("");
+    printline("Optional:");
+    printline("  -limit 5");
+}
+
+if (defined(args.help) || defined(args.h)) {
+    usage();
+    exit(0);
+}
+
+if (!defined(args.modelPath) || args.modelPath == null || args.modelPath == "") {
+    printline("Missing -modelPath.");
+    usage();
+    exit(1);
+}
+
+if (!defined(args.query) || args.query == null || args.query == "") {
+    printline("Missing -query.");
+    usage();
+    exit(1);
+}
+
+limit = defined(args.limit) && args.limit != null && args.limit != "" ? number.parseFloat(stringify(args.limit)) : 5;
+system = respond.loadSystem(args.modelPath);
+result = respond.answer(system, decode_cli_text(args.query), limit);
+lines = respond.render(result);
+
+for (i = 0; i < lines.count(); i = i + 1) printline(lines[i]);

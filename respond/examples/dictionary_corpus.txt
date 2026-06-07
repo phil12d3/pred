@@ -1,0 +1,39 @@
+poodle is a dog breed
+poodle has a curly coat
+poodle is known for intelligence
+
+dog is a domesticated animal
+dog can learn commands
+dog is known for loyalty
+
+invoice is a billing document
+invoice includes charges and due dates
+invoice belongs to billing
+
+planet is a large body that orbits a star
+planet belongs to astronomy
+planet can have moons
+
+dictionary is a reference book of words and meanings
+dictionary is used for word lookup
+dictionary belongs to language study
+
+algorithm is a step by step procedure for solving a problem
+algorithm is used in computing
+algorithm can process inputs into outputs
+
+server is a computer system that provides services to other systems
+server belongs to infrastructure
+server can respond to network requests
+
+database is a structured collection of information
+database is used for storing and querying records
+database belongs to data systems
+
+receipt is a record of payment
+receipt belongs to billing
+receipt includes payment details
+
+compiler is a program that translates source code into another form
+compiler belongs to software development
+compiler can report errors in code

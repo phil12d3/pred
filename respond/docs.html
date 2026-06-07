@@ -105,7 +105,7 @@
     <div class="hero">
       <h1>respond Documentation</h1>
       <p class="muted">Turn free-text requests into grounded answers by combining request classification, semantic overlap, lightweight embeddings, and evidence ranking.</p>
-      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> for the compact example, <a href="examples/large_corpus_demo.ns">examples/large_corpus_demo.ns</a> or <a href="examples/mega_corpus_demo.ns">examples/mega_corpus_demo.ns</a> for broader corpora, <a href="examples/rules_demo.ns">examples/rules_demo.ns</a> for manual rule overrides, or the language-specific demos in <a href="examples/japanese_demo.ns">Japanese</a>, <a href="examples/romaji_demo.ns">Romaji</a>, and <a href="examples/french_demo.ns">French</a>.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> for the compact example, <a href="examples/large_corpus_demo.ns">examples/large_corpus_demo.ns</a> or <a href="examples/mega_corpus_demo.ns">examples/mega_corpus_demo.ns</a> for broader corpora, <a href="examples/rules_demo.ns">examples/rules_demo.ns</a> for manual rule overrides, or the language-specific demos in <a href="examples/japanese_demo.ns">Japanese</a>, <a href="examples/romaji_demo.ns">Romaji</a>, and <a href="examples/french_demo.ns">French</a>. For saved-model usage, also see <a href="train.ns">train.ns</a> and <a href="load.ns">load.ns</a>.</p>
     </div>
 
     <div class="section">
@@ -349,6 +349,57 @@ printline(result.answer);</code></div>
         </tbody>
       </table>
       <p><code>render(...)</code> does not re-rank or re-analyze anything. It only formats an existing result into readable lines.</p>
+
+      <h3>saveSystem(system, path)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> persisting a trained respond system to disk so you can reload it later without retraining.
+        <br><strong>Returns:</strong> a save result object with file path, format information, and saved-model stats.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Type</th><th>What it means</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>system</code></td><td>trained system object</td><td>The full object returned by <code>train(...)</code>. This is the learned respond model that will be serialized to disk.</td></tr>
+          <tr><td><code>path</code></td><td>string</td><td>Destination model file path. Relative and absolute paths are both valid. Missing parent directories are created automatically.</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><code>saved = respond.saveSystem(system, "./tmp/respond_model.bin");
+
+printline(saved.path);              // ./tmp/respond_model.bin
+printline(saved.kind);              // respond.system
+printline(saved.version);           // 1
+printline(saved.metadata.segments);</code></div>
+      <p><code>saveSystem(...)</code> stores a wrapped model object with a small header:</p>
+      <div class="code"><code>{
+    kind: "respond.system",
+    version: 1,
+    payload: {...trained system...},
+    metadata: {
+        documents: 100,
+        segments: 100,
+        vocabTerms: 167,
+        bridgeProfiles: 58
+    }
+}</code></div>
+      <p>The persistence mechanism is the same compressed value storage style used by the repo’s <code>store</code> module. The file is meant to be loaded back by <code>loadSystem(...)</code>, not edited manually.</p>
+
+      <h3>loadSystem(path)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> restoring a previously saved respond model.
+        <br><strong>Returns:</strong> the trained system object, ready for <code>analyze(...)</code> or <code>answer(...)</code>.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Type</th><th>What it means</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>path</code></td><td>string</td><td>Path to a model file created by <code>saveSystem(...)</code>.</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><code>restored = respond.loadSystem("./tmp/respond_model.bin");
+result = respond.answer(restored, "can dogs swim", 3);</code></div>
+      <p><code>loadSystem(...)</code> validates the saved model header before returning the payload. Right now it expects <code>kind = "respond.system"</code> and <code>version = 1</code>.</p>
     </div>
 
     <div class="section">
@@ -439,6 +490,7 @@ invoice/billing context neighborhood, even if the exact token overlap differs.</
 
       <h3>config for train(...)</h3>
       <p>If you omit <code>config</code>, the module uses <code>respond.defaultConfig()</code>.</p>
+      <p>If you save a trained model and load it back later, the original config is restored as part of that saved system. You do not re-pass config at load time.</p>
       <table>
         <thead>
           <tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
@@ -853,6 +905,28 @@ printline(result.intent);                // question
 printline(result.analysis.intentSource); // rule
 printline(result.analysis.matchedRule);  // matched rule object</code></div>
       <p>For a broader runnable example, use <a href="examples/rules_demo.ns">examples/rules_demo.ns</a>.</p>
+
+      <h3>Save And Reload Example</h3>
+      <div class="code"><code>corpus = "
+dogs are animals
+dogs can swim
+birds can fly
+";
+
+system = respond.train(corpus, respond.defaultConfig());
+respond.saveSystem(system, "./tmp/respond_model.bin");
+
+restored = respond.loadSystem("./tmp/respond_model.bin");
+result = respond.answer(restored, "can dogs swim", 3);
+
+printline(result.answer);  // dogs can swim.</code></div>
+
+      <h3>CLI Scripts</h3>
+      <div class="code"><code>../ns/bin/ns train.ns -text "dogs are animals\ndogs can swim" -modelPath ./tmp/respond_model.bin
+../ns/bin/ns load.ns -modelPath ./tmp/respond_model.bin -query "can dogs swim"</code></div>
+      <p><code>train.ns</code> accepts either <code>-text</code> or <code>-corpusPath</code>. The first passes the corpus inline. The second reads a plain text file from disk and trains on that text.</p>
+      <p>The script also prints lightweight stage progress while it runs: reading corpus input, building config, training the model, and saving the output file.</p>
+      <p><code>load.ns</code> accepts <code>-modelPath</code>, <code>-query</code>, and optional <code>-limit</code>. It loads the saved model, runs one query through <code>respond.answer(...)</code>, and prints the rendered result lines.</p>
     </div>
 
     <div class="section">
@@ -888,6 +962,7 @@ Top evidence:
         <li><a href="examples/large_corpus_demo.ns">examples/large_corpus_demo.ns</a> for a larger corpus example.</li>
         <li><a href="examples/mega_corpus_demo.ns">examples/mega_corpus_demo.ns</a> for an even broader mixed-domain corpus.</li>
         <li><a href="examples/japanese_demo.ns">examples/japanese_demo.ns</a>, <a href="examples/romaji_demo.ns">examples/romaji_demo.ns</a>, and <a href="examples/french_demo.ns">examples/french_demo.ns</a> for smaller multilingual examples.</li>
+        <li><a href="train.ns">train.ns</a> and <a href="load.ns">load.ns</a> for saved-model CLI usage.</li>
         <li><a href="tests/respond_tests.ns">tests/respond_tests.ns</a> for expected behaviors.</li>
         <li><a href="src/respond.ns">src/respond.ns</a> for the implementation details.</li>
       </ul>

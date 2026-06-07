@@ -63,6 +63,57 @@ normalize = func(text) {
     return stringify(text);
 }
 
+splitPath = func(path) {
+    parts = [];
+    current = "";
+    value = this.asText(path);
+    for (i = 0; i < value.length; i = i + 1) {
+        ch = value[i];
+        if (ch == "/") {
+            parts.add(current);
+            current = "";
+        } else {
+            current = current + ch;
+        }
+    }
+    parts.add(current);
+    return parts;
+}
+
+ensureDirectory = func(path) {
+    if (!defined(path) || path == null || path == "" || path == ".") return true;
+    parts = this.splitPath(path);
+    current = "";
+    isAbsolute = this.asText(path).length > 0 && this.asText(path)[0] == "/";
+    if (isAbsolute) current = "/";
+    for (i = 0; i < parts.count(); i = i + 1) {
+        part = parts[i];
+        if (!defined(part) || part == "" || part == ".") continue;
+        if (current == "") current = "./" + part;
+        else if (current == "/") current = "/" + part;
+        else current = current + "/" + part;
+        if (!exists(current)) mkdir(current);
+    }
+    return true;
+}
+
+ensureParentDirectory = func(path) {
+    parts = this.splitPath(path);
+    if (parts.count() <= 1) return true;
+    dir = "";
+    value = this.asText(path);
+    isAbsolute = value.length > 0 && value[0] == "/";
+    if (isAbsolute) dir = "/";
+    for (i = 0; i < parts.count() - 1; i = i + 1) {
+        part = parts[i];
+        if (!defined(part) || part == "" || part == ".") continue;
+        if (dir == "") dir = "./" + part;
+        else if (dir == "/") dir = "/" + part;
+        else dir = dir + "/" + part;
+    }
+    return this.ensureDirectory(dir);
+}
+
 lines = func(text) {
     s = this.normalize(text);
     rows = [];
@@ -1229,6 +1280,43 @@ train = func(corpusInput, config) {
     };
     system.segments = this.buildSegmentRows(rawSegments, system);
     return system;
+}
+
+saveSystem = func(system, path) {
+    if (!defined(system) || system == null) throw("respond.saveSystem requires a trained system");
+    this.ensureParentDirectory(path);
+    model = {
+        kind: "respond.system",
+        version: 1,
+        payload: system,
+        metadata: {
+            documents: defined(system.docs) ? system.docs.count() : 0,
+            segments: defined(system.segments) ? system.segments.count() : 0,
+            vocabTerms: defined(system.vocab) ? system.vocab.count() : 0,
+            bridgeProfiles: defined(system.bridgeProfiles) ? system.bridgeProfiles.count() : 0
+        }
+    };
+    compress_to_file(model, path);
+    return {
+        path: path,
+        saved: true,
+        kind: model.kind,
+        version: model.version,
+        metadata: model.metadata
+    };
+}
+
+loadSystem = func(path) {
+    model = decompress_from_file(path);
+    if (!defined(model) || model == null) throw("respond.loadSystem could not load model from " + this.asText(path));
+    if (defined(model.kind) && model.kind == "respond.system") {
+        if (!defined(model.version) || model.version != 1) {
+            throw("respond.loadSystem does not support model version " + stringify(model.version));
+        }
+        if (!defined(model.payload) || model.payload == null) throw("respond.loadSystem found no payload in " + this.asText(path));
+        return model.payload;
+    }
+    return model;
 }
 
 answer = func(system, inputText, limit) {
