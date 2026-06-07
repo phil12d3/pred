@@ -10,6 +10,8 @@ defaultConfig = func() {
         parentDepth: 2,
         answerEvidenceLimit: 2,
         fuzzyThreshold: 0.82,
+        trainingProgressHook: null,
+        trainingProgressEvery: 100,
         intentRules: [],
         scoreWeights: {
             evidence: 0.45,
@@ -26,6 +28,53 @@ defaultConfig = func() {
             explain_topic: "explain"
         }
     };
+}
+
+cloneValue = func(value) {
+    if (!defined(value)) return null;
+    typeName = type(value).typename;
+    if (typeName == "Null") return null;
+    if (typeName == "Array") {
+        out = [];
+        for (i = 0; i < value.count(); i = i + 1) out.add(this.cloneValue(value[i]));
+        return out;
+    }
+    if (typeName == "Object") {
+        out = {};
+        foreach(propName in value.props) out[propName] = this.cloneValue(value[propName]);
+        return out;
+    }
+    if (typeName == "Function") return null;
+    return value;
+}
+
+copyConfig = func(config) {
+    return this.cloneValue(config);
+}
+
+emitTrainingProgress = func(hook, stage, stats) {
+    if (!defined(hook)) return false;
+    if (type(hook).typename == "Null") return false;
+    payload = defined(stats) ? this.cloneValue(stats) : {};
+    payload.stage = stage;
+    hook(payload);
+    return true;
+}
+
+countProps = func(obj) {
+    if (!defined(obj) || obj == null) return 0;
+    total = 0;
+    foreach(propName in obj.props) total = total + 1;
+    return total;
+}
+
+shouldEmitProgress = func(current, total, every) {
+    step = defined(every) && every > 0 ? every : 100;
+    if (current <= 0) return false;
+    if (current == 1 || current == 5 || current == 10 || current == 25 || current == 50) return true;
+    if (current == total) return true;
+    remainder = current % step;
+    return remainder == 0;
 }
 
 asText = func(value) {
@@ -260,7 +309,7 @@ normalizeDocs = func(corpusInput) {
     return docs;
 }
 
-buildSegments = func(docs) {
+buildSegments = func(docs, progressHook, progressEvery) {
     rows = [];
     for (di = 0; di < docs.count(); di = di + 1) {
         text = this.asText(docs[di]);
@@ -297,6 +346,14 @@ buildSegments = func(docs) {
                 normalizedTokens: this.normalizeTokens(tail)
             });
         }
+        processed = di + 1;
+        if (this.shouldEmitProgress(processed, docs.count(), progressEvery)) {
+            this.emitTrainingProgress(progressHook, "build_segments_progress", {
+                processedDocuments: processed,
+                totalDocuments: docs.count(),
+                rawSegments: rows.count()
+            });
+        }
     }
     return rows;
 }
@@ -328,7 +385,7 @@ splitSegments = func(text) {
     return segments;
 }
 
-semanticCoOccurrence = func(docs, windowSize) {
+semanticCoOccurrence = func(docs, windowSize, progressHook, progressEvery) {
     win = defined(windowSize) ? windowSize : 2;
     if (win < 1) win = 1;
 
@@ -354,11 +411,19 @@ semanticCoOccurrence = func(docs, windowSize) {
                 }
             }
         }
+        processed = di + 1;
+        if (this.shouldEmitProgress(processed, docs.count(), progressEvery)) {
+            this.emitTrainingProgress(progressHook, "semantic_cooccurrence_progress", {
+                processedDocuments: processed,
+                totalDocuments: docs.count(),
+                cooccurrenceTerms: this.countProps(matrix)
+            });
+        }
     }
     return matrix;
 }
 
-wordCounts = func(docs) {
+wordCounts = func(docs, progressHook, progressEvery) {
     counts = {};
     total = 0;
     for (di = 0; di < docs.count(); di = di + 1) {
@@ -369,12 +434,21 @@ wordCounts = func(docs) {
             counts[word] = counts[word] + 1;
             total = total + 1;
         }
+        processed = di + 1;
+        if (this.shouldEmitProgress(processed, docs.count(), progressEvery)) {
+            this.emitTrainingProgress(progressHook, "word_counts_progress", {
+                processedDocuments: processed,
+                totalDocuments: docs.count(),
+                uniqueTerms: this.countProps(counts),
+                tokenCount: total
+            });
+        }
     }
     return {counts: counts, total: total};
 }
 
-buildVocabulary = func(docs, cooc, limit) {
-    counts = this.wordCounts(docs);
+buildVocabulary = func(docs, cooc, limit, progressHook, progressEvery) {
+    counts = this.wordCounts(docs, progressHook, progressEvery);
     rows = [];
     foreach(word in counts.counts.props) {
         if (!defined(cooc[word])) continue;
@@ -397,6 +471,12 @@ createEmbedding = func(dimensions, seedId) {
 
 normalizeEmbedding = func(embedding) {
     if (!defined(embedding) || embedding == null || embedding.values.count() == 0) return embedding;
+    sumSquares = 0;
+    for (i = 0; i < embedding.values.count(); i = i + 1) {
+        value = embedding.values[i];
+        sumSquares = sumSquares + (value * value);
+    }
+    if (sumSquares == 0) return embedding;
     m = matrice_fromArray([embedding.values]);
     normed = m.normalize().toArray()[0];
     values = [];
@@ -482,9 +562,19 @@ averageEmbeddings = func(embeddings, dimensions, idValue) {
     return this.normalizeEmbedding(emb);
 }
 
-buildTermEmbeddings = func(vocab, cooc, dimensions) {
+buildTermEmbeddings = func(vocab, cooc, dimensions, progressHook, progressEvery) {
     map = {};
-    for (i = 0; i < vocab.count(); i = i + 1) map[vocab[i]] = this.embeddingFromCoOccurrence(cooc, vocab[i], dimensions);
+    for (i = 0; i < vocab.count(); i = i + 1) {
+        map[vocab[i]] = this.embeddingFromCoOccurrence(cooc, vocab[i], dimensions);
+        processed = i + 1;
+        if (this.shouldEmitProgress(processed, vocab.count(), progressEvery)) {
+            this.emitTrainingProgress(progressHook, "build_embeddings_progress", {
+                processedTerms: processed,
+                totalTerms: vocab.count(),
+                dimensions: dimensions
+            });
+        }
+    }
     return map;
 }
 
@@ -503,7 +593,7 @@ embeddingForTokens = func(system, tokens, idValue) {
     return this.embeddingFromFrequencies(freqMap, system.config.dimensions);
 }
 
-buildSegmentRows = func(segments, system) {
+buildSegmentRows = func(segments, system, progressHook, progressEvery) {
     rows = [];
     for (i = 0; i < segments.count(); i = i + 1) {
         row = segments[i];
@@ -516,6 +606,13 @@ buildSegmentRows = func(segments, system) {
             normalizedTokens: row.normalizedTokens,
             embedding: this.embeddingForTokens(system, row.tokens, "segment_" + stringify(i))
         });
+        processed = i + 1;
+        if (this.shouldEmitProgress(processed, segments.count(), progressEvery)) {
+            this.emitTrainingProgress(progressHook, "build_segment_rows_progress", {
+                processedSegments: processed,
+                totalSegments: segments.count()
+            });
+        }
     }
     return rows;
 }
@@ -528,7 +625,7 @@ addUniqueNumber = func(values, value) {
     return true;
 }
 
-buildTokenIndex = func(segmentRows) {
+buildTokenIndex = func(segmentRows, progressHook, progressEvery) {
     index = {};
     for (i = 0; i < segmentRows.count(); i = i + 1) {
         tokens = this.uniqueTokens(segmentRows[i].normalizedTokens);
@@ -536,6 +633,14 @@ buildTokenIndex = func(segmentRows) {
             token = tokens[j];
             if (!defined(index[token])) index[token] = [];
             index[token].add(i);
+        }
+        processed = i + 1;
+        if (this.shouldEmitProgress(processed, segmentRows.count(), progressEvery)) {
+            this.emitTrainingProgress(progressHook, "build_token_index_progress", {
+                processedSegments: processed,
+                totalSegments: segmentRows.count(),
+                tokenIndexTerms: this.countProps(index)
+            });
         }
     }
     return index;
@@ -547,7 +652,7 @@ buildAllSegmentIds = func(segmentRows) {
     return ids;
 }
 
-buildRelationIndex = func(relations, config) {
+buildRelationIndex = func(relations, config, progressHook) {
     index = {};
     labels = defined(config.intentLabels) ? config.intentLabels : {};
 
@@ -563,14 +668,26 @@ buildRelationIndex = func(relations, config) {
         row = relations.categoryRows[i];
         if (!defined(index[defineLabel][row.topic])) index[defineLabel][row.topic] = row.text;
     }
+    this.emitTrainingProgress(progressHook, "build_relation_index_progress", {
+        relationIntent: defineLabel,
+        relationEntries: this.countProps(index[defineLabel])
+    });
     for (i = 0; i < relations.capabilityRows.count(); i = i + 1) {
         row = relations.capabilityRows[i];
         if (!defined(index[capabilityLabel][row.topic])) index[capabilityLabel][row.topic] = row.text;
     }
+    this.emitTrainingProgress(progressHook, "build_relation_index_progress", {
+        relationIntent: capabilityLabel,
+        relationEntries: this.countProps(index[capabilityLabel])
+    });
     for (i = 0; i < relations.attributeRows.count(); i = i + 1) {
         row = relations.attributeRows[i];
         if (!defined(index[attributeLabel][row.topic])) index[attributeLabel][row.topic] = row.text;
     }
+    this.emitTrainingProgress(progressHook, "build_relation_index_progress", {
+        relationIntent: attributeLabel,
+        relationEntries: this.countProps(index[attributeLabel])
+    });
 
     return index;
 }
@@ -578,9 +695,9 @@ buildRelationIndex = func(relations, config) {
 ensureSystemIndexes = func(system) {
     if (!defined(system.answerCache) || system.answerCache == null) system.answerCache = {};
     if (!defined(system.segments) || system.segments == null) system.segments = [];
-    if (!defined(system.tokenIndex) || system.tokenIndex == null) system.tokenIndex = this.buildTokenIndex(system.segments);
+    if (!defined(system.tokenIndex) || system.tokenIndex == null) system.tokenIndex = this.buildTokenIndex(system.segments, null, 100);
     if (!defined(system.allSegmentIds) || system.allSegmentIds == null) system.allSegmentIds = this.buildAllSegmentIds(system.segments);
-    if (!defined(system.relationIndex) || system.relationIndex == null) system.relationIndex = this.buildRelationIndex(system.relations, system.config);
+    if (!defined(system.relationIndex) || system.relationIndex == null) system.relationIndex = this.buildRelationIndex(system.relations, system.config, null);
     return system;
 }
 
@@ -1342,17 +1459,81 @@ composeAnswer = func(system, result) {
 }
 
 train = func(corpusInput, config) {
-    cfg = defined(config) && config != null ? config : this.defaultConfig();
+    cfgSource = defined(config) && config != null ? config : this.defaultConfig();
+    progressHook = defined(cfgSource.trainingProgressHook) ? cfgSource.trainingProgressHook : null;
+    cfg = this.copyConfig(cfgSource);
+    cfg.trainingProgressHook = null;
+    progressEvery = defined(cfg.trainingProgressEvery) && cfg.trainingProgressEvery > 0 ? cfg.trainingProgressEvery : 100;
+
+    this.emitTrainingProgress(progressHook, "normalize_docs_start", {});
     docs = this.normalizeDocs(corpusInput);
-    rawSegments = this.buildSegments(docs);
+    this.emitTrainingProgress(progressHook, "normalize_docs_complete", {
+        documents: docs.count()
+    });
+
+    this.emitTrainingProgress(progressHook, "build_segments_start", {
+        documents: docs.count()
+    });
+    rawSegments = this.buildSegments(docs, progressHook, progressEvery);
+    this.emitTrainingProgress(progressHook, "build_segments_complete", {
+        documents: docs.count(),
+        rawSegments: rawSegments.count()
+    });
+
+    this.emitTrainingProgress(progressHook, "build_pairs_start", {
+        rawSegments: rawSegments.count()
+    });
     pairRows = this.pairRows(rawSegments);
+    this.emitTrainingProgress(progressHook, "build_pairs_complete", {
+        rawSegments: rawSegments.count(),
+        pairRows: pairRows.count()
+    });
+
+    this.emitTrainingProgress(progressHook, "build_bridge_profiles_start", {
+        pairRows: pairRows.count()
+    });
     bridgeProfiles = this.buildBridgeProfiles(pairRows);
+    this.emitTrainingProgress(progressHook, "build_bridge_profiles_complete", {
+        pairRows: pairRows.count(),
+        bridgeProfiles: bridgeProfiles.count()
+    });
     bridgeMap = {};
     for (i = 0; i < bridgeProfiles.count(); i = i + 1) bridgeMap[bridgeProfiles[i].bridge] = bridgeProfiles[i];
     relations = this.deriveRelations(pairRows, bridgeProfiles, bridgeMap);
-    cooc = this.semanticCoOccurrence(docs, cfg.semanticWindow);
-    vocab = this.buildVocabulary(docs, cooc, cfg.vocabLimit);
-    termEmbeddings = this.buildTermEmbeddings(vocab, cooc, cfg.dimensions);
+
+    this.emitTrainingProgress(progressHook, "semantic_cooccurrence_start", {
+        documents: docs.count(),
+        window: cfg.semanticWindow
+    });
+    cooc = this.semanticCoOccurrence(docs, cfg.semanticWindow, progressHook, progressEvery);
+    this.emitTrainingProgress(progressHook, "semantic_cooccurrence_complete", {
+        documents: docs.count(),
+        cooccurrenceTerms: this.countProps(cooc)
+    });
+
+    this.emitTrainingProgress(progressHook, "build_vocabulary_start", {
+        vocabLimit: cfg.vocabLimit
+    });
+    vocab = this.buildVocabulary(docs, cooc, cfg.vocabLimit, progressHook, progressEvery);
+    this.emitTrainingProgress(progressHook, "build_vocabulary_complete", {
+        vocabTerms: vocab.count(),
+        vocabLimit: cfg.vocabLimit
+    });
+
+    this.emitTrainingProgress(progressHook, "build_embeddings_start", {
+        vocabTerms: vocab.count(),
+        dimensions: cfg.dimensions
+    });
+    termEmbeddings = this.buildTermEmbeddings(vocab, cooc, cfg.dimensions, progressHook, progressEvery);
+    this.emitTrainingProgress(progressHook, "build_embeddings_complete", {
+        vocabTerms: vocab.count(),
+        termEmbeddings: this.countProps(termEmbeddings),
+        dimensions: cfg.dimensions
+    });
+
+    this.emitTrainingProgress(progressHook, "build_segment_rows_start", {
+        segments: rawSegments.count()
+    });
 
     topicIndex = {};
     parentIndex = {};
@@ -1383,10 +1564,43 @@ train = func(corpusInput, config) {
         relationIndex: {},
         answerCache: {}
     };
-    system.segments = this.buildSegmentRows(rawSegments, system);
-    system.tokenIndex = this.buildTokenIndex(system.segments);
+    system.segments = this.buildSegmentRows(rawSegments, system, progressHook, progressEvery);
+    this.emitTrainingProgress(progressHook, "build_segment_rows_complete", {
+        segments: system.segments.count()
+    });
+
+    this.emitTrainingProgress(progressHook, "build_token_index_start", {
+        segments: system.segments.count()
+    });
+    system.tokenIndex = this.buildTokenIndex(system.segments, progressHook, progressEvery);
+    this.emitTrainingProgress(progressHook, "build_token_index_complete", {
+        segments: system.segments.count(),
+        tokenIndexTerms: this.countProps(system.tokenIndex)
+    });
+
+    this.emitTrainingProgress(progressHook, "build_all_segment_ids_start", {
+        segments: system.segments.count()
+    });
     system.allSegmentIds = this.buildAllSegmentIds(system.segments);
-    system.relationIndex = this.buildRelationIndex(system.relations, system.config);
+    this.emitTrainingProgress(progressHook, "build_all_segment_ids_complete", {
+        segmentIds: system.allSegmentIds.count()
+    });
+
+    this.emitTrainingProgress(progressHook, "build_relation_index_start", {});
+    system.relationIndex = this.buildRelationIndex(system.relations, system.config, progressHook);
+    this.emitTrainingProgress(progressHook, "build_relation_index_complete", {
+        defineEntries: defined(system.relationIndex.define) ? this.countProps(system.relationIndex.define) : 0,
+        capabilityEntries: defined(system.relationIndex.capability_check) ? this.countProps(system.relationIndex.capability_check) : 0,
+        attributeEntries: defined(system.relationIndex.attribute_query) ? this.countProps(system.relationIndex.attribute_query) : 0
+    });
+    this.emitTrainingProgress(progressHook, "train_complete", {
+        documents: system.docs.count(),
+        segments: system.segments.count(),
+        vocabTerms: system.vocab.count(),
+        bridgeProfiles: system.bridgeProfiles.count(),
+        pairRows: system.pairRows.count(),
+        tokenIndexTerms: this.countProps(system.tokenIndex)
+    });
     return system;
 }
 

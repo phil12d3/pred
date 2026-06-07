@@ -63,15 +63,95 @@ usage = func() {
     printline("  -segmentLimit 5");
     printline("  -topicLimit 3");
     printline("  -evidenceLimit 5");
+    printline("  -trainingProgressEvery 100");
 }
 
 stage = func(text) {
     printline("[train] ", text);
 }
 
+progressSummary = func(event) {
+    if (!defined(event) || event == null) return "";
+    parts = [];
+    if (defined(event.documents)) parts.add("documents=" + stringify(event.documents));
+    if (defined(event.segments)) parts.add("segments=" + stringify(event.segments));
+    if (defined(event.processedDocuments) && defined(event.totalDocuments)) {
+        parts.add("documents=" + stringify(event.processedDocuments) + "/" + stringify(event.totalDocuments));
+        if (event.totalDocuments > 0) parts.add("pct=" + stringify((event.processedDocuments * 100) / event.totalDocuments));
+    }
+    if (defined(event.processedSegments) && defined(event.totalSegments)) {
+        parts.add("segments=" + stringify(event.processedSegments) + "/" + stringify(event.totalSegments));
+        if (event.totalSegments > 0) parts.add("pct=" + stringify((event.processedSegments * 100) / event.totalSegments));
+    }
+    if (defined(event.rawSegments)) parts.add("segments=" + stringify(event.rawSegments));
+    if (defined(event.pairRows)) parts.add("pairs=" + stringify(event.pairRows));
+    if (defined(event.bridgeProfiles)) parts.add("bridges=" + stringify(event.bridgeProfiles));
+    if (defined(event.cooccurrenceTerms)) parts.add("coocTerms=" + stringify(event.cooccurrenceTerms));
+    if (defined(event.vocabTerms)) parts.add("vocab=" + stringify(event.vocabTerms));
+    if (defined(event.termEmbeddings)) parts.add("embeddings=" + stringify(event.termEmbeddings));
+    if (defined(event.tokenIndexTerms)) parts.add("tokenIndexTerms=" + stringify(event.tokenIndexTerms));
+    if (defined(event.uniqueTerms)) parts.add("uniqueTerms=" + stringify(event.uniqueTerms));
+    if (defined(event.tokenCount)) parts.add("tokens=" + stringify(event.tokenCount));
+    if (defined(event.processedTerms) && defined(event.totalTerms)) {
+        parts.add("terms=" + stringify(event.processedTerms) + "/" + stringify(event.totalTerms));
+        if (event.totalTerms > 0) parts.add("pct=" + stringify((event.processedTerms * 100) / event.totalTerms));
+    }
+    if (defined(event.segmentIds)) parts.add("segmentIds=" + stringify(event.segmentIds));
+    if (defined(event.relationIntent)) parts.add("intent=" + stringify(event.relationIntent));
+    if (defined(event.relationEntries)) parts.add("entries=" + stringify(event.relationEntries));
+    if (defined(event.defineEntries)) parts.add("defineEntries=" + stringify(event.defineEntries));
+    if (defined(event.capabilityEntries)) parts.add("capabilityEntries=" + stringify(event.capabilityEntries));
+    if (defined(event.attributeEntries)) parts.add("attributeEntries=" + stringify(event.attributeEntries));
+    if (defined(event.window)) parts.add("window=" + stringify(event.window));
+    if (defined(event.dimensions)) parts.add("dimensions=" + stringify(event.dimensions));
+    if (defined(event.vocabLimit)) parts.add("vocabLimit=" + stringify(event.vocabLimit));
+    if (parts.count() == 0) return "";
+
+    text = "";
+    for (i = 0; i < parts.count(); i = i + 1) {
+        if (i > 0) text = text + " ";
+        text = text + parts[i];
+    }
+    return text;
+}
+
+progressLabel = func(stageName) {
+    if (stageName == "normalize_docs_start") return "normalizing corpus";
+    if (stageName == "normalize_docs_complete") return "normalized corpus";
+    if (stageName == "build_segments_start") return "building segments";
+    if (stageName == "build_segments_progress") return "building segments";
+    if (stageName == "build_segments_complete") return "built segments";
+    if (stageName == "build_pairs_start") return "building pair rows";
+    if (stageName == "build_pairs_complete") return "built pair rows";
+    if (stageName == "build_bridge_profiles_start") return "building bridge profiles";
+    if (stageName == "build_bridge_profiles_complete") return "built bridge profiles";
+    if (stageName == "semantic_cooccurrence_start") return "building co-occurrence map";
+    if (stageName == "semantic_cooccurrence_progress") return "building co-occurrence map";
+    if (stageName == "semantic_cooccurrence_complete") return "built co-occurrence map";
+    if (stageName == "build_vocabulary_start") return "building vocabulary";
+    if (stageName == "word_counts_progress") return "counting vocabulary terms";
+    if (stageName == "build_vocabulary_complete") return "built vocabulary";
+    if (stageName == "build_embeddings_start") return "building embeddings";
+    if (stageName == "build_embeddings_progress") return "building embeddings";
+    if (stageName == "build_embeddings_complete") return "built embeddings";
+    if (stageName == "build_segment_rows_start") return "building segment rows";
+    if (stageName == "build_segment_rows_progress") return "building segment rows";
+    if (stageName == "build_segment_rows_complete") return "built segment rows";
+    if (stageName == "build_token_index_start") return "building token index";
+    if (stageName == "build_token_index_progress") return "building token index";
+    if (stageName == "build_token_index_complete") return "built token index";
+    if (stageName == "build_all_segment_ids_start") return "building segment id list";
+    if (stageName == "build_all_segment_ids_complete") return "built segment id list";
+    if (stageName == "build_relation_index_start") return "building relation index";
+    if (stageName == "build_relation_index_progress") return "building relation index";
+    if (stageName == "build_relation_index_complete") return "built relation index";
+    if (stageName == "train_complete") return "training complete";
+    return stageName;
+}
+
 readNumberArg = func(name, currentValue) {
     if (!defined(args[name]) || args[name] == null || args[name] == "") return currentValue;
-    return number.parseFloat(stringify(args[name]));
+    return args[name];
 }
 
 buildConfig = func() {
@@ -85,9 +165,8 @@ buildConfig = func() {
     config.parentTopicLimit = readNumberArg("parentTopicLimit", config.parentTopicLimit);
     config.parentDepth = readNumberArg("parentDepth", config.parentDepth);
     config.answerEvidenceLimit = readNumberArg("answerEvidenceLimit", config.answerEvidenceLimit);
-    if (defined(args.fuzzyThreshold) && args.fuzzyThreshold != null && args.fuzzyThreshold != "") {
-        config.fuzzyThreshold = number.parseFloat(stringify(args.fuzzyThreshold));
-    }
+    config.trainingProgressEvery = readNumberArg("trainingProgressEvery", config.trainingProgressEvery);
+    if (defined(args.fuzzyThreshold) && args.fuzzyThreshold != null && args.fuzzyThreshold != "") config.fuzzyThreshold = args.fuzzyThreshold;
     return config;
 }
 
@@ -112,6 +191,15 @@ if (defined(args.text) && args.text != null && args.text != "") {
 modelPath = defined(args.modelPath) && args.modelPath != null && args.modelPath != "" ? args.modelPath : "./tmp/respond_model.bin";
 stage("building config");
 config = buildConfig();
+trainTimer = timer();
+trainTimer.start();
+config.trainingProgressHook = func(event) {
+    elapsed = trainTimer.duration();
+    label = progressLabel(event.stage);
+    summary = progressSummary(event);
+    if (summary == "") printline("[train] ", label, " (", elapsed, "ms)");
+    else printline("[train] ", label, " (", elapsed, "ms) ", summary);
+};
 stage("training respond model");
 system = respond.train(corpusText, config);
 stage("saving model to " + modelPath);

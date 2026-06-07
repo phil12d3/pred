@@ -1,0 +1,1308 @@
+A poodle is a dog.
+A Labrador is a dog.
+A German shepherd is a dog.
+A beagle is a dog.
+A bulldog is a dog.
+A greyhound is a dog.
+A dachshund is a dog.
+A border collie is a dog.
+A Siamese is a cat.
+A Persian is a cat.
+A Maine Coon is a cat.
+A lion is a cat.
+A tiger is a cat.
+A leopard is a cat.
+A cheetah is a cat.
+A jaguar is a cat.
+A wolf is a canine.
+A fox is a canine.
+A coyote is a canine.
+A dog is a mammal.
+A cat is a mammal.
+A horse is a mammal.
+A cow is a mammal.
+A sheep is a mammal.
+A goat is a mammal.
+A pig is a mammal.
+A rabbit is a mammal.
+A whale is a mammal.
+A dolphin is a mammal.
+A bat is a mammal.
+A human is a mammal.
+A kangaroo is a marsupial.
+A koala is a marsupial.
+A wombat is a marsupial.
+A platypus is a monotreme.
+An echidna is a monotreme.
+A chicken is a bird.
+A robin is a bird.
+A sparrow is a bird.
+An eagle is a bird.
+A hawk is a bird.
+An owl is a bird.
+A penguin is a bird.
+An ostrich is a bird.
+A swan is a bird.
+A duck is a bird.
+A goose is a bird.
+A parrot is a bird.
+A raven is a bird.
+A crow is a bird.
+A peacock is a bird.
+A frog is an amphibian.
+A toad is an amphibian.
+A salamander is an amphibian.
+A newt is an amphibian.
+A snake is a reptile.
+A lizard is a reptile.
+A crocodile is a reptile.
+An alligator is a reptile.
+A turtle is a reptile.
+A tortoise is a reptile.
+A salmon is a fish.
+A trout is a fish.
+A cod is a fish.
+A tuna is a fish.
+A shark is a fish.
+A ray is a fish.
+A seahorse is a fish.
+A goldfish is a fish.
+A bee is an insect.
+An ant is an insect.
+A butterfly is an insect.
+A moth is an insect.
+A beetle is an insect.
+A fly is an insect.
+A mosquito is an insect.
+A wasp is an insect.
+A dragonfly is an insect.
+A grasshopper is an insect.
+A spider is an arachnid.
+A scorpion is an arachnid.
+A tick is an arachnid.
+A mite is an arachnid.
+A crab is a crustacean.
+A lobster is a crustacean.
+A shrimp is a crustacean.
+A prawn is a crustacean.
+An octopus is a mollusc.
+A squid is a mollusc.
+A snail is a mollusc.
+A slug is a mollusc.
+A clam is a mollusc.
+An oyster is a mollusc.
+A worm is an invertebrate.
+A jellyfish is an invertebrate.
+A starfish is an echinoderm.
+A sea urchin is an echinoderm.
+A coral is an animal.
+A sponge is an animal.
+A deer is a mammal.
+A bear is a mammal.
+A badger is a mammal.
+A hedgehog is a mammal.
+A mole is a mammal.
+A squirrel is a mammal.
+A mouse is a mammal.
+A rat is a mammal.
+An elephant is a mammal.
+A rhinoceros is a mammal.
+A hippopotamus is a mammal.
+A giraffe is a mammal.
+A zebra is a mammal.
+A camel is a mammal.
+A llama is a mammal.
+An alpaca is a mammal.
+A gorilla is a primate.
+A chimpanzee is a primate.
+An orangutan is a primate.
+A lemur is a primate.
+A monkey is a primate.
+An ape is a primate.
+A horse is an equine.
+A donkey is an equine.
+A zebra is an equine.
+A cow is a bovine.
+A bison is a bovine.
+A buffalo is a bovine.
+A sheep is an ovine.
+A goat is a caprine.
+A pig is a porcine animal.
+A boar is a pig.
+A sow is a female pig.
+A stallion is a male horse.
+A mare is a female horse.
+A foal is a young horse.
+A calf is a young cow.
+A lamb is a young sheep.
+A kid is a young goat.
+A puppy is a young dog.
+A kitten is a young cat.
+A cub is a young bear.
+A cygnet is a young swan.
+A duckling is a young duck.
+A chick is a young bird.
+A tadpole is a young frog.
+A caterpillar is a young butterfly or moth.
+A queen bee lays eggs.
+A worker bee is usually female.
+A drone bee is male.
+Bees make honey.
+Cows produce milk.
+Sheep produce wool.
+Chickens lay eggs.
+Ducks lay eggs.
+Birds have feathers.
+Mammals usually have hair or fur.
+Fish have gills.
+Reptiles are cold-blooded vertebrates.
+Amphibians often live part of their life in water.
+Insects have six legs.
+Arachnids have eight legs.
+Spiders make silk.
+Owls are often nocturnal.
+Bats are mostly nocturnal.
+Penguins cannot fly.
+Ostriches cannot fly.
+Most birds can fly.
+Whales breathe air.
+Dolphins breathe air.
+Sharks have cartilage instead of bones.
+Octopuses have eight arms.
+Squids have tentacles.
+Snails have shells.
+Tortoises live mostly on land.
+Turtles often live in water.
+Crocodiles are reptiles.
+Alligators are reptiles.
+Elephants have trunks.
+Giraffes have long necks.
+Zebras have stripes.
+Tigers have stripes.
+Leopards have spots.
+Cheetahs have spots.
+Lions often live in prides.
+Wolves often live in packs.
+Ants often live in colonies.
+Bees often live in colonies.
+Termites often live in colonies.
+A hive is a home for bees.
+A nest is a home for many birds.
+A burrow is an underground animal home.
+A den is an animal shelter.
+A stable is a shelter for horses.
+A kennel is a shelter for dogs.
+A cattery is a place for cats.
+A coop is a shelter for chickens.
+A barn is a farm building.
+Mercury is a planet.
+Venus is a planet.
+Earth is a planet.
+Mars is a planet.
+Jupiter is a planet.
+Saturn is a planet.
+Uranus is a planet.
+Neptune is a planet.
+Pluto is a dwarf planet.
+Ceres is a dwarf planet.
+Eris is a dwarf planet.
+Makemake is a dwarf planet.
+Haumea is a dwarf planet.
+The Sun is a star.
+The Moon is Earth's natural satellite.
+Earth orbits the Sun.
+The Moon orbits Earth.
+Mars orbits the Sun.
+Jupiter orbits the Sun.
+Saturn orbits the Sun.
+Venus orbits the Sun.
+Mercury orbits the Sun.
+Neptune orbits the Sun.
+Uranus orbits the Sun.
+The Solar System contains the Sun.
+The Solar System contains planets.
+The Solar System contains asteroids.
+The Solar System contains comets.
+The asteroid belt lies mostly between Mars and Jupiter.
+The Kuiper Belt lies beyond Neptune.
+A comet is an icy body in space.
+An asteroid is a rocky body in space.
+A meteor is a streak of light in the sky.
+A meteorite is a space rock that reaches the ground.
+A meteoroid is a small object in space.
+A galaxy is a large collection of stars.
+The Milky Way is a galaxy.
+The Andromeda Galaxy is a galaxy.
+A star is a glowing ball of plasma.
+A planet does not produce its own light.
+A moon is a natural satellite.
+A nebula is a cloud of gas and dust in space.
+A supernova is an exploding star.
+A black hole is a region with extremely strong gravity.
+Gravity attracts matter.
+Light travels through space.
+A light-year is a unit of distance.
+An astronomical unit is roughly the distance from Earth to the Sun.
+Jupiter is the largest planet in the Solar System.
+Mercury is the smallest planet in the Solar System.
+Venus is the hottest planet in the Solar System.
+Neptune is the farthest recognized planet from the Sun.
+Saturn has prominent rings.
+Jupiter has a Great Red Spot.
+Mars is often called the red planet.
+Earth has liquid water on its surface.
+Venus has a thick atmosphere.
+Mercury has many craters.
+Uranus rotates on its side.
+Neptune is an ice giant.
+Jupiter is a gas giant.
+Saturn is a gas giant.
+Uranus is an ice giant.
+Mercury is a rocky planet.
+Venus is a rocky planet.
+Earth is a rocky planet.
+Mars is a rocky planet.
+The Sun contains most of the mass of the Solar System.
+Sunlight reaches Earth in about eight minutes.
+Earth rotates once in about twenty-four hours.
+Earth orbits the Sun in about one year.
+The Moon has phases.
+A lunar eclipse happens when Earth blocks sunlight from the Moon.
+A solar eclipse happens when the Moon blocks sunlight from the Sun.
+A telescope helps people observe distant objects.
+An observatory is a place used for observing space.
+An astronaut travels in space.
+A rocket launches spacecraft.
+A satellite orbits a larger body.
+GPS uses satellites.
+The International Space Station orbits Earth.
+Space is mostly a vacuum.
+Stars form in nebulae.
+Planets can form in disks around stars.
+Exoplanets orbit stars outside the Solar System.
+A constellation is a pattern of stars seen from Earth.
+Orion is a constellation.
+Ursa Major is a constellation.
+The North Star is also called Polaris.
+Polaris is near the north celestial pole.
+The Big Dipper is an asterism.
+The zodiac is a set of constellations along the ecliptic.
+The ecliptic is the apparent path of the Sun across the sky.
+Tides are influenced by the Moon.
+Seasons are caused by Earth's axial tilt.
+Day and night are caused by Earth's rotation.
+Africa is a continent.
+Antarctica is a continent.
+Asia is a continent.
+Europe is a continent.
+North America is a continent.
+South America is a continent.
+Australia is a continent.
+The Atlantic Ocean is an ocean.
+The Pacific Ocean is an ocean.
+The Indian Ocean is an ocean.
+The Arctic Ocean is an ocean.
+The Southern Ocean is an ocean.
+The Pacific Ocean is the largest ocean.
+The Nile is a river.
+The Amazon is a river.
+The Thames is a river.
+The Severn is a river.
+The Mississippi is a river.
+The Danube is a river.
+The Rhine is a river.
+The Ganges is a river.
+The Yangtze is a river.
+The Yellow River is a river.
+Mount Everest is a mountain.
+K2 is a mountain.
+Ben Nevis is a mountain.
+Snowdon is a mountain.
+Scafell Pike is a mountain.
+The Sahara is a desert.
+The Gobi is a desert.
+The Atacama is a desert.
+The Arabian Desert is a desert.
+The Amazon rainforest is a rainforest.
+The Congo rainforest is a rainforest.
+Greenland is an island.
+Madagascar is an island.
+Borneo is an island.
+Great Britain is an island.
+Ireland is an island.
+Japan is an island country.
+Indonesia is an island country.
+New Zealand is an island country.
+The United Kingdom is a country.
+France is a country.
+Germany is a country.
+Italy is a country.
+Spain is a country.
+Portugal is a country.
+Ireland is a country.
+Norway is a country.
+Sweden is a country.
+Finland is a country.
+Denmark is a country.
+Poland is a country.
+Austria is a country.
+Switzerland is a country.
+Greece is a country.
+Turkey is a country.
+Egypt is a country.
+Morocco is a country.
+Nigeria is a country.
+Kenya is a country.
+South Africa is a country.
+India is a country.
+China is a country.
+Japan is a country.
+South Korea is a country.
+Thailand is a country.
+Vietnam is a country.
+Australia is a country.
+Canada is a country.
+Mexico is a country.
+Brazil is a country.
+Argentina is a country.
+Chile is a country.
+Peru is a country.
+The United States is a country.
+London is a city.
+Paris is a city.
+Berlin is a city.
+Rome is a city.
+Madrid is a city.
+Lisbon is a city.
+Dublin is a city.
+Edinburgh is a city.
+Cardiff is a city.
+Belfast is a city.
+New York is a city.
+Los Angeles is a city.
+Chicago is a city.
+Toronto is a city.
+Vancouver is a city.
+Mexico City is a city.
+Rio de Janeiro is a city.
+Buenos Aires is a city.
+Tokyo is a city.
+Beijing is a city.
+Shanghai is a city.
+Seoul is a city.
+Bangkok is a city.
+Sydney is a city.
+Melbourne is a city.
+Cairo is a city.
+Lagos is a city.
+Nairobi is a city.
+Cape Town is a city.
+London is the capital of the United Kingdom.
+Paris is the capital of France.
+Berlin is the capital of Germany.
+Rome is the capital of Italy.
+Madrid is the capital of Spain.
+Lisbon is the capital of Portugal.
+Dublin is the capital of Ireland.
+Oslo is the capital of Norway.
+Stockholm is the capital of Sweden.
+Helsinki is the capital of Finland.
+Copenhagen is the capital of Denmark.
+Warsaw is the capital of Poland.
+Vienna is the capital of Austria.
+Bern is the capital of Switzerland.
+Athens is the capital of Greece.
+Ankara is the capital of Turkey.
+Cairo is the capital of Egypt.
+Rabat is the capital of Morocco.
+Abuja is the capital of Nigeria.
+Nairobi is the capital of Kenya.
+Pretoria is an administrative capital of South Africa.
+New Delhi is the capital of India.
+Beijing is the capital of China.
+Tokyo is the capital of Japan.
+Seoul is the capital of South Korea.
+Bangkok is the capital of Thailand.
+Hanoi is the capital of Vietnam.
+Canberra is the capital of Australia.
+Wellington is the capital of New Zealand.
+Ottawa is the capital of Canada.
+Washington, D.C. is the capital of the United States.
+Mexico City is the capital of Mexico.
+Brasilia is the capital of Brazil.
+Buenos Aires is the capital of Argentina.
+Santiago is the capital of Chile.
+Lima is the capital of Peru.
+A lake is a body of water.
+A river is flowing water.
+An island is land surrounded by water.
+A peninsula is land surrounded by water on most sides.
+A mountain is a high landform.
+A valley is low land between higher land.
+A desert is a dry region.
+A forest is an area with many trees.
+A rainforest is a dense wet forest.
+A volcano is a mountain or vent that can erupt.
+An earthquake is shaking of the ground.
+A glacier is a large mass of ice.
+A coastline is where land meets the sea.
+A beach is a shore with sand or pebbles.
+A cliff is a steep rock face.
+A cave is a natural underground space.
+A waterfall is water falling from a height.
+A bay is a body of water partly enclosed by land.
+A gulf is a large bay.
+A strait is a narrow waterway.
+A canal is a man-made waterway.
+Water is a liquid at room temperature.
+Ice is frozen water.
+Steam is water vapour.
+Water is made of hydrogen and oxygen.
+Salt is sodium chloride.
+Oxygen is an element.
+Hydrogen is an element.
+Carbon is an element.
+Nitrogen is an element.
+Iron is an element.
+Gold is an element.
+Silver is an element.
+Copper is an element.
+Helium is an element.
+Neon is an element.
+Chlorine is an element.
+Sodium is an element.
+Calcium is an element.
+Potassium is an element.
+Magnesium is an element.
+Aluminium is an element.
+Silicon is an element.
+Uranium is an element.
+An atom is a basic unit of matter.
+A molecule is made of atoms.
+A proton has a positive charge.
+An electron has a negative charge.
+A neutron has no electric charge.
+The nucleus is the centre of an atom.
+Electrons surround the atomic nucleus.
+Matter has mass.
+Energy can do work.
+Heat is a form of energy transfer.
+Light is electromagnetic radiation.
+Sound is a vibration.
+Sound travels through matter.
+Sound does not travel through a perfect vacuum.
+Electricity involves electric charge.
+Magnetism involves magnetic fields.
+Gravity is a force of attraction.
+Friction resists motion.
+Mass measures the amount of matter.
+Weight depends on gravity.
+Density is mass divided by volume.
+Velocity is speed with direction.
+Acceleration is a change in velocity.
+Force can change motion.
+Pressure is force per unit area.
+Temperature measures thermal energy.
+Boiling changes a liquid into a gas.
+Melting changes a solid into a liquid.
+Freezing changes a liquid into a solid.
+Condensation changes a gas into a liquid.
+Evaporation changes a liquid into a gas.
+Sublimation changes a solid into a gas.
+Deposition changes a gas into a solid.
+Photosynthesis uses sunlight to make sugar.
+Plants use carbon dioxide in photosynthesis.
+Plants release oxygen during photosynthesis.
+Respiration releases energy from food.
+Cells are basic units of life.
+DNA carries genetic information.
+Genes are sections of DNA.
+Proteins are made from amino acids.
+Enzymes are biological catalysts.
+Bacteria are single-celled organisms.
+Viruses need host cells to reproduce.
+Fungi include mushrooms.
+Yeast is a fungus.
+Algae can photosynthesise.
+Chlorophyll helps plants absorb light.
+Roots absorb water and minerals.
+Leaves often carry out photosynthesis.
+Stems support plants.
+Flowers help plants reproduce.
+Seeds can grow into plants.
+Pollen helps fertilise plants.
+A fruit contains seeds.
+An ecosystem is a community of organisms and their environment.
+A habitat is a place where an organism lives.
+A food chain shows feeding relationships.
+A predator hunts other animals.
+Prey is hunted by predators.
+A herbivore eats plants.
+A carnivore eats animals.
+An omnivore eats plants and animals.
+A decomposer breaks down dead matter.
+A producer makes its own food.
+A consumer eats other organisms.
+A microscope magnifies small objects.
+A thermometer measures temperature.
+A barometer measures air pressure.
+An anemometer measures wind speed.
+A hygrometer measures humidity.
+A telescope magnifies distant objects.
+A scale measures mass or weight.
+A ruler measures length.
+A clock measures time.
+A battery stores chemical energy.
+A circuit allows electricity to flow.
+A conductor allows electricity to flow easily.
+An insulator resists electricity flow.
+Metal is often a good conductor.
+Rubber is often a good insulator.
+Glass is often transparent.
+Wood comes from trees.
+Paper is often made from wood pulp.
+Plastic is made from polymers.
+Steel is an alloy of iron.
+Bronze is an alloy of copper and tin.
+Brass is an alloy of copper and zinc.
+Air is a mixture of gases.
+Earth's atmosphere contains nitrogen.
+Earth's atmosphere contains oxygen.
+Carbon dioxide is a greenhouse gas.
+Methane is a greenhouse gas.
+Ozone is a form of oxygen.
+Acids have a pH below seven.
+Alkalis have a pH above seven.
+Neutral solutions have a pH around seven.
+Pure water has a pH close to seven.
+The heart pumps blood.
+The lungs exchange oxygen and carbon dioxide.
+The brain controls many body functions.
+The stomach helps digest food.
+The liver processes nutrients and toxins.
+The kidneys filter blood.
+The skin is the body's largest organ.
+Bones support the body.
+Muscles help the body move.
+Nerves carry signals.
+Blood carries oxygen.
+Red blood cells carry oxygen.
+White blood cells help fight infection.
+Platelets help blood clot.
+Teeth help chew food.
+The tongue helps taste food.
+The eyes detect light.
+The ears detect sound.
+The nose detects smells.
+Hands have fingers.
+Feet have toes.
+The skull protects the brain.
+The rib cage protects the heart and lungs.
+The spine supports the body.
+Joints allow movement.
+The immune system defends the body.
+The digestive system breaks down food.
+The respiratory system helps breathing.
+The circulatory system moves blood.
+The nervous system carries signals.
+The skeleton is made of bones.
+Exercise can strengthen muscles.
+Sleep helps the body recover.
+Water is important for hydration.
+Protein helps build and repair tissues.
+Carbohydrates can provide energy.
+Fats can store energy.
+Vitamins support body functions.
+Minerals support body functions.
+Fibre helps digestion.
+Calcium helps build bones.
+Iron helps blood carry oxygen.
+Vitamin D helps the body use calcium.
+Vitamin C supports the immune system.
+Vaccines train the immune system.
+Antibiotics treat bacterial infections.
+Antibiotics do not treat viral infections.
+A fever is a raised body temperature.
+A pulse is a heartbeat rhythm.
+Blood pressure measures force in blood vessels.
+An apple is a fruit.
+A banana is a fruit.
+An orange is a fruit.
+A lemon is a fruit.
+A lime is a fruit.
+A pear is a fruit.
+A peach is a fruit.
+A plum is a fruit.
+A cherry is a fruit.
+A grape is a fruit.
+A strawberry is a fruit.
+A raspberry is a fruit.
+A blackberry is a fruit.
+A blueberry is a fruit.
+A pineapple is a fruit.
+A mango is a fruit.
+A coconut is a fruit.
+A tomato is a fruit botanically.
+A cucumber is a fruit botanically.
+A pumpkin is a fruit botanically.
+A carrot is a root vegetable.
+A potato is a tuber.
+An onion is a bulb.
+Garlic is a bulb.
+Lettuce is a leafy vegetable.
+Spinach is a leafy vegetable.
+Cabbage is a leafy vegetable.
+Broccoli is a vegetable.
+Cauliflower is a vegetable.
+Peas are legumes.
+Beans are legumes.
+Lentils are legumes.
+Chickpeas are legumes.
+Wheat is a grain.
+Rice is a grain.
+Barley is a grain.
+Oats are grains.
+Rye is a grain.
+Corn is a grain.
+Bread is often made from wheat.
+Pasta is often made from wheat.
+Rice is a staple food.
+Milk is a dairy product.
+Cheese is a dairy product.
+Yoghurt is a dairy product.
+Butter is a dairy product.
+Eggs come from birds.
+Honey comes from bees.
+Sugar can come from sugar cane.
+Sugar can come from sugar beet.
+Coffee comes from coffee beans.
+Tea comes from tea leaves.
+Chocolate comes from cacao beans.
+Olive oil comes from olives.
+Sunflower oil comes from sunflower seeds.
+Maple syrup comes from maple trees.
+Vinegar contains acetic acid.
+Salt adds a salty taste.
+Sugar adds a sweet taste.
+Lemons taste sour.
+Chillies can taste hot or spicy.
+Mint is an herb.
+Basil is an herb.
+Parsley is an herb.
+Rosemary is an herb.
+Thyme is an herb.
+Sage is an herb.
+Cinnamon is a spice.
+Pepper is a spice.
+Ginger is a spice.
+Turmeric is a spice.
+Cumin is a spice.
+Paprika is a spice.
+Vanilla is a flavouring.
+Yeast helps bread rise.
+Baking powder helps cakes rise.
+Flour is ground grain.
+Jam is made from fruit and sugar.
+Marmalade is often made from citrus fruit.
+Soup is a liquid food.
+Salad is usually served cold.
+Sandwiches contain filling between bread.
+Pizza is a baked dish with toppings.
+Sushi often contains rice.
+Curry is a spiced dish.
+Noodles are made from dough.
+Soba noodles are often made from buckwheat.
+Udon noodles are thick wheat noodles.
+A computer processes data.
+A keyboard is an input device.
+A mouse is an input device.
+A monitor is an output device.
+A printer is an output device.
+A speaker is an output device.
+A microphone is an input device.
+A webcam is an input device.
+A touchscreen is an input and output device.
+A CPU executes instructions.
+RAM stores temporary data.
+A hard drive stores data.
+An SSD stores data.
+A GPU processes graphics.
+A motherboard connects computer components.
+An operating system manages hardware and software.
+Linux is an operating system.
+Windows is an operating system.
+macOS is an operating system.
+Android is an operating system.
+iOS is an operating system.
+A file stores data.
+A folder groups files.
+A database stores structured data.
+SQL is used to query databases.
+HTML describes web page structure.
+CSS styles web pages.
+JavaScript can make web pages interactive.
+Python is a programming language.
+C is a programming language.
+C++ is a programming language.
+C# is a programming language.
+Java is a programming language.
+Rust is a programming language.
+Go is a programming language.
+PHP is a programming language.
+Ruby is a programming language.
+Swift is a programming language.
+Kotlin is a programming language.
+TypeScript is a programming language.
+Assembly language is low-level code.
+A compiler translates code.
+An interpreter runs code.
+An algorithm is a set of steps.
+A variable stores a value.
+A function performs a task.
+A loop repeats instructions.
+A condition chooses between actions.
+An array stores a sequence of values.
+A list stores multiple values.
+A stack follows last-in-first-out order.
+A queue follows first-in-first-out order.
+A tree is a hierarchical data structure.
+A graph contains nodes and edges.
+A hash table maps keys to values.
+Encryption protects information.
+A password helps protect an account.
+Two-factor authentication adds security.
+A network connects devices.
+The internet is a global network.
+A router forwards network traffic.
+Wi-Fi is wireless networking.
+Bluetooth is short-range wireless communication.
+Ethernet is wired networking.
+HTTP is used for web communication.
+HTTPS encrypts web communication.
+DNS maps domain names to addresses.
+An IP address identifies a network device.
+A URL identifies a web resource.
+Email sends digital messages.
+A browser displays web pages.
+A search engine finds web pages.
+A server provides services to clients.
+A client requests services from a server.
+Cloud computing uses remote servers.
+A backup is a copy of data.
+Version control tracks changes.
+Git is a version control system.
+GitHub hosts Git repositories.
+An API lets software communicate.
+JSON is a data format.
+XML is a markup format.
+CSV stores tabular data as text.
+Markdown formats plain text.
+Unicode represents text characters.
+ASCII is an older character encoding.
+A pixel is a picture element.
+A bitmap image is made of pixels.
+A vector image is made of shapes.
+A codec encodes and decodes media.
+An app is a software application.
+A bug is an error in software.
+Debugging finds and fixes bugs.
+Testing checks software behaviour.
+Refactoring improves code structure.
+Open-source software has publicly available source code.
+William Shakespeare was a playwright.
+Jane Austen was a novelist.
+Charles Dickens was a novelist.
+Mary Shelley was a novelist.
+George Orwell was a novelist.
+J. R. R. Tolkien was a novelist.
+Agatha Christie was a novelist.
+Leonardo da Vinci was an artist.
+Michelangelo was an artist.
+Vincent van Gogh was an artist.
+Pablo Picasso was an artist.
+Claude Monet was an artist.
+Rembrandt was an artist.
+Beethoven was a composer.
+Mozart was a composer.
+Bach was a composer.
+Chopin was a composer.
+Tchaikovsky was a composer.
+Vivaldi was a composer.
+Jazz is a music genre.
+Classical music is a music genre.
+Rock is a music genre.
+Pop is a music genre.
+Folk is a music genre.
+Blues is a music genre.
+Reggae is a music genre.
+Hip hop is a music genre.
+Opera combines music and drama.
+Ballet is a form of dance.
+Theatre is a performing art.
+Cinema is a visual storytelling medium.
+Photography uses light to create images.
+Painting uses pigment on a surface.
+Drawing uses marks on a surface.
+Sculpture is three-dimensional art.
+Poetry uses language in concentrated form.
+A novel is a long fictional story.
+A short story is brief fiction.
+A biography tells a person's life story.
+An autobiography is written about oneself.
+A myth is a traditional story.
+A legend is a traditional story about the past.
+A fable is a story with a moral.
+A fairy tale is a traditional magical story.
+History studies the past.
+Archaeology studies past human activity through remains.
+Anthropology studies humans and cultures.
+Philosophy studies fundamental questions.
+Ethics studies moral questions.
+Logic studies valid reasoning.
+Democracy is a form of government.
+A monarchy has a monarch.
+A republic has no hereditary monarch as head of state.
+Law is a system of rules.
+A constitution sets basic principles for government.
+A museum preserves and displays objects.
+A library stores books and information.
+An archive preserves records.
+A school is a place of learning.
+A university is a higher education institution.
+A teacher helps students learn.
+A student learns from study.
+One plus one equals two.
+Two plus two equals four.
+Three plus three equals six.
+Five times five equals twenty-five.
+Ten divided by two equals five.
+Zero is an integer.
+One is an integer.
+Two is an even number.
+Three is an odd number.
+Four is an even number.
+Five is an odd number.
+A prime number has exactly two positive factors.
+Two is the smallest prime number.
+Two is the only even prime number.
+Three is a prime number.
+Four is not a prime number.
+Five is a prime number.
+A square has four equal sides.
+A rectangle has four right angles.
+A triangle has three sides.
+A circle has no corners.
+A pentagon has five sides.
+A hexagon has six sides.
+A heptagon has seven sides.
+An octagon has eight sides.
+A nonagon has nine sides.
+A decagon has ten sides.
+A cube has six square faces.
+A sphere is round in three dimensions.
+A cylinder has two circular faces.
+A cone has one circular base.
+A right angle is ninety degrees.
+A straight angle is one hundred eighty degrees.
+A full turn is three hundred sixty degrees.
+Parallel lines do not meet.
+Perpendicular lines meet at right angles.
+Area measures surface size.
+Volume measures three-dimensional space.
+Perimeter measures distance around a shape.
+Circumference is the distance around a circle.
+Radius is the distance from the centre of a circle to its edge.
+Diameter is twice the radius.
+Pi relates a circle's circumference to its diameter.
+A fraction represents part of a whole.
+A decimal is a base-ten number representation.
+A percentage is a fraction out of one hundred.
+An equation states that two expressions are equal.
+A graph can show relationships between values.
+Statistics studies data.
+Probability measures chance.
+Mean is a type of average.
+Median is the middle value.
+Mode is the most common value.
+Range is the difference between highest and lowest values.
+A noun names a person, place, thing, or idea.
+A verb describes an action or state.
+An adjective describes a noun.
+An adverb describes a verb, adjective, or other adverb.
+A pronoun can replace a noun.
+A preposition shows a relationship between words.
+A conjunction joins words or phrases.
+An interjection expresses emotion.
+A sentence expresses a complete thought.
+A question asks for information.
+A statement gives information.
+A command gives an instruction.
+A paragraph contains related sentences.
+A synonym has a similar meaning.
+An antonym has an opposite meaning.
+A homophone sounds like another word.
+A prefix comes before a word root.
+A suffix comes after a word root.
+A vowel is a speech sound.
+A consonant is a speech sound.
+English uses the Latin alphabet.
+A dictionary lists words and meanings.
+A thesaurus lists similar words.
+Grammar describes language structure.
+Punctuation helps clarify writing.
+A comma marks a pause or separation.
+A full stop ends a sentence.
+A question mark ends a question.
+An exclamation mark shows emphasis.
+A chair is furniture.
+A table is furniture.
+A bed is furniture.
+A sofa is furniture.
+A wardrobe is furniture.
+A desk is furniture.
+A shelf stores objects.
+A book contains pages.
+A pen writes with ink.
+A pencil writes with graphite.
+An eraser removes pencil marks.
+Scissors cut material.
+A knife cuts material.
+A spoon is used for eating.
+A fork is used for eating.
+A plate holds food.
+A bowl holds food.
+A cup holds drinks.
+A mug holds drinks.
+A glass holds drinks.
+A kettle boils water.
+An oven heats food.
+A fridge keeps food cold.
+A freezer keeps food frozen.
+A microwave heats food.
+A washing machine washes clothes.
+A dryer dries clothes.
+A vacuum cleaner removes dust.
+A broom sweeps floors.
+A mop cleans floors.
+A towel dries things.
+Soap helps clean skin.
+Shampoo cleans hair.
+Toothpaste helps clean teeth.
+A toothbrush cleans teeth.
+A mirror reflects light.
+A window lets in light.
+A door opens and closes an entrance.
+A key opens a lock.
+A lock secures something.
+A lamp produces light.
+A candle produces light.
+A clock shows time.
+A watch shows time.
+A phone enables communication.
+A camera takes photographs.
+A radio receives broadcasts.
+A television displays video.
+A bicycle has two wheels.
+A car is a vehicle.
+A bus is a vehicle.
+A train is a vehicle.
+A plane is a vehicle.
+A boat is a vehicle.
+A ship is a large boat.
+A motorcycle is a vehicle.
+A tractor is a farm vehicle.
+A wheel helps vehicles move.
+Brakes slow a vehicle.
+An engine provides power.
+Fuel stores energy.
+Petrol is a fuel.
+Diesel is a fuel.
+Electricity can power vehicles.
+A road is used by vehicles.
+A pavement is used by pedestrians.
+A bridge crosses an obstacle.
+A tunnel passes through or under something.
+A house is a building.
+An apartment is a home.
+A castle is a fortified building.
+A church is a religious building.
+A mosque is a religious building.
+A synagogue is a religious building.
+A temple is a religious building.
+A factory produces goods.
+A shop sells goods.
+A hospital treats patients.
+A bank handles money.
+A post office handles mail.
+A restaurant serves meals.
+A cafe serves drinks and food.
+A hotel provides accommodation.
+A map represents an area.
+A compass shows direction.
+North is a direction.
+South is a direction.
+East is a direction.
+West is a direction.
+Cloth is made from fibres.
+Cotton is a natural fibre.
+Wool is a natural fibre.
+Silk is a natural fibre.
+Linen comes from flax.
+Polyester is a synthetic fibre.
+Nylon is a synthetic fibre.
+Leather comes from animal hide.
+Glass is made mainly from silica.
+Concrete is a building material.
+Brick is a building material.
+Stone is a natural material.
+Clay can be shaped and fired.
+Rain is falling water.
+Snow is frozen precipitation.
+Hail is frozen precipitation.
+Fog is low cloud near the ground.
+Mist is thin fog.
+Clouds are made of tiny water droplets or ice crystals.
+Wind is moving air.
+Thunder is the sound of lightning.
+Lightning is an electrical discharge.
+A rainbow is caused by light refracting through water droplets.
+The sky appears blue because of light scattering.
+The Sun provides light and heat to Earth.
+Plants need water.
+Plants need light.
+Plants need carbon dioxide.
+Animals need food.
+Animals need water.
+Humans need oxygen.
+Fire needs fuel, heat, and oxygen.
+Soil supports plant growth.
+Compost is decomposed organic matter.
+Rocks are made of minerals.
+Sand is made of small rock or mineral particles.
+Clay is fine-grained soil.
+Granite is an igneous rock.
+Basalt is an igneous rock.
+Limestone is a sedimentary rock.
+Sandstone is a sedimentary rock.
+Slate is a metamorphic rock.
+Marble is a metamorphic rock.
+Coal is a fossil fuel.
+Oil is a fossil fuel.
+Natural gas is a fossil fuel.
+Solar power uses sunlight.
+Wind power uses wind.
+Hydropower uses moving water.
+Geothermal energy comes from Earth's heat.
+A tree is a plant.
+An oak is a tree.
+An ash is a tree.
+A birch is a tree.
+A pine is a tree.
+A willow is a tree.
+A beech is a tree.
+A maple is a tree.
+A rose is a flower.
+A daisy is a flower.
+A tulip is a flower.
+A sunflower is a flower.
+A bluebell is a flower.
+A poppy is a flower.
+Lavender is a plant.
+Grass is a plant.
+Moss is a plant.
+Fern is a plant.
+Ivy is a climbing plant.
+Cactus is a plant adapted to dry places.
+Bamboo is a grass.
+Mushrooms are fungi.
+Lichen is a partnership between organisms.
+Coral reefs support many marine species.
+Wetlands store water and support wildlife.
+Forests store carbon.
+Trees produce oxygen during photosynthesis.
+Leaves can change colour in autumn.
+Deciduous trees lose leaves seasonally.
+Evergreen trees keep leaves through the year.
+Spring is a season.
+Summer is a season.
+Autumn is a season.
+Winter is a season.
+Spring often brings new plant growth.
+Summer is often warmer than winter.
+Autumn often brings falling leaves.
+Winter is often colder than summer.
+United Kingdom is in Europe.
+France is in Europe.
+Germany is in Europe.
+Italy is in Europe.
+Spain is in Europe.
+Portugal is in Europe.
+Ireland is in Europe.
+Norway is in Europe.
+Sweden is in Europe.
+Finland is in Europe.
+Denmark is in Europe.
+Netherlands is in Europe.
+Belgium is in Europe.
+Poland is in Europe.
+Czechia is in Europe.
+Slovakia is in Europe.
+Hungary is in Europe.
+Romania is in Europe.
+Bulgaria is in Europe.
+Greece is in Europe.
+Iceland is in Europe.
+Canada is in North America.
+United States is in North America.
+Mexico is in North America.
+Guatemala is in North America.
+Cuba is in North America.
+Jamaica is in North America.
+Brazil is in South America.
+Argentina is in South America.
+Chile is in South America.
+Peru is in South America.
+Colombia is in South America.
+Venezuela is in South America.
+Ecuador is in South America.
+Bolivia is in South America.
+Uruguay is in South America.
+China is in Asia.
+India is in Asia.
+Japan is in Asia.
+South Korea is in Asia.
+North Korea is in Asia.
+Thailand is in Asia.
+Vietnam is in Asia.
+Malaysia is in Asia.
+Indonesia is in Asia.
+Philippines is in Asia.
+Singapore is in Asia.
+Pakistan is in Asia.
+Bangladesh is in Asia.
+Nepal is in Asia.
+Sri Lanka is in Asia.
+Saudi Arabia is in Asia.
+Iran is in Asia.
+Iraq is in Asia.
+Israel is in Asia.
+Jordan is in Asia.
+Mongolia is in Asia.
+Egypt is in Africa.
+Nigeria is in Africa.
+Kenya is in Africa.
+South Africa is in Africa.
+Morocco is in Africa.
+Algeria is in Africa.
+Tunisia is in Africa.
+Ethiopia is in Africa.
+Ghana is in Africa.
+Tanzania is in Africa.
+Uganda is in Africa.
+Zimbabwe is in Africa.
+Botswana is in Africa.
+Namibia is in Africa.
+Australia is in Oceania.
+New Zealand is in Oceania.
+Fiji is in Oceania.
+Papua New Guinea is in Oceania.
+London is the capital of United Kingdom.
+Amsterdam is the capital of Netherlands.
+Brussels is the capital of Belgium.
+Prague is the capital of Czechia.
+Bratislava is the capital of Slovakia.
+Budapest is the capital of Hungary.
+Bucharest is the capital of Romania.
+Sofia is the capital of Bulgaria.
+Reykjavik is the capital of Iceland.
+Washington, D.C. is the capital of United States.
+Guatemala City is the capital of Guatemala.
+Havana is the capital of Cuba.
+Kingston is the capital of Jamaica.
+Bogota is the capital of Colombia.
+Caracas is the capital of Venezuela.
+Quito is the capital of Ecuador.
+Sucre is the capital of Bolivia.
+Montevideo is the capital of Uruguay.
+Pyongyang is the capital of North Korea.
+Kuala Lumpur is the capital of Malaysia.
+Jakarta is the capital of Indonesia.
+Manila is the capital of Philippines.
+Singapore is the capital of Singapore.
+Islamabad is the capital of Pakistan.
+Dhaka is the capital of Bangladesh.
+Kathmandu is the capital of Nepal.
+Sri Jayawardenepura Kotte is the capital of Sri Lanka.
+Riyadh is the capital of Saudi Arabia.
+Tehran is the capital of Iran.
+Baghdad is the capital of Iraq.
+Jerusalem is the capital of Israel.
+Amman is the capital of Jordan.
+Ulaanbaatar is the capital of Mongolia.
+Pretoria is the capital of South Africa.
+Algiers is the capital of Algeria.
+Tunis is the capital of Tunisia.
+Addis Ababa is the capital of Ethiopia.
+Accra is the capital of Ghana.
+Dodoma is the capital of Tanzania.
+Kampala is the capital of Uganda.
+Harare is the capital of Zimbabwe.
+Gaborone is the capital of Botswana.
+Windhoek is the capital of Namibia.
+Suva is the capital of Fiji.
+Port Moresby is the capital of Papua New Guinea.
+Grass is often green.
+The sky on a clear day is often blue.
+Coal is often black.
+Snow is often white.
+Blood is often red.
+A banana is often yellow.
+An orange is often orange.
+A lemon is often yellow.
+A lime is often green.
+A strawberry is often red.
+A blueberry is often blue.
+A carrot is often orange.
+A table can be made of wood.
+A window can be made of glass.
+A spoon can be made of metal.
+A tyre can be made of rubber.
+A book can be made of paper.
+A shirt can be made of fabric.
+A house can be made of brick.
+A road can be made of asphalt.
+A bottle can be made of plastic.
+A coin can be made of metal.
+A ring can be made of metal.
+A cup can be made of ceramic.
+Monday is a day of the week.
+Tuesday is a day of the week.
+Wednesday is a day of the week.
+Thursday is a day of the week.
+Friday is a day of the week.
+Saturday is a day of the week.
+Sunday is a day of the week.
+January is a month of the year.
+February is a month of the year.
+March is a month of the year.
+April is a month of the year.
+May is a month of the year.
+June is a month of the year.
+July is a month of the year.
+August is a month of the year.
+September is a month of the year.
+October is a month of the year.
+November is a month of the year.
+December is a month of the year.
+January is month number 1.
+February is month number 2.
+March is month number 3.
+April is month number 4.
+May is month number 5.
+June is month number 6.
+July is month number 7.
+August is month number 8.
+September is month number 9.
+October is month number 10.
+November is month number 11.
+December is month number 12.
