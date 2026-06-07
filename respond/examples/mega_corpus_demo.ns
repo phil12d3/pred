@@ -1,0 +1,149 @@
+respond = import("./respond.ns").respond;
+
+corpus = "
+aardvarks are animals
+aardvarks have long snouts
+aardvarks can dig
+alpacas are animals
+alpacas have soft fleece
+alpacas can graze
+otters are mammals
+otters have dense fur
+otters can swim
+otters can crack shellfish
+wolves are mammals
+wolves can hunt
+wolves have pack structures
+whales are mammals
+whales can dive
+whales have thick blubber
+penguins are birds
+penguins can swim
+penguins have short wings
+sparrows are birds
+sparrows can fly
+sparrows have small beaks
+planets are celestial_bodies
+moons are celestial_bodies
+telescopes are instruments
+telescopes can magnify
+telescopes have optical tubes
+satellites are machines
+satellites can orbit
+satellites have solar panels
+invoices belong to billing
+receipts belong to billing
+subscriptions belong to billing
+refunds belong to billing
+billing pages let users download invoices
+billing dashboards show overdue invoices
+billing workflows explain subscription renewals
+payment history pages list completed charges
+refund pages explain reimbursement timelines
+support tickets belong to support
+knowledge bases belong to support
+support pages explain password resets
+support pages explain billing workflows
+support pages explain shipment delays
+password reset pages let users request recovery emails
+recovery emails contain secure reset links
+account recovery pages explain verification steps
+deployments belong to operations
+alerts belong to operations
+dashboards belong to operations
+incident reviews belong to operations
+operations dashboards show service latency
+operations dashboards show error rates
+alerts have severity levels
+alerts have escalation policies
+deployments can fail
+deployments can roll back
+incident reviews explain service failures
+incident reviews explain rollback decisions
+services have latency budgets
+services have dependency graphs
+warehouses belong to logistics
+shipments belong to logistics
+orders belong to commerce
+orders have fulfillment states
+shipments have tracking numbers
+shipments can arrive
+warehouses have inventory counts
+shipment portals let users trace deliveries
+delivery updates explain customs delays
+forecasts belong to planning
+scenarios belong to planning
+planning tools compare demand scenarios
+scenario reports show baseline demand
+scenario reports show upside demand
+scenario reports show downside demand
+analysts are people
+engineers are people
+designers are people
+analysts can compare reports
+engineers can inspect dashboards
+engineers have deployment access
+analysts have billing access
+designers have prototype tools
+policies belong to governance
+audits belong to governance
+governance pages explain approval workflows
+approval workflows have review stages
+audits have evidence logs
+libraries belong to software
+services belong to software
+libraries have public interfaces
+services can respond
+services can scale
+databases belong to infrastructure
+databases have replica sets
+replica sets can fail over
+backups belong to infrastructure
+backups have retention windows
+backups can restore
+";
+
+config = respond.defaultConfig();
+config.dimensions = 20;
+config.vocabLimit = 320;
+config.topicLimit = 5;
+config.segmentLimit = 6;
+config.evidenceLimit = 6;
+
+system = respond.train(corpus, config);
+
+queries = [
+    "what is an otter",
+    "can whales dive",
+    "what do alerts have",
+    "tell me about invoices",
+    "tell me about shipment delays",
+    "can deployments fail",
+    "what is a telescope",
+    "tell me about rollback decisions",
+    "what do backups have",
+    "tell me about demand scenarios"
+];
+
+printline("=== respond mega corpus demo ===");
+printline("");
+printline("documents: ", system.docs.count());
+printline("segments: ", system.segments.count());
+printline("vocab terms: ", system.vocab.count());
+printline("bridge profiles: ", system.bridgeProfiles.count());
+printline("");
+
+for (i = 0; i < queries.count(); i = i + 1) {
+    result = respond.answer(system, queries[i], 5);
+    printline("Query: ", queries[i]);
+    printline("Intent: ", result.intent);
+    printline("Intent source: ", result.analysis.intentSource);
+    printline("Answer: ", result.answer);
+    printline("Topics: ", result.analysis.topics);
+    printline("Top candidates:");
+    for (j = 0; j < result.candidates.count(); j = j + 1) {
+        row = result.candidates[j];
+        printline("  ", row.rank, ". score=", row.score, " text=", row.text);
+    }
+    printline("");
+}
