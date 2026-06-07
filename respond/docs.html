@@ -127,6 +127,96 @@
         <li>Synthesize a direct answer string from the best grounded rows.</li>
       </ol>
       <div class="code"><code>request -> analyze -> rank evidence -> compose answer</code></div>
+      <p>That summary is accurate but compressed. In practice the module does two different jobs:</p>
+      <ul>
+        <li><strong>Build a searchable response system from the corpus.</strong> This is the training step. It prepares segments, relation rows, co-occurrence structure, topic lookup maps, and term embeddings.</li>
+        <li><strong>Resolve one new request against that system.</strong> This is the answer step. It infers likely topics and intent, builds an embedding for the new request, scores all candidate segments, and composes a short grounded answer from the best rows.</li>
+      </ul>
+      <p>The important design point is that the response is not generated from scratch. The module chooses and combines existing grounded corpus rows, and only adds a small amount of response formatting around them.</p>
+    </div>
+
+    <div class="section">
+      <h2>How The Module Works Internally</h2>
+      <h3>1. Corpus Normalization</h3>
+      <p>The module first turns <code>corpusInput</code> into a document list. If you pass one large string with several non-empty lines, each line becomes its own document. If you pass an array of strings, each array entry is already treated as one document.</p>
+      <p>This matters because later statistics such as co-occurrence, vocabulary frequency, and segmentation all work from this normalized document list.</p>
+
+      <h3>2. Segment Extraction</h3>
+      <p>Each document is split into smaller evidence rows called <strong>segments</strong>. A segment is a sentence-like unit cut on:</p>
+      <ul>
+        <li><code>.</code></li>
+        <li><code>!</code></li>
+        <li><code>?</code></li>
+        <li><code>;</code></li>
+        <li>newline</li>
+      </ul>
+      <p>So a corpus line like <code>"billing pages let users download invoices"</code> becomes one segment. A paragraph with multiple sentences becomes several segments.</p>
+      <p>Segments are the main retrieval units used at answer time. The module does not answer from whole documents. It answers from scored segments, because segments are usually small enough to be precise and large enough to be readable.</p>
+
+      <h3>3. Relation Hint Extraction</h3>
+      <p>Before doing semantic ranking, the module extracts simple structured relation rows from segment text. These are not deep parses. They are deliberately lightweight pattern matches over normalized tokens.</p>
+      <table>
+        <thead>
+          <tr><th>Pattern shape</th><th>Relation row produced</th><th>Typical use</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>X is Y</code>, <code>X are Y</code></td><td><code>categoryRows</code></td><td>Definition-like answers such as <code>"what is X"</code></td></tr>
+          <tr><td><code>X can ...</code></td><td><code>capabilityRows</code></td><td>Capability checks such as <code>"can X ..."</code></td></tr>
+          <tr><td><code>X has ...</code>, <code>X have ...</code></td><td><code>attributeRows</code></td><td>Attribute-style answers such as <code>"what does X have"</code></td></tr>
+          <tr><td><code>X belong to Y</code>, <code>X belongs to Y</code></td><td><code>categoryRows</code></td><td>Taxonomy or ownership-style definitions</td></tr>
+        </tbody>
+      </table>
+      <p>These relation rows let the module prefer a more direct answer when the request shape suggests a specific relation family. For example, a definition request can prefer a category row even if a descriptive row scores slightly higher overall.</p>
+
+      <h3>4. Topic and Parent Index Construction</h3>
+      <p>From the extracted relations and retained vocabulary, the module builds:</p>
+      <ul>
+        <li><code>topicIndex</code>: a fast map of candidate topic terms</li>
+        <li><code>parentIndex</code>: a direct topic-to-parent map from category-style rows</li>
+      </ul>
+      <p>This is what supports output like “poodle” as the direct topic and “dog” as its parent topic.</p>
+
+      <h3>5. Semantic Co-Occurrence Map</h3>
+      <p>The module walks each document segment with a sliding token window and records which normalized words appear near each other. That produces a local co-occurrence matrix:</p>
+      <div class="code"><code>{
+    invoice: {billing: 4, download: 2, overdue: 1},
+    billing: {invoice: 4, dashboard: 2, page: 1}
+}</code></div>
+      <p>This map is the semantic backbone for the embedding step. The module does not learn embeddings from labels or neural weights. It learns them from local context structure inside the corpus.</p>
+
+      <h3>6. Embedding Construction</h3>
+      <p>Each retained vocabulary term gets a lightweight embedding built from its co-occurrence neighborhood. Segment embeddings and request embeddings are then built by averaging the embeddings of the terms they contain.</p>
+      <p>So the module does not embed a whole sentence directly in one step. Instead it:</p>
+      <ol>
+        <li>builds term embeddings from co-occurrence</li>
+        <li>builds a segment embedding by averaging the segment’s term embeddings</li>
+        <li>builds a request embedding by averaging the request’s term embeddings</li>
+      </ol>
+
+      <h3>7. Request Analysis</h3>
+      <p>When a new request arrives, the module:</p>
+      <ul>
+        <li>tokenizes it</li>
+        <li>normalizes tokens</li>
+        <li>scores likely topics from the topic index and co-occurrence support</li>
+        <li>derives parent topics when a category parent exists</li>
+        <li>assigns a relation family and public intent label from request shape heuristics</li>
+        <li>collects early evidence rows that look topic-relevant</li>
+      </ul>
+
+      <h3>8. Final Candidate Ranking</h3>
+      <p>After analysis, every stored segment is scored again using the final weighted blend. This is the main retrieval pass that produces <code>result.candidates</code>.</p>
+
+      <h3>9. Answer Composition</h3>
+      <p>The module then chooses how to turn the top-ranked evidence into a response. The strategy depends on intent:</p>
+      <ul>
+        <li><strong>define</strong>: prefer a category-style row if available</li>
+        <li><strong>capability_check</strong>: prefer a capability-style row if available</li>
+        <li><strong>attribute_query</strong>: prefer an attribute-style row if available</li>
+        <li><strong>explain</strong>: usually combine one or two descriptive rows</li>
+        <li><strong>compare</strong>: expose more than one high-ranking row rather than compressing to one statement</li>
+      </ul>
+      <p>The text returned in <code>result.answer</code> is therefore a <em>selection-and-composition</em> step, not free-form generation.</p>
     </div>
 
     <div class="section">
@@ -251,6 +341,78 @@ printline(result.answer);</code></div>
     </div>
 
     <div class="section">
+      <h2>What Segments Are</h2>
+      <p>A <strong>segment</strong> is the smallest text unit the response system ranks and returns as evidence. You can think of it as the module’s “retrieval chunk”.</p>
+      <div class="code"><code>{
+    docIndex: 12,
+    segmentIndex: 0,
+    text: "billing pages let users download invoices",
+    tokens: ["billing", "pages", "let", "users", "download", "invoices"],
+    normalizedTokens: ["billing", "page", "let", "user", "download", "invoice"],
+    embedding: {...}
+}</code></div>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>docIndex</code></td><td>Which normalized document this segment came from.</td></tr>
+          <tr><td><code>segmentIndex</code></td><td>Which segment number it was within that document.</td></tr>
+          <tr><td><code>text</code></td><td>The original printable segment text.</td></tr>
+          <tr><td><code>tokens</code></td><td>The raw lowercase alphanumeric token list.</td></tr>
+          <tr><td><code>normalizedTokens</code></td><td>The lighter normalized form used for matching, including simple singularization of some trailing <code>s</code> forms.</td></tr>
+          <tr><td><code>embedding</code></td><td>The segment-level embedding built from the embeddings of the normalized terms it contains.</td></tr>
+        </tbody>
+      </table>
+      <p>Why segments matter:</p>
+      <ul>
+        <li>Smaller segments make responses more precise.</li>
+        <li>Larger segments give more context but can blur ranking.</li>
+        <li>Since this module uses sentence-like segments, the retrieved evidence usually reads well directly in the final answer.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>How Embeddings Are Used</h2>
+      <p>Embeddings in this module are not used to generate text. They are used only to help rank which evidence segments are semantically closest to the new request.</p>
+
+      <h3>What the embeddings represent</h3>
+      <p>A term embedding is a compact numeric summary of the contexts that term appears in. If two words appear near many of the same neighboring words, their embeddings will tend to be more similar.</p>
+      <p>For example, if the corpus often places <code>invoice</code> near <code>billing</code>, <code>download</code>, <code>charge</code>, and <code>overdue</code>, then the <code>invoice</code> embedding will carry that context signature.</p>
+
+      <h3>How the module builds them</h3>
+      <ol>
+        <li>Build a co-occurrence map from local token windows.</li>
+        <li>Hash context terms into a fixed-size vector.</li>
+        <li>Weight each context contribution by its co-occurrence frequency.</li>
+        <li>Normalize the resulting vector.</li>
+      </ol>
+      <p>This is a lightweight distributional embedding. It is not a transformer embedding and it is not trained with gradient descent.</p>
+
+      <h3>Where embeddings affect results</h3>
+      <p>Embeddings affect the <code>embeddingScore</code> part of each candidate row’s final score. That means they help surface semantically related rows even when the wording is not an exact lexical match.</p>
+      <div class="code"><code>request: "tell me about invoices"
+
+candidate A: "invoices belong to billing"
+candidate B: "billing dashboards show overdue invoices"
+candidate C: "account pages show payment history"
+
+embedding similarity helps A and B stay high because they live in the same
+invoice/billing context neighborhood, even if the exact token overlap differs.</code></div>
+
+      <h3>What embeddings do not do</h3>
+      <ul>
+        <li>They do not choose the intent label directly.</li>
+        <li>They do not replace lexical matching.</li>
+        <li>They do not override direct relation rows when the module already has a stronger exact answer form.</li>
+        <li>They do not generate paraphrases.</li>
+      </ul>
+
+      <h3>Practical effect</h3>
+      <p>If you reduce embedding influence, the module becomes more literal and keyword-driven. If you increase embedding influence, the module becomes more tolerant of wording variation but may sometimes rank semantically related rows above the most explicit one.</p>
+    </div>
+
+    <div class="section">
       <h2>Input Parameters</h2>
 
       <h3>corpusInput for train(...)</h3>
@@ -300,6 +462,79 @@ printline(result.answer);</code></div>
         <li>For <code>answer(...)</code> and <code>reply(...)</code>, <code>limit</code> is the maximum number of final ranked candidate rows returned in <code>result.candidates</code>.</li>
       </ul>
       <p>So if you call <code>answer(system, "can dogs swim", 3)</code>, the <code>3</code> means “return at most 3 ranked evidence candidates”. It does not mean “return 3 tokens”, “use only 3 documents”, or “generate 3 answer sentences”.</p>
+    </div>
+
+    <div class="section">
+      <h2>Config In Depth</h2>
+      <p>The config controls three broad behaviors:</p>
+      <ul>
+        <li>how rich the semantic representation is</li>
+        <li>how much evidence is retained and exposed</li>
+        <li>how the final ranking balances exact matches versus semantic matches</li>
+      </ul>
+
+      <h3>dimensions</h3>
+      <p><strong>What it is:</strong> embedding vector width for terms, requests, and segments.</p>
+      <p><strong>Lower values:</strong> faster and simpler, but more collisions between unrelated context terms. Semantic ranking becomes cruder.</p>
+      <p><strong>Higher values:</strong> more room to distinguish different context neighborhoods, which can improve semantic separation in larger corpora. Past a point, gains flatten and runtime/storage rise.</p>
+      <p><strong>Typical effect on results:</strong> if your corpus spans many domains, increasing this can help keep those domains apart. If your corpus is tiny and simple, changing it may have little visible effect.</p>
+
+      <h3>semanticWindow</h3>
+      <p><strong>What it is:</strong> how far left and right the co-occurrence pass looks when deciding which words are neighbors.</p>
+      <p><strong>Smaller values:</strong> tighter, more local meanings. Better when you want context to stay precise.</p>
+      <p><strong>Larger values:</strong> broader context neighborhoods. Better when important terms are often separated by a few words, but too large a window can blur unrelated words together.</p>
+      <p><strong>Typical effect on results:</strong> increasing this can make semantic retrieval more forgiving, but also more diffuse.</p>
+
+      <h3>vocabLimit</h3>
+      <p><strong>What it is:</strong> maximum number of frequent vocabulary terms that get prebuilt reusable embeddings.</p>
+      <p><strong>Lower values:</strong> smaller, faster system, but more rare terms fall back to on-the-fly embedding construction or weaker frequency-only behavior.</p>
+      <p><strong>Higher values:</strong> better coverage of the corpus vocabulary, especially in larger or more varied corpora, at the cost of more preprocessing and memory.</p>
+      <p><strong>Typical effect on results:</strong> raising this helps when useful topic words are moderately frequent but not in the top core vocabulary.</p>
+
+      <h3>segmentLimit</h3>
+      <p><strong>What it is:</strong> default maximum number of candidate evidence rows returned by <code>answer(...)</code> when you do not pass an explicit limit.</p>
+      <p><strong>Lower values:</strong> less output, simpler debugging, fewer returned candidates.</p>
+      <p><strong>Higher values:</strong> more candidate visibility for inspection or UI rendering, but also more noise if you surface all of them directly to users.</p>
+      <p><strong>Typical effect on results:</strong> it does not change how the best row is scored. It changes how many ranked rows you keep and expose.</p>
+
+      <h3>topicLimit</h3>
+      <p><strong>What it is:</strong> default maximum number of direct topic rows exposed by <code>analyze(...)</code>.</p>
+      <p><strong>Lower values:</strong> a narrower view of what the system thinks the request is about.</p>
+      <p><strong>Higher values:</strong> more visibility into secondary topic guesses, which can be useful for debugging but may include weaker or noisier topic rows.</p>
+
+      <h3>answerEvidenceLimit</h3>
+      <p><strong>What it is:</strong> a reserved answer-composition budget field.</p>
+      <p><strong>Current implementation status:</strong> the module already tends to compose from the top one or two rows, so this field is more of a policy signal than a hard runtime constraint right now.</p>
+      <p><strong>How to think about it:</strong> it expresses how much raw evidence you conceptually want to expose in one answer before the response becomes too long or mixed.</p>
+
+      <h3>scoreWeights.evidence</h3>
+      <p><strong>What it is:</strong> how much to trust the earlier topic-focused evidence score in final ranking.</p>
+      <p><strong>Increase it:</strong> final candidates stay closer to topic-first analysis.</p>
+      <p><strong>Decrease it:</strong> final ranking relies more on lexical and embedding similarity.</p>
+      <p><strong>Typical effect on results:</strong> higher values make the system more conservative around the detected topic.</p>
+
+      <h3>scoreWeights.embedding</h3>
+      <p><strong>What it is:</strong> how much semantic similarity matters in final ranking.</p>
+      <p><strong>Increase it:</strong> semantically related rows can beat literal keyword rows more often.</p>
+      <p><strong>Decrease it:</strong> the system becomes more literal and exact-match oriented.</p>
+      <p><strong>Typical effect on results:</strong> useful when users phrase requests differently from the corpus wording.</p>
+
+      <h3>scoreWeights.lexical</h3>
+      <p><strong>What it is:</strong> how much direct token overlap matters.</p>
+      <p><strong>Increase it:</strong> exact wording matches rise in the ranking.</p>
+      <p><strong>Decrease it:</strong> semantic and topic-based matches matter relatively more.</p>
+      <p><strong>Typical effect on results:</strong> good to raise when your corpus uses very explicit, repetitive terminology and exact wording should dominate.</p>
+
+      <h3>scoreWeights.topic</h3>
+      <p><strong>What it is:</strong> how much direct topic and parent-topic hits matter.</p>
+      <p><strong>Increase it:</strong> rows that explicitly mention the chosen topic get boosted harder.</p>
+      <p><strong>Decrease it:</strong> more indirect but semantically related rows have a better chance to surface.</p>
+      <p><strong>Typical effect on results:</strong> useful when you want responses to stay tightly anchored to the detected entity or concept.</p>
+
+      <h3>intentLabels</h3>
+      <p><strong>What it is:</strong> the public names exposed for internal relation families.</p>
+      <p>Changing these does not change the underlying ranking behavior. It changes the labels you see in <code>analysis.intent</code> and <code>result.intent</code>.</p>
+      <p>For example, you could rename <code>capability_check</code> to <code>ability_query</code> without changing how capability requests are detected or answered.</p>
     </div>
 
     <div class="section">
@@ -423,6 +658,17 @@ printline(result.answer);</code></div>
     lexicalWeight   * lexicalScore +
     topicWeight     * topicScore</code></div>
       <p>This means a segment can rank well either because it is a direct lexical match, because it is semantically close, or because it is strongly tied to the inferred topic.</p>
+      <table>
+        <thead>
+          <tr><th>Score field</th><th>What it measures</th><th>Why it matters</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>evidenceScore</code></td><td>How strong the segment already looked during early topic-focused evidence selection.</td><td>Preserves the first-pass topic grounding.</td></tr>
+          <tr><td><code>embeddingScore</code></td><td>Semantic similarity between request embedding and segment embedding.</td><td>Helps with wording variation and related concepts.</td></tr>
+          <tr><td><code>lexicalScore</code></td><td>Direct normalized token overlap between the request and the segment.</td><td>Rewards exact or near-exact wording matches.</td></tr>
+          <tr><td><code>topicScore</code></td><td>Whether the segment explicitly mentions the inferred topic or parent topic.</td><td>Keeps retrieval anchored to the detected subject.</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <div class="section">
