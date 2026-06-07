@@ -55,3 +55,61 @@ semantic_ranking_should_find_billing_evidence_for_invoice_requests = func(t) {
     t.truthy(regex_test(result.answer, "invoice") || regex_test(result.answer, "billing"), "invoice answer should stay within invoice or billing evidence");
     t.truthy(rendered.count() >= 4, "render should expose a compact human-readable summary");
 };
+
+[test]
+rules_can_override_the_public_intent_label = func(t) {
+    respond = import("./respond.ns").respond;
+
+    corpus = "
+    poodles are dogs
+    dogs are animals
+    poodles have curly coats
+    ";
+
+    config = respond.defaultConfig();
+    config.intentRules = [{
+        label: "question",
+        priority: 100,
+        containsAny: ["what"],
+        sequence: [
+            {kind: "word", value: "what"},
+            {kind: "topic"}
+        ]
+    }];
+
+    system = respond.train(corpus, config);
+    result = respond.answer(system, "what is a poodle", 3);
+
+    t.equal(result.intent, "question", "rule label should override the public intent");
+    t.equal(result.analysis.intentSource, "rule", "analysis should record that a rule supplied the intent");
+    t.truthy(defined(result.analysis.matchedRule), "analysis should expose the matched rule");
+};
+
+[test]
+rules_can_override_the_relation_kind = func(t) {
+    respond = import("./respond.ns").respond;
+
+    corpus = "
+    poodles are dogs
+    dogs are animals
+    poodles have curly coats
+    ";
+
+    config = respond.defaultConfig();
+    config.intentRules = [{
+        relation: "attribute_of",
+        priority: 50,
+        containsAny: ["what"],
+        sequence: [
+            {kind: "word", value: "what"},
+            {kind: "topic"}
+        ]
+    }];
+
+    system = respond.train(corpus, config);
+    analysis = respond.analyze(system, "what is a poodle", 3);
+
+    t.equal(analysis.intent, "attribute_query", "rule relation should map through intentLabels");
+    t.equal(analysis.relationsRequested[0].relation, "attribute_of", "rule relation should override the top relation request");
+    t.equal(analysis.intentSource, "rule", "relation override from a rule should mark the source as rule");
+};

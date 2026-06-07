@@ -1,0 +1,97 @@
+respond = import("./respond.ns").respond;
+
+corpus = "
+poodles are dogs
+dogs are animals
+poodles have curly coats
+dogs can swim
+birds can fly
+invoices belong to billing
+billing pages let users download invoices
+support pages explain password resets
+password reset pages let users request recovery emails
+";
+
+printline("=== respond rules demo ===");
+printline("");
+
+printline("1) Default statistical behavior");
+baseSystem = respond.train(corpus, respond.defaultConfig());
+baseResult = respond.answer(baseSystem, "what is a poodle", 3);
+printline("intent: ", baseResult.intent);
+printline("answer: ", baseResult.answer);
+printline("");
+
+printline("2) Override the public intent label");
+labelConfig = respond.defaultConfig();
+labelConfig.intentRules = [{
+    label: "question",
+    priority: 100,
+    containsAny: ["what"],
+    sequence: [
+        {kind: "word", value: "what"},
+        {kind: "topic"}
+    ]
+}];
+labelSystem = respond.train(corpus, labelConfig);
+labelResult = respond.answer(labelSystem, "what is a poodle", 3);
+printline("intent: ", labelResult.intent);
+printline("intentSource: ", labelResult.analysis.intentSource);
+printline("matchedRule: ", labelResult.analysis.matchedRule);
+printline("answer: ", labelResult.answer);
+printline("");
+
+printline("3) Override the inferred relation");
+relationConfig = respond.defaultConfig();
+relationConfig.intentRules = [{
+    relation: "attribute_of",
+    priority: 80,
+    containsAny: ["what"],
+    sequence: [
+        {kind: "word", value: "what"},
+        {kind: "topic"}
+    ]
+}];
+relationSystem = respond.train(corpus, relationConfig);
+relationAnalysis = respond.analyze(relationSystem, "what is a poodle", 3);
+printline("intent: ", relationAnalysis.intent);
+printline("top relation: ", relationAnalysis.relationsRequested[0].relation);
+printline("intentSource: ", relationAnalysis.intentSource);
+printline("");
+
+printline("4) Use relation-aware gating");
+gatedConfig = respond.defaultConfig();
+gatedConfig.intentRules = [{
+    label: "help",
+    priority: 120,
+    containsAny: ["reset", "recovery"],
+    relationAny: ["category_of", "explain_topic", "related_to"],
+    sequence: [
+        {kind: "topic"}
+    ]
+}];
+gatedSystem = respond.train(corpus, gatedConfig);
+gatedResult = respond.answer(gatedSystem, "reset password pages", 4);
+printline("intent: ", gatedResult.intent);
+printline("intentSource: ", gatedResult.analysis.intentSource);
+printline("matchedRule: ", gatedResult.analysis.matchedRule);
+printline("answer: ", gatedResult.answer);
+printline("");
+
+printline("5) Use parentTopic pattern items");
+parentConfig = respond.defaultConfig();
+parentConfig.intentRules = [{
+    label: "animal_question",
+    priority: 110,
+    containsAny: ["what"],
+    sequence: [
+        {kind: "word", value: "what"},
+        {kind: "topic"},
+        {kind: "optional", item: {kind: "parentTopic"}}
+    ]
+}];
+parentSystem = respond.train(corpus, parentConfig);
+parentResult = respond.answer(parentSystem, "what is a poodle", 3);
+printline("intent: ", parentResult.intent);
+printline("parent topics: ", parentResult.analysis.parentTopics);
+printline("answer: ", parentResult.answer);

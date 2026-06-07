@@ -41,6 +41,24 @@ printline(result.answer);
 - `respond.reply(system, inputText, limit)` alias of `answer`
 - `respond.render(result)`
 
+## Rules
+
+`respond` now supports optional manual intent rules through
+`config.intentRules`. These follow the same general shape as the `intent`
+module rules and can:
+
+- override the public `intent` label with `label`
+- override the top inferred relation with `relation`
+- match on lexical gates such as `containsAny`, `containsAll`, `containsNone`
+- match ordered token shapes with `sequence`
+- refer to detected `topic` and `parentTopic` items
+- constrain against inferred relations with `relationAny` and `relationAll`
+
+See:
+
+- `examples/rules_demo.ns` for label overrides, relation overrides, and pattern examples
+- `docs.html` for the full rule-field reference
+
 ## Returned Result Shape
 
 `respond.answer(...)` returns:

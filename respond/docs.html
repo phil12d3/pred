@@ -105,7 +105,7 @@
     <div class="hero">
       <h1>respond Documentation</h1>
       <p class="muted">Turn free-text requests into grounded answers by combining request classification, semantic overlap, lightweight embeddings, and evidence ranking.</p>
-      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> if you want a working example first.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> for the compact example, <a href="examples/large_corpus_demo.ns">examples/large_corpus_demo.ns</a> for a broader corpus, or <a href="examples/rules_demo.ns">examples/rules_demo.ns</a> for manual rule overrides.</p>
     </div>
 
     <div class="section">
@@ -154,7 +154,7 @@
       <p>Segments are the main retrieval units used at answer time. The module does not answer from whole documents. It answers from scored segments, because segments are usually small enough to be precise and large enough to be readable.</p>
 
       <h3>3. Relation Hint Extraction</h3>
-      <p>Before doing semantic ranking, the module extracts simple structured relation rows from segment text. These are not deep parses. They are deliberately lightweight pattern matches over normalized tokens.</p>
+      <p>Before doing semantic ranking, the module extracts pair rows and bridge profiles from segment text. These are not deep parses. They are deliberately lightweight structural summaries of segment token order.</p>
       <table>
         <thead>
           <tr><th>Pattern shape</th><th>Relation row produced</th><th>Typical use</th></tr>
@@ -166,7 +166,8 @@
           <tr><td><code>X belong to Y</code>, <code>X belongs to Y</code></td><td><code>categoryRows</code></td><td>Taxonomy or ownership-style definitions</td></tr>
         </tbody>
       </table>
-      <p>These relation rows let the module prefer a more direct answer when the request shape suggests a specific relation family. For example, a definition request can prefer a category row even if a descriptive row scores slightly higher overall.</p>
+      <p>Internally the module first converts a segment into <code>left -> bridge -> right</code> form. Then it groups repeated bridges across the corpus and classifies those bridges statistically into relation families such as <code>category_of</code>, <code>capability_of</code>, <code>attribute_of</code>, <code>explain_topic</code>, or <code>related_to</code>.</p>
+      <p>These learned relation rows let the module prefer a more direct answer when the bridge evidence suggests a specific relation family. For example, if the request tokens match a bridge profile that the corpus has statistically learned as <code>capability_of</code>, the module can prefer a capability-style row even if a descriptive row scores similarly.</p>
 
       <h3>4. Topic and Parent Index Construction</h3>
       <p>From the extracted relations and retained vocabulary, the module builds:</p>
@@ -200,12 +201,22 @@
         <li>normalizes tokens</li>
         <li>scores likely topics from the topic index and co-occurrence support</li>
         <li>derives parent topics when a category parent exists</li>
-        <li>assigns a relation family and public intent label from request shape heuristics</li>
+        <li>assigns a relation family and public intent label from bridge-profile matches and topic-linked corpus relations</li>
         <li>collects early evidence rows that look topic-relevant</li>
       </ul>
 
       <h3>8. Final Candidate Ranking</h3>
       <p>After analysis, every stored segment is scored again using the final weighted blend. This is the main retrieval pass that produces <code>result.candidates</code>.</p>
+
+      <h3>9. Manual Rule Layer</h3>
+      <p>If <code>config.intentRules</code> is non-empty, rules run after statistical topic and relation inference.</p>
+      <p>That ordering matters:</p>
+      <ul>
+        <li>the corpus still determines the default topics and relation requests</li>
+        <li>rules do not replace the statistical pipeline</li>
+        <li>rules only override the public intent label, the top inferred relation, or both</li>
+      </ul>
+      <p>This means you can keep the default corpus-driven behavior while adding a few targeted overrides for a domain or application.</p>
 
       <h3>9. Answer Composition</h3>
       <p>The module then chooses how to turn the top-ranked evidence into a response. The strategy depends on intent:</p>
@@ -444,6 +455,7 @@ invoice/billing context neighborhood, even if the exact token overlap differs.</
           <tr><td><code>scoreWeights.lexical</code></td><td><code>0.15</code></td><td>Weight for token overlap between the request and a segment.</td></tr>
           <tr><td><code>scoreWeights.topic</code></td><td><code>0.10</code></td><td>Weight for direct topic and parent-topic hits inside a segment.</td></tr>
           <tr><td><code>intentLabels</code></td><td>mapping object</td><td>Public labels exposed for relation families. Current defaults include <code>define</code>, <code>capability_check</code>, <code>attribute_query</code>, <code>compare</code>, <code>relation_query</code>, and <code>explain</code>.</td></tr>
+          <tr><td><code>intentRules</code></td><td><code>[]</code></td><td>Optional manual override rules. These can override the inferred public intent label, the top inferred relation, or both.</td></tr>
         </tbody>
       </table>
 
@@ -535,6 +547,89 @@ invoice/billing context neighborhood, even if the exact token overlap differs.</
       <p><strong>What it is:</strong> the public names exposed for internal relation families.</p>
       <p>Changing these does not change the underlying ranking behavior. It changes the labels you see in <code>analysis.intent</code> and <code>result.intent</code>.</p>
       <p>For example, you could rename <code>capability_check</code> to <code>ability_query</code> without changing how capability requests are detected or answered.</p>
+
+      <h3>intentRules</h3>
+      <p><strong>What it is:</strong> an optional manual rule layer that runs after statistical relation inference and can override the top public intent or relation.</p>
+      <p><strong>Why it exists:</strong> the module stays corpus-driven by default, but you may still want a controlled override for a domain, interface, or product vocabulary.</p>
+      <p><strong>What it can override:</strong></p>
+      <ul>
+        <li><code>label</code>: override the final public <code>analysis.intent</code></li>
+        <li><code>relation</code>: override the top relation request before intent-label mapping</li>
+      </ul>
+      <p><strong>Supported rule fields:</strong></p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>label</code></td><td>Optional explicit public intent label, such as <code>question</code> or <code>help</code>.</td></tr>
+          <tr><td><code>relation</code></td><td>Optional internal relation override, such as <code>attribute_of</code> or <code>capability_of</code>.</td></tr>
+          <tr><td><code>priority</code></td><td>Higher-priority rules win when more than one rule matches.</td></tr>
+          <tr><td><code>containsAny</code></td><td>At least one of these tokens must appear.</td></tr>
+          <tr><td><code>containsAll</code></td><td>All listed tokens must appear.</td></tr>
+          <tr><td><code>containsNone</code></td><td>None of the listed tokens may appear.</td></tr>
+          <tr><td><code>sequence</code></td><td>Ordered token-pattern match supporting <code>word</code>, <code>oneOf</code>, <code>topic</code>, <code>parentTopic</code>, <code>wildcard</code>, and <code>optional</code>.</td></tr>
+          <tr><td><code>relationAny</code></td><td>Require at least one inferred relation request to match one of the listed relation kinds.</td></tr>
+          <tr><td><code>relationAll</code></td><td>Require all listed relation kinds to be present in the inferred relation requests.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>How matching works:</strong></p>
+      <ul>
+        <li><code>containsAny</code>, <code>containsAll</code>, and <code>containsNone</code> are simple lexical gates over normalized request tokens.</li>
+        <li><code>sequence</code> is an ordered pattern matcher. It can skip filler tokens between the listed items.</li>
+        <li><code>topic</code> and <code>parentTopic</code> refer to the statistically detected topics for the current request.</li>
+        <li><code>relationAny</code> and <code>relationAll</code> refer to the statistically inferred relation requests, not raw lexical cues.</li>
+        <li>If multiple rules match, the rule with the highest <code>priority</code> wins.</li>
+      </ul>
+      <p><strong>Supported sequence items:</strong></p>
+      <table>
+        <thead>
+          <tr><th>Pattern item</th><th>Meaning</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>"what"</code></td><td>String shorthand for an exact word match.</td><td>Matches the normalized token <code>what</code>.</td></tr>
+          <tr><td><code>{kind: "word", value: "reset"}</code></td><td>Exact word match written explicitly.</td><td>Useful when building longer structured sequences.</td></tr>
+          <tr><td><code>{kind: "oneOf", words: ["help", "support"]}</code></td><td>Matches any one token from the list.</td><td>Useful for domain-specific cue sets.</td></tr>
+          <tr><td><code>{kind: "topic"}</code></td><td>Matches a detected direct topic token.</td><td>Lets a rule refer to “whatever topic was inferred here”.</td></tr>
+          <tr><td><code>{kind: "parentTopic"}</code></td><td>Matches a detected parent-topic token.</td><td>Useful when a rule should fire only for broader classes.</td></tr>
+          <tr><td><code>{kind: "wildcard"}</code></td><td>Matches zero or more tokens.</td><td>Useful when you do not know how many filler words may appear between two important items.</td></tr>
+          <tr><td><code>{kind: "optional", item: ...}</code></td><td>Matches zero or one occurrence of the inner item.</td><td>Useful when one token may or may not be present.</td></tr>
+          <tr><td><code>{kind: "any"}</code></td><td>Matches any single token.</td><td>Use when position matters but content does not.</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><code>config.intentRules = [{
+    label: "question",
+    priority: 100,
+    containsAny: ["what"],
+    sequence: [
+        {kind: "word", value: "what"},
+        {kind: "topic"}
+    ]
+}];</code></div>
+      <p>That example overrides the final public intent to <code>question</code> whenever the normalized request tokens contain <code>what</code> followed later by a detected topic.</p>
+      <div class="code"><code>config.intentRules = [{
+    relation: "attribute_of",
+    priority: 80,
+    containsAny: ["what"],
+    sequence: [
+        {kind: "word", value: "what"},
+        {kind: "topic"}
+    ]
+}];</code></div>
+      <p>That example does not set a custom public label directly. Instead it overrides the top inferred relation to <code>attribute_of</code>. The final public intent then becomes whatever <code>intentLabels.attribute_of</code> is currently mapped to, which defaults to <code>attribute_query</code>.</p>
+      <div class="code"><code>config.intentRules = [{
+    label: "help",
+    priority: 120,
+    containsAny: ["reset", "recovery"],
+    relationAny: ["explain_topic", "related_to"],
+    sequence: [
+        {kind: "word", value: "reset"},
+        {kind: "wildcard"},
+        {kind: "topic"}
+    ]
+}];</code></div>
+      <p>That example shows a more cautious override: it only fires if the lexical cues match <em>and</em> the statistical relation inference already looks like descriptive or generic topic evidence.</p>
+      <p>See <a href="examples/rules_demo.ns">examples/rules_demo.ns</a> for a runnable demonstration of all three patterns above.</p>
     </div>
 
     <div class="section">
@@ -678,15 +773,15 @@ invoice/billing context neighborhood, even if the exact token overlap differs.</
           <tr><th>Intent</th><th>Typical trigger shape</th><th>Typical answer strategy</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>define</code></td><td><code>what is X</code>, <code>who is X</code></td><td>Prefer category-style evidence such as <code>X is Y</code>.</td></tr>
-          <tr><td><code>capability_check</code></td><td><code>can X ...</code>, <code>could X ...</code></td><td>Prefer capability-style evidence such as <code>X can ...</code>.</td></tr>
-          <tr><td><code>attribute_query</code></td><td>Requests involving <code>has</code> or <code>have</code></td><td>Prefer attribute-style evidence such as <code>X has ...</code>.</td></tr>
-          <tr><td><code>compare</code></td><td>Explicit compare cues or multiple strong topics</td><td>Return the closest comparison evidence rows rather than one compressed definition.</td></tr>
+          <tr><td><code>define</code></td><td>The request aligns best with category-like bridge evidence or a topic with strong category relations.</td><td>Prefer category-style evidence such as <code>X is Y</code>.</td></tr>
+          <tr><td><code>capability_check</code></td><td>The request aligns best with bridge profiles statistically learned as capabilities.</td><td>Prefer capability-style evidence such as <code>X can ...</code>.</td></tr>
+          <tr><td><code>attribute_query</code></td><td>The request aligns best with bridge profiles statistically learned as attributes.</td><td>Prefer attribute-style evidence such as <code>X has ...</code>.</td></tr>
+          <tr><td><code>compare</code></td><td>Two strong topics are active or the request links multiple topic endpoints.</td><td>Return the closest comparison evidence rows rather than one compressed definition.</td></tr>
           <tr><td><code>relation_query</code></td><td>Fallback relation-style request</td><td>Return the strongest general evidence.</td></tr>
-          <tr><td><code>explain</code></td><td><code>tell me about X</code> or topic-only prompts</td><td>Return one or two descriptive evidence rows.</td></tr>
+          <tr><td><code>explain</code></td><td>The request resolves to descriptive topic evidence without a stronger category, capability, or attribute relation.</td><td>Return one or two descriptive evidence rows.</td></tr>
         </tbody>
       </table>
-      <div class="note">The current implementation uses simple heuristic intent detection. It is intentionally lightweight and grounded in the local corpus rather than a full language model.</div>
+      <div class="note">The current implementation infers relation type from corpus-learned bridge structure and topic-linked evidence. It is still intentionally lightweight and grounded in the local corpus rather than a full language model.</div>
     </div>
 
     <div class="section">
@@ -738,6 +833,26 @@ printraw(analysis.topics);
 printraw(analysis.relationsRequested);
 printraw(analysis.evidence.matchingSegments);</code></div>
       <p>Use this path when you want to inspect why the module chose a particular answer before showing it to the user.</p>
+
+      <h3>Rules Example</h3>
+      <div class="code"><code>config = respond.defaultConfig();
+config.intentRules = [{
+    label: "question",
+    priority: 100,
+    containsAny: ["what"],
+    sequence: [
+        {kind: "word", value: "what"},
+        {kind: "topic"}
+    ]
+}];
+
+system = respond.train(corpus, config);
+result = respond.answer(system, "what is a poodle", 3);
+
+printline(result.intent);                // question
+printline(result.analysis.intentSource); // rule
+printline(result.analysis.matchedRule);  // matched rule object</code></div>
+      <p>For a broader runnable example, use <a href="examples/rules_demo.ns">examples/rules_demo.ns</a>.</p>
     </div>
 
     <div class="section">
@@ -756,10 +871,11 @@ Top evidence:
     <div class="section">
       <h2>Current Limits</h2>
       <ul>
-        <li>Relation extraction is intentionally simple and currently favors patterns like <code>X is Y</code>, <code>X can ...</code>, <code>X has ...</code>, and <code>X belongs to Y</code>.</li>
+        <li>Relation extraction is intentionally lightweight. It uses endpoint-plus-bridge structure and repeated bridge statistics rather than deep parsing.</li>
         <li>Token normalization is lightweight and mainly lowercases plus singularizes some trailing <code>s</code> forms.</li>
         <li>There is no external world knowledge. If the corpus does not support an answer, the module can only return grounded fallback evidence.</li>
-        <li>The scoring and intent logic are heuristic. They are designed for transparent behavior and local control, not full conversational generality.</li>
+        <li>The scoring and relation inference are lightweight statistical heuristics. They are designed for transparent behavior and local control, not full conversational generality.</li>
+        <li>Rules are overrides, not full parsers. They are best used to steer or relabel the existing statistical behavior, not to encode an entire language-specific grammar.</li>
       </ul>
     </div>
 
@@ -768,6 +884,8 @@ Top evidence:
       <ul>
         <li><a href="README.md">README.md</a> for the short package summary.</li>
         <li><a href="examples/demo.ns">examples/demo.ns</a> for a runnable example.</li>
+        <li><a href="examples/rules_demo.ns">examples/rules_demo.ns</a> for manual override examples.</li>
+        <li><a href="examples/large_corpus_demo.ns">examples/large_corpus_demo.ns</a> for a larger corpus example.</li>
         <li><a href="tests/respond_tests.ns">tests/respond_tests.ns</a> for expected behaviors.</li>
         <li><a href="src/respond.ns">src/respond.ns</a> for the implementation details.</li>
       </ul>

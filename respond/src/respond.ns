@@ -4,8 +4,13 @@ defaultConfig = func() {
         semanticWindow: 2,
         vocabLimit: 128,
         segmentLimit: 5,
+        evidenceLimit: 5,
         topicLimit: 3,
+        parentTopicLimit: 4,
+        parentDepth: 2,
         answerEvidenceLimit: 2,
+        fuzzyThreshold: 0.82,
+        intentRules: [],
         scoreWeights: {
             evidence: 0.45,
             embedding: 0.3,
@@ -453,32 +458,197 @@ buildSegmentRows = func(segments, system) {
     return rows;
 }
 
-extractRelations = func(segments) {
+pairRows = func(segmentRows) {
+    rows = [];
+    for (i = 0; i < segmentRows.count(); i = i + 1) {
+        tokens = segmentRows[i].normalizedTokens;
+        if (tokens.count() < 2) continue;
+        left = tokens[0];
+        right = tokens[tokens.count() - 1];
+        bridgeTokens = [];
+        for (j = 1; j < tokens.count() - 1; j = j + 1) bridgeTokens.add(tokens[j]);
+        rows.add({
+            left: left,
+            right: right,
+            bridge: this.joinTokens(bridgeTokens, 0),
+            bridgeTokens: bridgeTokens,
+            text: this.asText(segmentRows[i].text),
+            docIndex: segmentRows[i].docIndex,
+            segmentIndex: segmentRows[i].segmentIndex
+        });
+    }
+    return rows;
+}
+
+arrayContains = func(values, target) {
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (values[i] == target) return true;
+    }
+    return false;
+}
+
+bridgeKind = func(bridgeRow, leftCounts) {
+    rightAsLeft = 0;
+    for (i = 0; i < bridgeRow.rightSet.count(); i = i + 1) {
+        word = bridgeRow.rightSet[i];
+        if (defined(leftCounts[word])) rightAsLeft = rightAsLeft + 1;
+    }
+    pairCount = bridgeRow.pairs.count();
+    uniqueLeft = bridgeRow.leftSet.count();
+    uniqueRight = bridgeRow.rightSet.count();
+    subjectReuse = uniqueRight > 0 ? rightAsLeft / uniqueRight : 0;
+    leftDiversity = pairCount > 0 ? uniqueLeft / pairCount : 0;
+    rightDiversity = pairCount > 0 ? uniqueRight / pairCount : 0;
+
+    if (subjectReuse >= 0.34) return "category_of";
+    if (pairCount >= 2 && leftDiversity >= 0.75 && rightDiversity >= 0.5) return "capability_of";
+    if (pairCount >= 2 && leftDiversity <= 0.5 && rightDiversity >= 0.5 && subjectReuse < 0.2) return "explain_topic";
+    if (pairCount == 1 && bridgeRow.bridgeTokens.count() >= 1) return "attribute_of";
+    return "related_to";
+}
+
+buildBridgeProfiles = func(pairRows) {
+    profiles = {};
+    leftCounts = {};
+
+    for (i = 0; i < pairRows.count(); i = i + 1) {
+        row = pairRows[i];
+        if (!defined(leftCounts[row.left])) leftCounts[row.left] = 0;
+        leftCounts[row.left] = leftCounts[row.left] + 1;
+
+        key = row.bridge;
+        if (!defined(profiles[key])) {
+            profiles[key] = {
+                bridge: row.bridge,
+                bridgeTokens: row.bridgeTokens,
+                pairs: [],
+                leftSet: [],
+                rightSet: []
+            };
+        }
+        profiles[key].pairs.add(row);
+        if (!this.arrayContains(profiles[key].leftSet, row.left)) profiles[key].leftSet.add(row.left);
+        if (!this.arrayContains(profiles[key].rightSet, row.right)) profiles[key].rightSet.add(row.right);
+    }
+
+    rows = [];
+    foreach(key in profiles.props) {
+        profile = profiles[key];
+        rows.add({
+            bridge: profile.bridge,
+            bridgeTokens: profile.bridgeTokens,
+            pairs: profile.pairs,
+            leftSet: profile.leftSet,
+            rightSet: profile.rightSet,
+            kind: this.bridgeKind(profile, leftCounts),
+            pairCount: profile.pairs.count()
+        });
+    }
+    return rows;
+}
+
+deriveRelations = func(pairRows, bridgeProfiles, bridgeMap) {
     categoryRows = [];
     capabilityRows = [];
     attributeRows = [];
-    for (i = 0; i < segments.count(); i = i + 1) {
-        row = segments[i];
-        toks = row.normalizedTokens;
-        if (toks.count() < 3) continue;
-        subject = toks[0];
-
-        if ((toks[1] == "is" || toks[1] == "are") && toks.count() >= 3) {
-            if (toks[2] == "known" || toks[2] == "like") {
-                attributeRows.add({topic: subject, text: row.text});
-            } else {
-                categoryRows.add({topic: subject, parent: toks[2], text: row.text});
-            }
+    explainRows = [];
+    for (i = 0; i < pairRows.count(); i = i + 1) {
+        row = pairRows[i];
+        profile = bridgeMap[row.bridge];
+        if (!defined(profile)) continue;
+        if (profile.kind == "category_of") {
+            categoryRows.add({topic: row.left, parent: row.right, text: row.text, bridge: row.bridge});
+        } else if (profile.kind == "capability_of") {
+            capabilityRows.add({topic: row.left, action: row.right, text: row.text, bridge: row.bridge});
+        } else if (profile.kind == "attribute_of") {
+            attributeRows.add({topic: row.left, attribute: row.right, text: row.text, bridge: row.bridge});
+        } else if (profile.kind == "explain_topic") {
+            explainRows.add({topic: row.left, detail: row.right, text: row.text, bridge: row.bridge});
         }
-        if (toks[1] == "can" && toks.count() >= 3) capabilityRows.add({topic: subject, action: this.joinTokens(toks, 2), text: row.text});
-        if ((toks[1] == "has" || toks[1] == "have") && toks.count() >= 3) attributeRows.add({topic: subject, attribute: this.joinTokens(toks, 2), text: row.text});
-        if ((toks[1] == "belong" || toks[1] == "belongs") && toks.count() >= 4 && toks[2] == "to") categoryRows.add({topic: subject, parent: toks[3], text: row.text});
     }
     return {
         categoryRows: categoryRows,
         capabilityRows: capabilityRows,
-        attributeRows: attributeRows
+        attributeRows: attributeRows,
+        explainRows: explainRows
     };
+}
+
+levenshteinDistance = func(a, b) {
+    s1 = stringify(a);
+    s2 = stringify(b);
+    m = s1.length;
+    n = s2.length;
+    if (m == 0) return n;
+    if (n == 0) return m;
+
+    prev = [];
+    curr = [];
+    for (j = 0; j <= n; j = j + 1) prev.add(j);
+
+    for (i = 1; i <= m; i = i + 1) {
+        curr = [i];
+        c1 = s1[i - 1];
+        for (j = 1; j <= n; j = j + 1) {
+            c2 = s2[j - 1];
+            cost = c1 == c2 ? 0 : 1;
+            del = prev[j] + 1;
+            ins = curr[j - 1] + 1;
+            sub = prev[j - 1] + cost;
+            best = del;
+            if (ins < best) best = ins;
+            if (sub < best) best = sub;
+            curr.add(best);
+        }
+        prev = curr;
+    }
+    return prev[n];
+}
+
+tokenSimilarity = func(a, b, threshold) {
+    if (a == b) return 1;
+    s1 = stringify(a);
+    s2 = stringify(b);
+    maxLen = s1.length > s2.length ? s1.length : s2.length;
+    if (maxLen == 0) return 1;
+    d = this.levenshteinDistance(s1, s2);
+    score = 1 - (d / maxLen);
+    if (score < 0) score = 0;
+    if (score > 1) score = 1;
+    return score >= threshold ? score : 0;
+}
+
+filterNonTopicTokens = func(tokens, topics, threshold) {
+    out = [];
+    for (i = 0; i < tokens.count(); i = i + 1) {
+        tok = tokens[i];
+        matched = false;
+        for (j = 0; j < topics.count(); j = j + 1) {
+            if (tok == topics[j].word || tok == topics[j].corpusWord) matched = true;
+            else if (this.tokenSimilarity(tok, topics[j].corpusWord, threshold) > 0) matched = true;
+        }
+        if (!matched) out.add(tok);
+    }
+    return out;
+}
+
+relationMatchRows = func(inputTokens, relationRows, threshold) {
+    matches = [];
+    for (i = 0; i < relationRows.count(); i = i + 1) {
+        best = 0;
+        for (j = 0; j < inputTokens.count(); j = j + 1) {
+            sim = this.tokenSimilarity(inputTokens[j], relationRows[i].word, threshold);
+            if (sim > best) best = sim;
+        }
+        if (best > 0) {
+            matches.add({
+                word: relationRows[i].word,
+                relationScore: defined(relationRows[i].score) ? relationRows[i].score : 0,
+                matchScore: best
+            });
+        }
+    }
+    return matches;
 }
 
 scoreTopics = func(system, inputTokens) {
@@ -492,14 +662,14 @@ scoreTopics = func(system, inputTokens) {
                 if (this.containsToken(normalized, other)) score = score + 0.2;
             }
         }
-        if (score > 0) rows.add({word: word, score: score});
+        if (score > 0) rows.add({word: word, corpusWord: word, score: score});
     }
 
     if (rows.count() == 0) {
         for (i = 0; i < normalized.count(); i = i + 1) {
             token = normalized[i];
             if (!defined(system.termEmbeddings[token])) continue;
-            rows.add({word: token, score: 0.4});
+            rows.add({word: token, corpusWord: token, score: 0.4});
         }
     }
 
@@ -522,16 +692,261 @@ parentTopics = func(system, topics) {
     return rows;
 }
 
-detectIntent = func(inputText, topics) {
-    tokens = this.normalizeTokens(this.tokens(inputText));
-    if (tokens.count() >= 2 && (tokens[0] == "can" || tokens[0] == "could")) return {relation: "capability_of", intent: "capability_check"};
-    if (tokens.count() >= 2 && tokens[0] == "what" && tokens[1] == "is") return {relation: "category_of", intent: "define"};
-    if (tokens.count() >= 2 && tokens[0] == "who" && tokens[1] == "is") return {relation: "category_of", intent: "define"};
-    if (tokens.count() >= 2 && tokens[0] == "tell" && tokens[1] == "me") return {relation: "explain_topic", intent: "explain"};
-    if (this.containsToken(tokens, "compare") || topics.count() >= 2) return {relation: "compare_topics", intent: "compare"};
-    if (this.containsToken(tokens, "have") || this.containsToken(tokens, "has")) return {relation: "attribute_of", intent: "attribute_query"};
-    if (topics.count() > 0) return {relation: "explain_topic", intent: "explain"};
-    return {relation: "related_to", intent: "relation_query"};
+topTopicRelations = func(system, topicWord) {
+    rows = [];
+    for (i = 0; i < system.pairRows.count(); i = i + 1) {
+        if (system.pairRows[i].left == topicWord || system.pairRows[i].right == topicWord) rows.add(system.pairRows[i]);
+    }
+    return rows;
+}
+
+buildRelationRequests = func(system, inputTokens, topics) {
+    if (topics.count() == 0) return [];
+    tokens = this.uniqueTokens(this.normalizeTokens(inputTokens));
+    nonTopicTokens = this.filterNonTopicTokens(tokens, topics, system.config.fuzzyThreshold);
+    requests = [];
+    selectedWords = [];
+    for (i = 0; i < topics.count(); i = i + 1) selectedWords.add(topics[i].corpusWord);
+
+    for (i = 0; i < system.bridgeProfiles.count(); i = i + 1) {
+        profile = system.bridgeProfiles[i];
+        bridgeRows = [];
+        for (bi = 0; bi < profile.bridgeTokens.count(); bi = bi + 1) bridgeRows.add({word: profile.bridgeTokens[bi], score: 1});
+        bridgeMatches = this.relationMatchRows(nonTopicTokens, bridgeRows, system.config.fuzzyThreshold);
+        if (bridgeMatches.count() == 0) continue;
+
+        for (j = 0; j < profile.pairs.count(); j = j + 1) {
+            pair = profile.pairs[j];
+            if (!this.arrayContains(selectedWords, pair.left) && !this.arrayContains(selectedWords, pair.right)) continue;
+            topicWord = this.arrayContains(selectedWords, pair.left) ? pair.left : pair.right;
+            requests.add({
+                relation: profile.kind,
+                topics: [topicWord],
+                score: bridgeMatches[0].matchScore + profile.pairCount + (this.arrayContains(selectedWords, pair.left) ? 0.5 : 0),
+                evidence: [{word: profile.bridge, relationScore: profile.pairCount, matchScore: bridgeMatches[0].matchScore}]
+            });
+        }
+    }
+
+    if (requests.count() == 0 && topics.count() >= 2) {
+        for (i = 0; i < system.pairRows.count(); i = i + 1) {
+            pair = system.pairRows[i];
+            if (!this.arrayContains(selectedWords, pair.left)) continue;
+            if (!this.arrayContains(selectedWords, pair.right)) continue;
+            profile = system.bridgeMap[pair.bridge];
+            requests.add({
+                relation: defined(profile) ? profile.kind : "related_to",
+                topics: [pair.left],
+                score: topics[0].score + topics[1].score + 1,
+                evidence: [{word: pair.bridge, relationScore: 1, matchScore: 1}]
+            });
+        }
+    }
+
+    if (requests.count() == 0 && topics.count() >= 2) {
+        requests.add({
+            relation: "compare_topics",
+            topics: [topics[0].word, topics[1].word],
+            score: (topics[0].score + topics[1].score) * 0.5,
+            evidence: []
+        });
+    }
+
+    if (requests.count() == 0 && topics.count() == 1) {
+        rels = this.topTopicRelations(system, topics[0].corpusWord);
+        categoryPairs = [];
+        explainPairs = [];
+        for (i = 0; i < rels.count(); i = i + 1) {
+            profile = system.bridgeMap[rels[i].bridge];
+            if (defined(profile) && profile.kind == "category_of" && rels[i].left == topics[0].corpusWord) categoryPairs.add(rels[i]);
+            if (defined(profile) && profile.kind == "explain_topic" && rels[i].left == topics[0].corpusWord) explainPairs.add(rels[i]);
+        }
+        if (categoryPairs.count() > 0) {
+            requests.add({relation: "category_of", topics: [topics[0].word], score: topics[0].score, evidence: [{word: categoryPairs[0].bridge, relationScore: 1, matchScore: 1}]});
+        } else if (explainPairs.count() > 0) {
+            requests.add({relation: "explain_topic", topics: [topics[0].word], score: topics[0].score, evidence: [{word: explainPairs[0].bridge, relationScore: 1, matchScore: 1}]});
+        } else {
+            requests.add({relation: "related_to", topics: [topics[0].word], score: topics[0].score, evidence: []});
+        }
+    }
+
+    requests = this.sortRowsDesc(requests, "score");
+    return requests;
+}
+
+intentFromRelations = func(relationRequests) {
+    if (relationRequests.count() == 0) return "explore";
+    return relationRequests[0].relation;
+}
+
+ruleValueList = func(value) {
+    out = [];
+    if (!defined(value) || value == null) return out;
+    if (type(value).typename == "String") {
+        out.add(value);
+        return out;
+    }
+    if (!defined(value.count)) return out;
+    for (i = 0; i < value.count(); i = i + 1) out.add(value[i]);
+    return out;
+}
+
+ruleWordSet = func(rows) {
+    set = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (defined(rows[i].word)) set[rows[i].word] = true;
+        if (defined(rows[i].corpusWord)) set[rows[i].corpusWord] = true;
+    }
+    return set;
+}
+
+normalizeRuleItem = func(item) {
+    if (type(item).typename == "String") return {kind: "word", value: item};
+    return item;
+}
+
+matchRuleItem = func(item, token, context) {
+    rule = this.normalizeRuleItem(item);
+    if (!defined(rule.kind)) {
+        if (defined(rule.value)) return token == rule.value;
+        return false;
+    }
+    if (rule.kind == "any") return true;
+    if (rule.kind == "word") return token == rule.value;
+    if (rule.kind == "oneOf") {
+        words = this.ruleValueList(rule.words);
+        for (i = 0; i < words.count(); i = i + 1) {
+            if (token == words[i]) return true;
+        }
+        return false;
+    }
+    if (rule.kind == "topic") return defined(context.topicSet[token]);
+    if (rule.kind == "parentTopic") return defined(context.parentTopicSet[token]);
+    return false;
+}
+
+matchRuleSequenceAt = func(tokens, pattern, tokenIndex, patternIndex, context) {
+    if (patternIndex >= pattern.count()) return true;
+    item = this.normalizeRuleItem(pattern[patternIndex]);
+
+    if (defined(item.kind) && item.kind == "wildcard") {
+        for (i = tokenIndex; i <= tokens.count(); i = i + 1) {
+            if (this.matchRuleSequenceAt(tokens, pattern, i, patternIndex + 1, context)) return true;
+        }
+        return false;
+    }
+
+    if (defined(item.kind) && item.kind == "optional") {
+        if (this.matchRuleSequenceAt(tokens, pattern, tokenIndex, patternIndex + 1, context)) return true;
+        if (tokenIndex < tokens.count() && this.matchRuleItem(item.item, tokens[tokenIndex], context)) {
+            return this.matchRuleSequenceAt(tokens, pattern, tokenIndex + 1, patternIndex + 1, context);
+        }
+        return false;
+    }
+
+    for (i = tokenIndex; i < tokens.count(); i = i + 1) {
+        if (this.matchRuleItem(item, tokens[i], context)) {
+            return this.matchRuleSequenceAt(tokens, pattern, i + 1, patternIndex + 1, context);
+        }
+    }
+    return false;
+}
+
+matchRuleSequence = func(tokens, pattern, context) {
+    if (!defined(pattern) || pattern == null) return true;
+    if (pattern.count() == 0) return true;
+    return this.matchRuleSequenceAt(tokens, pattern, 0, 0, context);
+}
+
+matchIntentRule = func(rule, inputTokens, topics, parentTopics, relationRequests) {
+    if (!defined(rule)) return null;
+    if (!defined(rule.label) && !defined(rule.relation)) return null;
+
+    context = {
+        topicSet: this.ruleWordSet(topics),
+        parentTopicSet: this.ruleWordSet(parentTopics)
+    };
+
+    if (defined(rule.containsAny) && rule.containsAny != null) {
+        ok = false;
+        words = this.ruleValueList(rule.containsAny);
+        for (i = 0; i < words.count(); i = i + 1) {
+            if (this.arrayContains(inputTokens, words[i])) ok = true;
+        }
+        if (!ok) return null;
+    }
+
+    if (defined(rule.containsAll) && rule.containsAll != null) {
+        words = this.ruleValueList(rule.containsAll);
+        for (i = 0; i < words.count(); i = i + 1) {
+            if (!this.arrayContains(inputTokens, words[i])) return null;
+        }
+    }
+
+    if (defined(rule.containsNone) && rule.containsNone != null) {
+        words = this.ruleValueList(rule.containsNone);
+        for (i = 0; i < words.count(); i = i + 1) {
+            if (this.arrayContains(inputTokens, words[i])) return null;
+        }
+    }
+
+    if (defined(rule.sequence) && rule.sequence != null) {
+        if (!this.matchRuleSequence(inputTokens, rule.sequence, context)) return null;
+    }
+
+    if (defined(rule.relationAny) && rule.relationAny != null) {
+        relOk = false;
+        rels = this.ruleValueList(rule.relationAny);
+        for (i = 0; i < relationRequests.count(); i = i + 1) {
+            for (j = 0; j < rels.count(); j = j + 1) {
+                if (relationRequests[i].relation == rels[j]) relOk = true;
+            }
+        }
+        if (!relOk) return null;
+    }
+
+    if (defined(rule.relationAll) && rule.relationAll != null) {
+        rels = this.ruleValueList(rule.relationAll);
+        for (i = 0; i < rels.count(); i = i + 1) {
+            relFound = false;
+            for (j = 0; j < relationRequests.count(); j = j + 1) {
+                if (relationRequests[j].relation == rels[i]) relFound = true;
+            }
+            if (!relFound) return null;
+        }
+    }
+
+    return {
+        label: defined(rule.label) ? rule.label : "",
+        relation: defined(rule.relation) ? rule.relation : "",
+        priority: defined(rule.priority) ? rule.priority : 0,
+        rule: rule
+    };
+}
+
+matchIntentRules = func(system, inputTokens, topics, parentTopics, relationRequests) {
+    matches = [];
+    rules = defined(system.config.intentRules) && system.config.intentRules != null ? system.config.intentRules : [];
+    for (i = 0; i < rules.count(); i = i + 1) {
+        matched = this.matchIntentRule(rules[i], inputTokens, topics, parentTopics, relationRequests);
+        if (defined(matched) && matched != null) matches.add(matched);
+    }
+    matches = this.sortRowsDesc(matches, "priority");
+    return matches;
+}
+
+applyRuleRelationOverride = func(ruleMatch, relationRequests, topics) {
+    if (!defined(ruleMatch) || ruleMatch == null || !defined(ruleMatch.relation) || ruleMatch.relation == "") return relationRequests;
+    topicLabels = [];
+    if (topics.count() > 0) topicLabels.add(topics[0].word);
+    out = [{
+        relation: ruleMatch.relation,
+        topics: topicLabels,
+        score: relationRequests.count() > 0 ? relationRequests[0].score + 0.001 : 1,
+        evidence: []
+    }];
+    for (i = 0; i < relationRequests.count(); i = i + 1) out.add(relationRequests[i]);
+    return out;
 }
 
 topicWordMap = func(rows) {
@@ -594,22 +1009,29 @@ buildEvidence = func(system, topics, queryTokens, limit) {
 analyze = func(system, inputText, limit) {
     maxTopics = defined(limit) ? limit : system.config.topicLimit;
     inputTokens = this.tokens(inputText);
+    normalizedInputTokens = this.uniqueTokens(this.normalizeTokens(inputTokens));
     topics = this.scoreTopics(system, inputTokens);
     topics = this.sliceRows(topics, maxTopics);
     parents = this.parentTopics(system, topics);
-    intentInfo = this.detectIntent(inputText, topics);
-    evidence = this.buildEvidence(system, topics, inputTokens, system.config.segmentLimit);
+    relationRequests = this.buildRelationRequests(system, inputTokens, topics);
+    ruleMatches = this.matchIntentRules(system, normalizedInputTokens, topics, parents, relationRequests);
+    matchedRule = ruleMatches.count() > 0 ? ruleMatches[0] : null;
+    relationRequests = this.applyRuleRelationOverride(matchedRule, relationRequests, topics);
+    relationKind = this.intentFromRelations(relationRequests);
+    finalIntent = defined(system.config.intentLabels[relationKind]) ? system.config.intentLabels[relationKind] : "explore";
+    if (defined(matchedRule) && matchedRule != null && defined(matchedRule.label) && matchedRule.label != "") finalIntent = matchedRule.label;
+    evidence = this.buildEvidence(system, topics, inputTokens, system.config.evidenceLimit);
     return {
         input: inputText,
         topics: topics,
         parentTopics: parents,
-        relationsRequested: [{relation: intentInfo.relation, score: 1}],
-        rulesMatched: [],
-        matchedRule: null,
-        intent: intentInfo.intent,
-        intentSource: "relation",
+        relationsRequested: relationRequests,
+        rulesMatched: ruleMatches,
+        matchedRule: matchedRule,
+        intent: finalIntent,
+        intentSource: defined(matchedRule) && matchedRule != null ? "rule" : "relation",
         evidence: {
-            inputKeywords: this.uniqueTokens(this.normalizeTokens(inputTokens)),
+            inputKeywords: normalizedInputTokens,
             matchingSegments: evidence,
             parentSegments: []
         }
@@ -761,7 +1183,11 @@ train = func(corpusInput, config) {
     cfg = defined(config) && config != null ? config : this.defaultConfig();
     docs = this.normalizeDocs(corpusInput);
     rawSegments = this.buildSegments(docs);
-    relations = this.extractRelations(rawSegments);
+    pairRows = this.pairRows(rawSegments);
+    bridgeProfiles = this.buildBridgeProfiles(pairRows);
+    bridgeMap = {};
+    for (i = 0; i < bridgeProfiles.count(); i = i + 1) bridgeMap[bridgeProfiles[i].bridge] = bridgeProfiles[i];
+    relations = this.deriveRelations(pairRows, bridgeProfiles, bridgeMap);
     cooc = this.semanticCoOccurrence(docs, cfg.semanticWindow);
     vocab = this.buildVocabulary(docs, cooc, cfg.vocabLimit);
     termEmbeddings = this.buildTermEmbeddings(vocab, cooc, cfg.dimensions);
@@ -776,9 +1202,6 @@ train = func(corpusInput, config) {
     }
     for (i = 0; i < relations.capabilityRows.count(); i = i + 1) topicIndex[relations.capabilityRows[i].topic] = true;
     for (i = 0; i < relations.attributeRows.count(); i = i + 1) topicIndex[relations.attributeRows[i].topic] = true;
-    for (i = 0; i < vocab.count(); i = i + 1) {
-        if (!defined(topicIndex[vocab[i]]) && vocab[i].length > 2) topicIndex[vocab[i]] = true;
-    }
 
     system = {
         config: cfg,
@@ -786,6 +1209,9 @@ train = func(corpusInput, config) {
         cooc: cooc,
         vocab: vocab,
         termEmbeddings: termEmbeddings,
+        pairRows: pairRows,
+        bridgeProfiles: bridgeProfiles,
+        bridgeMap: bridgeMap,
         relations: relations,
         topicIndex: topicIndex,
         parentIndex: parentIndex,
