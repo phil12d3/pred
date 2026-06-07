@@ -1,0 +1,111 @@
+respond = import("./respond.ns").respond;
+
+corpus = "
+poodles are dogs
+dogs are animals
+cats are animals
+otters are mammals
+whales are mammals
+mammals are animals
+poodles have curly coats
+poodles have strong pattern recognition
+poodles are known for intelligence
+otters have dense fur
+whales have thick blubber
+dogs can swim
+otters can swim
+whales can dive
+birds can fly
+penguins are birds
+penguins can swim
+penguins have short wings
+satellites are machines
+telescopes are instruments
+invoices belong to billing
+receipts belong to billing
+subscriptions belong to billing
+billing pages let users download invoices
+billing dashboards show overdue invoices
+account pages show payment history
+payment history pages list completed charges
+support tickets belong to support
+support pages explain password resets
+password reset pages let users request recovery emails
+recovery emails contain secure reset links
+deployments belong to operations
+alerts belong to operations
+dashboards belong to operations
+operations dashboards show service latency
+operations dashboards show error rates
+alerts have severity levels
+alerts have escalation policies
+deployments can fail
+deployments can roll back
+services have latency budgets
+services have dependency graphs
+warehouses belong to logistics
+shipments belong to logistics
+orders belong to commerce
+orders have fulfillment states
+shipments have tracking numbers
+warehouses have inventory counts
+shipment portals let users trace deliveries
+forecasts belong to planning
+planning tools compare demand scenarios
+scenario reports show baseline demand
+scenario reports show upside demand
+scenario reports show downside demand
+analysts are people
+engineers are people
+analysts can compare reports
+engineers can inspect dashboards
+engineers have deployment access
+analysts have billing access
+knowledge bases belong to support
+knowledge bases explain account recovery
+knowledge bases explain billing workflows
+knowledge bases explain shipment delays
+incident reviews belong to operations
+incident reviews explain service failures
+incident reviews explain rollback decisions
+";
+
+config = respond.defaultConfig();
+config.segmentLimit = 6;
+config.topicLimit = 4;
+config.vocabLimit = 256;
+config.dimensions = 16;
+
+system = respond.train(corpus, config);
+
+queries = [
+    "what is a poodle",
+    "can otters swim",
+    "what do alerts have",
+    "tell me about invoices",
+    "tell me about shipment delays",
+    "what is a dashboard",
+    "can deployments fail",
+    "tell me about service failures"
+];
+
+printline("=== respond large corpus demo ===");
+printline("");
+printline("documents: ", system.docs.count());
+printline("segments: ", system.segments.count());
+printline("vocab terms: ", system.vocab.count());
+printline("");
+
+for (i = 0; i < queries.count(); i = i + 1) {
+    result = respond.answer(system, queries[i], 4);
+    printline("Query: ", queries[i]);
+    printline("Intent: ", result.intent);
+    printline("Answer: ", result.answer);
+    printline("Topics: ", result.analysis.topics);
+    printline("Top candidates:");
+    for (j = 0; j < result.candidates.count(); j = j + 1) {
+        row = result.candidates[j];
+        printline("  ", row.rank, ". score=", row.score, " text=", row.text);
+    }
+    printline("");
+}

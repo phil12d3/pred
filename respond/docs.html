@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>respond Documentation</title>
+  <style>
+    :root {
+      --panel: #ffffff;
+      --ink: #18212b;
+      --muted: #5a6975;
+      --line: #d7e1e8;
+      --accent: #0f766e;
+      --accent2: #1d4ed8;
+      --soft: #f8fbfc;
+      --warn: #fff7ed;
+      --radius: 12px;
+      --max: 1180px;
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(180deg, #fbfdff 0%, #edf4f7 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.65;
+    }
+    body { padding: 28px 16px 48px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)), var(--panel);
+    }
+    .section { padding: 20px; margin-bottom: 14px; }
+    h1, h2, h3 { margin: 0; font-family: "Trebuchet MS", Verdana, sans-serif; }
+    h1 { font-size: 2.35rem; margin-bottom: 8px; }
+    h2 { font-size: 1.45rem; margin: 24px 0 12px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { font-size: 1.08rem; margin: 18px 0 8px; color: var(--accent); }
+    p { margin: 10px 0; }
+    ul, ol { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); }
+    .code {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+    }
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+    .note, .prop {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      background: #fff;
+    }
+    .note {
+      background: var(--warn);
+      border-left: 4px solid #b45309;
+    }
+    .prop strong { color: var(--accent); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #f7fafc;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      font-size: 0.95rem;
+    }
+    tr:last-child td { border-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>respond Documentation</h1>
+      <p class="muted">Turn free-text requests into grounded answers by combining request classification, semantic overlap, lightweight embeddings, and evidence ranking.</p>
+      <p>Start with <a href="examples/demo.ns">examples/demo.ns</a> if you want a working example first.</p>
+    </div>
+
+    <div class="section">
+      <h2>What This Module Does</h2>
+      <p><code>respond</code> is an orchestration-style tool. You give it a corpus of text and a new request such as a question, prompt, or user message. It trains a small internal system from the corpus, analyzes what the request appears to be asking for, ranks the most relevant evidence segments, and produces a direct answer string.</p>
+      <p>The important constraint is that the answer stays grounded in the corpus. This module does not call an external model. It synthesizes answers from what it can justify using learned topics, relation patterns, lexical overlap, and embedding similarity.</p>
+      <div class="note">Use this when you want to step beyond “what is the intent?” and actually produce a user-facing response that is still tied to local evidence.</div>
+    </div>
+
+    <div class="section">
+      <h2>High-Level Flow</h2>
+      <ol>
+        <li>Normalize the input corpus into documents and segment-like rows.</li>
+        <li>Extract lightweight relation hints such as category, capability, and attribute statements.</li>
+        <li>Build a semantic co-occurrence map from the corpus.</li>
+        <li>Create lightweight embeddings for terms and segments.</li>
+        <li>Analyze the new input to infer likely topics and an intent label.</li>
+        <li>Rank candidate evidence segments using lexical overlap, topic hits, semantic similarity, and earlier evidence scores.</li>
+        <li>Synthesize a direct answer string from the best grounded rows.</li>
+      </ol>
+      <div class="code"><code>request -> analyze -> rank evidence -> compose answer</code></div>
+    </div>
+
+    <div class="section">
+      <h2>Quick Start</h2>
+      <div class="code"><code>respond = import("./respond.ns").respond;
+
+corpus = "
+poodles are dogs
+dogs are animals
+poodles have curly coats
+dogs can swim
+";
+
+system = respond.train(corpus, respond.defaultConfig());
+result = respond.answer(system, "can dogs swim", 3);
+
+printline(result.intent);
+printline(result.answer);</code></div>
+      <p>Typical output meaning:</p>
+      <ul>
+        <li><code>result.intent</code> might be <code>"capability_check"</code>.</li>
+        <li><code>result.answer</code> might be <code>"dogs can swim."</code>.</li>
+        <li><code>result.candidates</code> contains the ranked evidence rows that led to that answer.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Public API</h2>
+
+      <h3>defaultConfig()</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> getting a safe baseline config object.
+        <br><strong>Returns:</strong> an object with embedding, ranking, and intent-label defaults.
+      </div>
+      <p>This function takes no parameters. Call it when you want the module’s standard behavior before overriding a few fields.</p>
+
+      <h3>train(corpusInput, config)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> building a reusable response system from one text source or a list of text sources.
+        <br><strong>Returns:</strong> a trained system object containing normalized docs, co-occurrence data, embeddings, relation rows, topic index, and segment rows.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Type</th><th>What it means</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>corpusInput</code></td><td>string or array of strings</td><td>The source knowledge the module is allowed to answer from. A single string may be one document or a multi-line block. An array lets you pass separate source texts explicitly.</td></tr>
+          <tr><td><code>config</code></td><td>object, optional</td><td>Controls embedding size, ranking weights, vocabulary cap, and how many topics or evidence segments are exposed by default. If omitted, <code>defaultConfig()</code> is used.</td></tr>
+        </tbody>
+      </table>
+      <p><code>train(...)</code> does not answer anything by itself. It creates a reusable system object so you can run many requests against the same corpus without rebuilding everything each time.</p>
+
+      <h3>analyze(system, inputText, limit)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> inspecting what the module thinks the request is asking for before you generate a final answer.
+        <br><strong>Returns:</strong> topics, parent topics, the requested relation family, the final intent label, and supporting evidence rows.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Type</th><th>What it means</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>system</code></td><td>trained system object</td><td>The object returned by <code>train(...)</code>. It contains the learned documents, segments, semantic map, relation rows, and embeddings used during analysis.</td></tr>
+          <tr><td><code>inputText</code></td><td>string</td><td>The new request to interpret, such as <code>"what is a poodle"</code> or <code>"tell me about invoices"</code>.</td></tr>
+          <tr><td><code>limit</code></td><td>number, optional</td><td>The maximum number of direct topic rows exposed in <code>analysis.topics</code>. It is not a token limit, not a document limit, and not the number of final answer sentences. If omitted, <code>system.config.topicLimit</code> is used.</td></tr>
+        </tbody>
+      </table>
+      <p>Important detail: <code>analyze(...)</code> always computes evidence rows internally, but its <code>limit</code> parameter only caps the number of direct topics returned in the public <code>topics</code> array.</p>
+
+      <h3>answer(system, inputText, limit)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> the main end-to-end request handling path.
+        <br><strong>Returns:</strong> a full result object with the analysis, ranked candidates, query tokens, and a direct answer string.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Type</th><th>What it means</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>system</code></td><td>trained system object</td><td>The object returned by <code>train(...)</code>.</td></tr>
+          <tr><td><code>inputText</code></td><td>string</td><td>The new request to answer.</td></tr>
+          <tr><td><code>limit</code></td><td>number, optional</td><td>The maximum number of final ranked evidence rows returned in <code>result.candidates</code>. It does not limit training, tokenization, or topic detection. If omitted, <code>system.config.segmentLimit</code> is used.</td></tr>
+        </tbody>
+      </table>
+      <p>This is the most important difference from <code>analyze(...)</code>:</p>
+      <ul>
+        <li>In <code>analyze(...)</code>, <code>limit</code> means the maximum number of topic rows returned.</li>
+        <li>In <code>answer(...)</code>, <code>limit</code> means the maximum number of ranked evidence candidates returned.</li>
+      </ul>
+      <p>The answer text itself is usually built from the top one or two candidates, even if you request a larger candidate limit.</p>
+
+      <h3>reply(system, inputText, limit)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> a naming alias when “reply” reads better than “answer”.
+        <br><strong>Current behavior:</strong> this is an alias for <code>answer()</code>.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Type</th><th>What it means</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>system</code></td><td>trained system object</td><td>Same as <code>answer(...)</code>.</td></tr>
+          <tr><td><code>inputText</code></td><td>string</td><td>Same as <code>answer(...)</code>.</td></tr>
+          <tr><td><code>limit</code></td><td>number, optional</td><td>Same as <code>answer(...)</code>: the maximum number of ranked candidate rows in <code>result.candidates</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>render(result)</h3>
+      <div class="prop">
+        <strong>Use it for:</strong> turning a result object into compact human-readable lines for terminal output or debugging.
+        <br><strong>Returns:</strong> an array of strings.
+      </div>
+      <table>
+        <thead>
+          <tr><th>Parameter</th><th>Type</th><th>What it means</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>result</code></td><td>answer result object</td><td>The object returned by <code>answer(...)</code> or <code>reply(...)</code>. <code>render(...)</code> expects fields such as <code>input</code>, <code>intent</code>, <code>answer</code>, and <code>candidates</code>.</td></tr>
+        </tbody>
+      </table>
+      <p><code>render(...)</code> does not re-rank or re-analyze anything. It only formats an existing result into readable lines.</p>
+    </div>
+
+    <div class="section">
+      <h2>Input Parameters</h2>
+
+      <h3>corpusInput for train(...)</h3>
+      <table>
+        <thead>
+          <tr><th>Shape</th><th>Meaning</th><th>How it is handled</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>"one large string"</code></td><td>One text source.</td><td>If it contains multiple non-empty lines, each line becomes a separate document candidate during normalization.</td></tr>
+          <tr><td><code>["doc one", "doc two"]</code></td><td>Explicit list of sources.</td><td>Each non-empty entry becomes one document directly.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>config for train(...)</h3>
+      <p>If you omit <code>config</code>, the module uses <code>respond.defaultConfig()</code>.</p>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>dimensions</code></td><td><code>12</code></td><td>Embedding vector width used for terms, queries, and segments. Larger values give more room for the hashed co-occurrence signal.</td></tr>
+          <tr><td><code>semanticWindow</code></td><td><code>2</code></td><td>How many tokens to the left and right count as co-occurrence context when building the semantic map.</td></tr>
+          <tr><td><code>vocabLimit</code></td><td><code>128</code></td><td>Maximum number of frequent vocabulary items to keep when building reusable term embeddings.</td></tr>
+          <tr><td><code>segmentLimit</code></td><td><code>5</code></td><td>How many evidence segments to keep in analysis and final candidate ranking by default.</td></tr>
+          <tr><td><code>topicLimit</code></td><td><code>3</code></td><td>How many direct topics to expose from analysis.</td></tr>
+          <tr><td><code>answerEvidenceLimit</code></td><td><code>2</code></td><td>Reserved answer-synthesis budget. In the current implementation the answer usually uses at most the top one or two pieces of evidence.</td></tr>
+          <tr><td><code>scoreWeights.evidence</code></td><td><code>0.45</code></td><td>Weight for earlier topic-evidence score during final candidate ranking.</td></tr>
+          <tr><td><code>scoreWeights.embedding</code></td><td><code>0.30</code></td><td>Weight for embedding similarity between the request and a segment.</td></tr>
+          <tr><td><code>scoreWeights.lexical</code></td><td><code>0.15</code></td><td>Weight for token overlap between the request and a segment.</td></tr>
+          <tr><td><code>scoreWeights.topic</code></td><td><code>0.10</code></td><td>Weight for direct topic and parent-topic hits inside a segment.</td></tr>
+          <tr><td><code>intentLabels</code></td><td>mapping object</td><td>Public labels exposed for relation families. Current defaults include <code>define</code>, <code>capability_check</code>, <code>attribute_query</code>, <code>compare</code>, <code>relation_query</code>, and <code>explain</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>inputText for analyze(...), answer(...), reply(...)</h3>
+      <p>This is the new user request. It may be a question, command-like request, or short free-text prompt such as:</p>
+      <ul>
+        <li><code>"what is a poodle"</code></li>
+        <li><code>"can dogs swim"</code></li>
+        <li><code>"tell me about invoices"</code></li>
+      </ul>
+
+      <h3>limit for analyze(...), answer(...), reply(...)</h3>
+      <p><code>limit</code> does not mean one universal thing across the whole API. It depends on which function you call:</p>
+      <ul>
+        <li>For <code>analyze(...)</code>, <code>limit</code> is the maximum number of direct topic rows returned in <code>analysis.topics</code>.</li>
+        <li>For <code>answer(...)</code> and <code>reply(...)</code>, <code>limit</code> is the maximum number of final ranked candidate rows returned in <code>result.candidates</code>.</li>
+      </ul>
+      <p>So if you call <code>answer(system, "can dogs swim", 3)</code>, the <code>3</code> means “return at most 3 ranked evidence candidates”. It does not mean “return 3 tokens”, “use only 3 documents”, or “generate 3 answer sentences”.</p>
+    </div>
+
+    <div class="section">
+      <h2>Trained System Object</h2>
+      <p><code>train(...)</code> returns an internal system object. You usually pass it straight into <code>analyze()</code> or <code>answer()</code>, but it is useful to know what it contains.</p>
+      <div class="code"><code>{
+    config: {...},
+    docs: [...],
+    cooc: {...},
+    vocab: [...],
+    termEmbeddings: {...},
+    relations: {
+        categoryRows: [...],
+        capabilityRows: [...],
+        attributeRows: [...]
+    },
+    topicIndex: {...},
+    parentIndex: {...},
+    segments: [...]
+}</code></div>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>docs</code></td><td>The normalized document list built from the original corpus input.</td></tr>
+          <tr><td><code>cooc</code></td><td>The semantic co-occurrence matrix used for embedding construction and similarity support.</td></tr>
+          <tr><td><code>vocab</code></td><td>The retained vocabulary used for reusable term embeddings.</td></tr>
+          <tr><td><code>termEmbeddings</code></td><td>A map of term to embedding object.</td></tr>
+          <tr><td><code>relations.categoryRows</code></td><td>Simple category-like rows such as <code>poodles are dogs</code>.</td></tr>
+          <tr><td><code>relations.capabilityRows</code></td><td>Capability-like rows such as <code>dogs can swim</code>.</td></tr>
+          <tr><td><code>relations.attributeRows</code></td><td>Attribute-like rows such as <code>poodles have curly coats</code>.</td></tr>
+          <tr><td><code>topicIndex</code></td><td>A fast topic lookup map built from relation rows and vocabulary.</td></tr>
+          <tr><td><code>parentIndex</code></td><td>Direct topic-to-parent mapping learned from category-style rows.</td></tr>
+          <tr><td><code>segments</code></td><td>The segmented evidence rows, each with text, tokens, normalized tokens, and an embedding.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Analysis Output</h2>
+      <p><code>analyze(system, inputText, limit)</code> returns an interpretation of the request before final answer synthesis.</p>
+      <div class="code"><code>{
+    input: "can dogs swim",
+    topics: [{word: "dog", score: 1.2}],
+    parentTopics: [{word: "animal", fromTopic: "dog", score: 0.96}],
+    relationsRequested: [{relation: "capability_of", score: 1}],
+    rulesMatched: [],
+    matchedRule: null,
+    intent: "capability_check",
+    intentSource: "relation",
+    evidence: {
+        inputKeywords: ["can", "dog", "swim"],
+        matchingSegments: [...],
+        parentSegments: []
+    }
+}</code></div>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Meaning</th><th>What to use it for</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>topics</code></td><td>The direct things the system thinks the request is about.</td><td>Inspecting the main subject of the request.</td></tr>
+          <tr><td><code>parentTopics</code></td><td>Broader classes inherited from category-style rows.</td><td>Fallback reasoning or broader context.</td></tr>
+          <tr><td><code>relationsRequested</code></td><td>The relation family the request most resembles.</td><td>Intent-specific routing or debugging.</td></tr>
+          <tr><td><code>intent</code></td><td>The public label exposed for that relation.</td><td>Branching to different answer or tool behavior.</td></tr>
+          <tr><td><code>evidence.matchingSegments</code></td><td>Segments already scored as topic-relevant before final ranking.</td><td>Early evidence inspection.</td></tr>
+          <tr><td><code>evidence.inputKeywords</code></td><td>Normalized request keywords.</td><td>Debugging tokenization and normalization.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Answer Output</h2>
+      <p><code>answer(system, inputText, limit)</code> wraps analysis plus final ranking and answer synthesis.</p>
+      <div class="code"><code>{
+    input: "what is a poodle",
+    intent: "define",
+    analysis: {...},
+    queryTokens: ["what", "is", "a", "poodle"],
+    candidates: [
+        {
+            text: "poodles are dogs",
+            score: 0.66,
+            lexicalScore: 0.25,
+            embeddingScore: 0.72,
+            evidenceScore: 0.80,
+            topicScore: 1,
+            docIndex: 0,
+            segmentIndex: 0,
+            rank: 1
+        }
+    ],
+    answer: "poodles are dogs."
+}</code></div>
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>analysis</code></td><td>The full analysis object described above.</td></tr>
+          <tr><td><code>queryTokens</code></td><td>The raw request tokens before singular-style normalization.</td></tr>
+          <tr><td><code>candidates</code></td><td>The final ranked evidence rows after lexical, embedding, topic, and evidence-score blending.</td></tr>
+          <tr><td><code>answer</code></td><td>The direct user-facing response synthesized from the strongest grounded evidence.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>How Candidate Scoring Works</h2>
+      <p>Each segment gets a final score from four ingredients:</p>
+      <ul>
+        <li><strong>Evidence score:</strong> whether the segment was already a good match during topic-focused analysis.</li>
+        <li><strong>Embedding score:</strong> cosine similarity between the request embedding and the segment embedding.</li>
+        <li><strong>Lexical score:</strong> direct token overlap between the request and the segment.</li>
+        <li><strong>Topic score:</strong> whether the segment contains the detected topic or parent-topic words.</li>
+      </ul>
+      <div class="code"><code>finalScore =
+    evidenceWeight  * evidenceScore +
+    embeddingWeight * embeddingScore +
+    lexicalWeight   * lexicalScore +
+    topicWeight     * topicScore</code></div>
+      <p>This means a segment can rank well either because it is a direct lexical match, because it is semantically close, or because it is strongly tied to the inferred topic.</p>
+    </div>
+
+    <div class="section">
+      <h2>Intent Labels in Current Behavior</h2>
+      <table>
+        <thead>
+          <tr><th>Intent</th><th>Typical trigger shape</th><th>Typical answer strategy</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>define</code></td><td><code>what is X</code>, <code>who is X</code></td><td>Prefer category-style evidence such as <code>X is Y</code>.</td></tr>
+          <tr><td><code>capability_check</code></td><td><code>can X ...</code>, <code>could X ...</code></td><td>Prefer capability-style evidence such as <code>X can ...</code>.</td></tr>
+          <tr><td><code>attribute_query</code></td><td>Requests involving <code>has</code> or <code>have</code></td><td>Prefer attribute-style evidence such as <code>X has ...</code>.</td></tr>
+          <tr><td><code>compare</code></td><td>Explicit compare cues or multiple strong topics</td><td>Return the closest comparison evidence rows rather than one compressed definition.</td></tr>
+          <tr><td><code>relation_query</code></td><td>Fallback relation-style request</td><td>Return the strongest general evidence.</td></tr>
+          <tr><td><code>explain</code></td><td><code>tell me about X</code> or topic-only prompts</td><td>Return one or two descriptive evidence rows.</td></tr>
+        </tbody>
+      </table>
+      <div class="note">The current implementation uses simple heuristic intent detection. It is intentionally lightweight and grounded in the local corpus rather than a full language model.</div>
+    </div>
+
+    <div class="section">
+      <h2>Examples</h2>
+
+      <h3>Definition Example</h3>
+      <div class="code"><code>corpus = "
+poodles are dogs
+dogs are animals
+poodles have curly coats
+";
+
+system = respond.train(corpus, respond.defaultConfig());
+result = respond.answer(system, "what is a poodle", 3);
+
+printline(result.intent);  // define
+printline(result.answer);  // poodles are dogs.</code></div>
+
+      <h3>Capability Example</h3>
+      <div class="code"><code>corpus = "
+dogs are animals
+dogs can swim
+birds can fly
+";
+
+system = respond.train(corpus, respond.defaultConfig());
+result = respond.answer(system, "can dogs swim", 3);
+
+printline(result.intent);  // capability_check
+printline(result.answer);  // dogs can swim.</code></div>
+
+      <h3>Explain Example</h3>
+      <div class="code"><code>corpus = "
+invoices belong to billing
+billing pages let users download invoices
+account pages show payment history
+";
+
+system = respond.train(corpus, respond.defaultConfig());
+result = respond.answer(system, "tell me about invoices", 3);
+
+printline(result.intent);  // explain
+printline(result.answer);  // invoice: invoices belong to billing. billing pages let users download invoices.</code></div>
+
+      <h3>Debugging with analyze(...)</h3>
+      <div class="code"><code>analysis = respond.analyze(system, "can dogs swim", 3);
+
+printraw(analysis.topics);
+printraw(analysis.relationsRequested);
+printraw(analysis.evidence.matchingSegments);</code></div>
+      <p>Use this path when you want to inspect why the module chose a particular answer before showing it to the user.</p>
+    </div>
+
+    <div class="section">
+      <h2>render(result)</h2>
+      <p><code>render(...)</code> returns printable lines in this shape:</p>
+      <div class="code"><code>Input: can dogs swim
+Intent: capability_check
+Answer: dogs can swim.
+
+Top evidence:
+1. score=1 text=dogs can swim
+2. score=0.71 text=dogs are animals</code></div>
+      <p>This is meant for terminal display, logs, demos, or quick inspection during development.</p>
+    </div>
+
+    <div class="section">
+      <h2>Current Limits</h2>
+      <ul>
+        <li>Relation extraction is intentionally simple and currently favors patterns like <code>X is Y</code>, <code>X can ...</code>, <code>X has ...</code>, and <code>X belongs to Y</code>.</li>
+        <li>Token normalization is lightweight and mainly lowercases plus singularizes some trailing <code>s</code> forms.</li>
+        <li>There is no external world knowledge. If the corpus does not support an answer, the module can only return grounded fallback evidence.</li>
+        <li>The scoring and intent logic are heuristic. They are designed for transparent behavior and local control, not full conversational generality.</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Where To Look Next</h2>
+      <ul>
+        <li><a href="README.md">README.md</a> for the short package summary.</li>
+        <li><a href="examples/demo.ns">examples/demo.ns</a> for a runnable example.</li>
+        <li><a href="tests/respond_tests.ns">tests/respond_tests.ns</a> for expected behaviors.</li>
+        <li><a href="src/respond.ns">src/respond.ns</a> for the implementation details.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
