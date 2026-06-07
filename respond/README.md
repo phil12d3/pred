@@ -57,6 +57,9 @@ module rules and can:
 See:
 
 - `examples/rules_demo.ns` for label overrides, relation overrides, and pattern examples
+- `examples/japanese_demo.ns` for Japanese-script examples
+- `examples/romaji_demo.ns` for Romaji examples
+- `examples/french_demo.ns` for French examples
 - `docs.html` for the full rule-field reference
 
 ## Returned Result Shape

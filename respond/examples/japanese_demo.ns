@@ -1,0 +1,31 @@
+respond = import("./respond.ns").respond;
+
+corpus = "
+プードル は 犬
+犬 は 動物
+プードル は ふわふわ の 毛 を もつ
+犬 は 泳ぐ
+鳥 は 飛ぶ
+請求書 は 請求 の 記録
+請求 ページ は 請求書 を ダウンロード できる
+";
+
+system = respond.train(corpus, respond.defaultConfig());
+
+queries = [
+    "プードル は 何",
+    "犬 は 泳ぐ",
+    "請求書 は 何"
+];
+
+printline("=== respond japanese demo ===");
+printline("");
+
+for (i = 0; i < queries.count(); i = i + 1) {
+    result = respond.answer(system, queries[i], 3);
+    printline("Query: ", queries[i]);
+    printline("Intent: ", result.intent);
+    printline("Answer: ", result.answer);
+    printline("Topics: ", result.analysis.topics);
+    printline("");
+}

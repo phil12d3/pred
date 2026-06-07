@@ -1,0 +1,31 @@
+respond = import("./respond.ns").respond;
+
+corpus = "
+poodoru wa inu
+inu wa doubutsu
+poodoru wa yawa-rakai ke o motsu
+inu wa oyogu
+tori wa tobu
+seikyuusho wa seikyuu no kiroku
+seikyuu peeji wa seikyuusho o daunroodo dekiru
+";
+
+system = respond.train(corpus, respond.defaultConfig());
+
+queries = [
+    "poodoru wa nani",
+    "inu wa oyogu",
+    "seikyuusho wa nani"
+];
+
+printline("=== respond romaji demo ===");
+printline("");
+
+for (i = 0; i < queries.count(); i = i + 1) {
+    result = respond.answer(system, queries[i], 3);
+    printline("Query: ", queries[i]);
+    printline("Intent: ", result.intent);
+    printline("Answer: ", result.answer);
+    printline("Topics: ", result.analysis.topics);
+    printline("");
+}
