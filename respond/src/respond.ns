@@ -1,0 +1,833 @@
+defaultConfig = func() {
+    return {
+        dimensions: 12,
+        semanticWindow: 2,
+        vocabLimit: 128,
+        segmentLimit: 5,
+        topicLimit: 3,
+        answerEvidenceLimit: 2,
+        scoreWeights: {
+            evidence: 0.45,
+            embedding: 0.3,
+            lexical: 0.15,
+            topic: 0.1
+        },
+        intentLabels: {
+            capability_of: "capability_check",
+            attribute_of: "attribute_query",
+            category_of: "define",
+            compare_topics: "compare",
+            related_to: "relation_query",
+            explain_topic: "explain"
+        }
+    };
+}
+
+asText = func(value) {
+    if (!defined(value) || value == null) return "";
+    if (type(value).typename == "String") return value;
+    return stringify(value);
+}
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+sortRowsDesc = func(rows, keyName) {
+    out = this.copyArray(rows);
+    for (i = 0; i < out.count(); i = i + 1) {
+        best = i;
+        for (j = i + 1; j < out.count(); j = j + 1) {
+            if (out[j][keyName] > out[best][keyName]) best = j;
+        }
+        if (best != i) {
+            tmp = out[i];
+            out[i] = out[best];
+            out[best] = tmp;
+        }
+    }
+    return out;
+}
+
+normalize = func(text) {
+    if (!defined(text) || text == null) return "";
+    if (type(text).typename == "String") return text;
+    return stringify(text);
+}
+
+lines = func(text) {
+    s = this.normalize(text);
+    rows = [];
+    line = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        if (ch == "\n") {
+            rows.add(line);
+            line = "";
+        } else {
+            line = line + ch;
+        }
+    }
+    rows.add(line);
+    return rows;
+}
+
+toLowerText = func(text) {
+    s = this.normalize(text);
+    out = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        if (ch == "A") ch = "a";
+        else if (ch == "B") ch = "b";
+        else if (ch == "C") ch = "c";
+        else if (ch == "D") ch = "d";
+        else if (ch == "E") ch = "e";
+        else if (ch == "F") ch = "f";
+        else if (ch == "G") ch = "g";
+        else if (ch == "H") ch = "h";
+        else if (ch == "I") ch = "i";
+        else if (ch == "J") ch = "j";
+        else if (ch == "K") ch = "k";
+        else if (ch == "L") ch = "l";
+        else if (ch == "M") ch = "m";
+        else if (ch == "N") ch = "n";
+        else if (ch == "O") ch = "o";
+        else if (ch == "P") ch = "p";
+        else if (ch == "Q") ch = "q";
+        else if (ch == "R") ch = "r";
+        else if (ch == "S") ch = "s";
+        else if (ch == "T") ch = "t";
+        else if (ch == "U") ch = "u";
+        else if (ch == "V") ch = "v";
+        else if (ch == "W") ch = "w";
+        else if (ch == "X") ch = "x";
+        else if (ch == "Y") ch = "y";
+        else if (ch == "Z") ch = "z";
+        out = out + ch;
+    }
+    return out;
+}
+
+tokens = func(text) {
+    s = this.toLowerText(text);
+    out = [];
+    word = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        isAlphaNum = (ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9");
+        if (isAlphaNum) {
+            word = word + ch;
+        } else {
+            if (word != "") {
+                out.add(word);
+                word = "";
+            }
+        }
+    }
+    if (word != "") out.add(word);
+    return out;
+}
+
+normalizeToken = func(token) {
+    word = this.toLowerText(token);
+    if (word.length > 3 && word[word.length - 1] == "s") {
+        stem = "";
+        for (i = 0; i < word.length - 1; i = i + 1) stem = stem + word[i];
+        return stem;
+    }
+    return word;
+}
+
+normalizeTokens = func(tokens) {
+    out = [];
+    for (i = 0; i < tokens.count(); i = i + 1) out.add(this.normalizeToken(tokens[i]));
+    return out;
+}
+
+uniqueTokens = func(tokens) {
+    out = [];
+    seen = {};
+    for (i = 0; i < tokens.count(); i = i + 1) {
+        token = tokens[i];
+        if (defined(seen[token])) continue;
+        seen[token] = true;
+        out.add(token);
+    }
+    return out;
+}
+
+joinTokens = func(tokens, startIndex) {
+    start = defined(startIndex) ? startIndex : 0;
+    text = "";
+    for (i = start; i < tokens.count(); i = i + 1) {
+        if (text != "") text = text + " ";
+        text = text + tokens[i];
+    }
+    return text;
+}
+
+normalizeDocs = func(corpusInput) {
+    docs = [];
+    if (!defined(corpusInput) || corpusInput == null) return docs;
+
+    if (defined(corpusInput.count) && type(corpusInput).typename != "String") {
+        for (i = 0; i < corpusInput.count(); i = i + 1) {
+            text = this.asText(corpusInput[i]);
+            if (this.tokens(text).count() > 0) docs.add(text);
+        }
+        return docs;
+    }
+
+    text = this.asText(corpusInput);
+    rawLines = this.lines(text);
+    nonEmpty = [];
+    for (i = 0; i < rawLines.count(); i = i + 1) {
+        line = this.asText(rawLines[i]);
+        if (this.tokens(line).count() == 0) continue;
+        nonEmpty.add(line);
+    }
+    if (nonEmpty.count() > 1) return nonEmpty;
+    if (this.tokens(text).count() > 0) docs.add(text);
+    return docs;
+}
+
+buildSegments = func(docs) {
+    rows = [];
+    for (di = 0; di < docs.count(); di = di + 1) {
+        text = this.asText(docs[di]);
+        current = "";
+        localIndex = 0;
+        for (i = 0; i < text.length; i = i + 1) {
+            ch = text[i];
+            isBoundary = ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == "\n";
+            if (isBoundary) {
+                toks = this.tokens(current);
+                if (toks.count() > 0) {
+                    rows.add({
+                        docIndex: di,
+                        segmentIndex: localIndex,
+                        text: current,
+                        tokens: toks,
+                        normalizedTokens: this.normalizeTokens(toks)
+                    });
+                    localIndex = localIndex + 1;
+                }
+                current = "";
+            } else {
+                current = current + ch;
+            }
+        }
+
+        tail = this.tokens(current);
+        if (tail.count() > 0) {
+            rows.add({
+                docIndex: di,
+                segmentIndex: localIndex,
+                text: current,
+                tokens: tail,
+                normalizedTokens: this.normalizeTokens(tail)
+            });
+        }
+    }
+    return rows;
+}
+
+containsToken = func(tokens, target) {
+    for (i = 0; i < tokens.count(); i = i + 1) {
+        if (tokens[i] == target) return true;
+    }
+    return false;
+}
+
+splitSegments = func(text) {
+    segments = [];
+    current = "";
+    s = this.asText(text);
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        boundary = ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == "\n";
+        if (boundary) {
+            toks = this.tokens(current);
+            if (toks.count() > 0) segments.add(current);
+            current = "";
+        } else {
+            current = current + ch;
+        }
+    }
+    tailToks = this.tokens(current);
+    if (tailToks.count() > 0) segments.add(current);
+    return segments;
+}
+
+semanticCoOccurrence = func(docs, windowSize) {
+    win = defined(windowSize) ? windowSize : 2;
+    if (win < 1) win = 1;
+
+    matrix = {};
+    for (di = 0; di < docs.count(); di = di + 1) {
+        segments = this.splitSegments(docs[di]);
+        if (segments.count() == 0) segments.add(docs[di]);
+
+        for (si = 0; si < segments.count(); si = si + 1) {
+            toks = this.normalizeTokens(this.tokens(segments[si]));
+            for (i = 0; i < toks.count(); i = i + 1) {
+                w = toks[i];
+                if (!defined(matrix[w])) matrix[w] = {};
+                start = i - win;
+                if (start < 0) start = 0;
+                finish = i + win;
+                if (finish > toks.count() - 1) finish = toks.count() - 1;
+                for (j = start; j <= finish; j = j + 1) {
+                    if (j == i) continue;
+                    other = toks[j];
+                    if (!defined(matrix[w][other])) matrix[w][other] = 0;
+                    matrix[w][other] = matrix[w][other] + 1;
+                }
+            }
+        }
+    }
+    return matrix;
+}
+
+wordCounts = func(docs) {
+    counts = {};
+    total = 0;
+    for (di = 0; di < docs.count(); di = di + 1) {
+        toks = this.normalizeTokens(this.tokens(docs[di]));
+        for (ti = 0; ti < toks.count(); ti = ti + 1) {
+            word = toks[ti];
+            if (!defined(counts[word])) counts[word] = 0;
+            counts[word] = counts[word] + 1;
+            total = total + 1;
+        }
+    }
+    return {counts: counts, total: total};
+}
+
+buildVocabulary = func(docs, cooc, limit) {
+    counts = this.wordCounts(docs);
+    rows = [];
+    foreach(word in counts.counts.props) {
+        if (!defined(cooc[word])) continue;
+        rows.add({word: word, count: counts.counts[word]});
+    }
+    rows = this.sortRowsDesc(rows, "count");
+
+    maxItems = defined(limit) ? limit : rows.count();
+    vocab = [];
+    for (i = 0; i < rows.count() && i < maxItems; i = i + 1) vocab.add(rows[i].word);
+    return vocab;
+}
+
+createEmbedding = func(dimensions, seedId) {
+    dims = dimensions < 1 ? 1 : dimensions;
+    values = [];
+    for (i = 0; i < dims; i = i + 1) values.add(0);
+    return {dims: dims, values: values, id: defined(seedId) ? seedId : "emb", metadata: {}};
+}
+
+normalizeEmbedding = func(embedding) {
+    if (!defined(embedding) || embedding == null || embedding.values.count() == 0) return embedding;
+    m = matrice_fromArray([embedding.values]);
+    normed = m.normalize().toArray()[0];
+    values = [];
+    for (i = 0; i < normed.count(); i = i + 1) values.add(normed[i]);
+    return {dims: embedding.dims, values: values, id: embedding.id, metadata: embedding.metadata};
+}
+
+embeddingFromFrequencies = func(freqMap, dimensions) {
+    emb = this.createEmbedding(dimensions, "freq_emb");
+    rows = [];
+    total = 0;
+    foreach(key in freqMap.props) {
+        rows.add({key: key, freq: freqMap[key]});
+        total = total + freqMap[key];
+    }
+    if (rows.count() == 0) return emb;
+    rows = this.sortRowsDesc(rows, "freq");
+    for (d = 0; d < dimensions; d = d + 1) {
+        value = 0;
+        for (i = 0; i < rows.count(); i = i + 1) {
+            weight = total == 0 ? 0 : rows[i].freq / total;
+            seed = (d + 1 + i) * 1103515245 + 12345;
+            hashValue = (seed % 2147483648) / 2147483648;
+            value = value + (weight * hashValue);
+        }
+        emb.values[d] = rows.count() == 0 ? 0 : value / rows.count();
+    }
+    return this.normalizeEmbedding(emb);
+}
+
+embeddingFromCoOccurrence = func(cooc, term, dimensions) {
+    emb = this.createEmbedding(dimensions, "cooc_emb");
+    if (!defined(cooc[term])) return emb;
+
+    contextPairs = [];
+    total = 0;
+    foreach(contextTerm in cooc[term].props) {
+        count = cooc[term][contextTerm];
+        contextPairs.add({term: contextTerm, count: count});
+        total = total + count;
+    }
+    if (contextPairs.count() == 0) return emb;
+    contextPairs = this.sortRowsDesc(contextPairs, "count");
+
+    limit = dimensions * 2;
+    for (i = 0; i < contextPairs.count() && i < limit; i = i + 1) {
+        pair = contextPairs[i];
+        weight = total == 0 ? 0 : pair.count / total;
+        seed = 0;
+        for (j = 0; j < pair.term.length; j = j + 1) {
+            ch = pair.term[j];
+            charValue = (ch >= "a" && ch <= "z") ? ((ch - "a") + 1) : 1;
+            seed = seed + (charValue * (j + 1));
+        }
+        idx1 = seed % dimensions;
+        idx2 = ((seed * 7) + pair.term.length) % dimensions;
+        emb.values[idx1] = emb.values[idx1] + weight;
+        emb.values[idx2] = emb.values[idx2] + (weight * 0.5);
+    }
+    return this.normalizeEmbedding(emb);
+}
+
+cosineSimilarity = func(emb1, emb2) {
+    if (emb1.dims != emb2.dims) return 0;
+    if (emb1.dims == 0) return 1;
+    m1 = matrice_fromArray([emb1.values]);
+    m2 = matrice_fromArray([emb2.values]);
+    return m1.dotScalar(m2);
+}
+
+averageEmbeddings = func(embeddings, dimensions, idValue) {
+    emb = this.createEmbedding(dimensions, idValue);
+    if (!defined(embeddings) || embeddings == null || embeddings.count() == 0) return emb;
+    count = 0;
+    for (i = 0; i < embeddings.count(); i = i + 1) {
+        item = embeddings[i];
+        if (!defined(item) || item == null) continue;
+        count = count + 1;
+        for (j = 0; j < dimensions; j = j + 1) emb.values[j] = emb.values[j] + item.values[j];
+    }
+    if (count == 0) return emb;
+    for (i = 0; i < dimensions; i = i + 1) emb.values[i] = emb.values[i] / count;
+    return this.normalizeEmbedding(emb);
+}
+
+buildTermEmbeddings = func(vocab, cooc, dimensions) {
+    map = {};
+    for (i = 0; i < vocab.count(); i = i + 1) map[vocab[i]] = this.embeddingFromCoOccurrence(cooc, vocab[i], dimensions);
+    return map;
+}
+
+embeddingForTokens = func(system, tokens, idValue) {
+    normalized = this.uniqueTokens(this.normalizeTokens(tokens));
+    parts = [];
+    for (i = 0; i < normalized.count(); i = i + 1) {
+        token = normalized[i];
+        if (defined(system.termEmbeddings[token])) parts.add(system.termEmbeddings[token]);
+        else if (defined(system.cooc[token])) parts.add(this.embeddingFromCoOccurrence(system.cooc, token, system.config.dimensions));
+    }
+    if (parts.count() > 0) return this.averageEmbeddings(parts, system.config.dimensions, idValue);
+
+    freqMap = {};
+    for (i = 0; i < normalized.count(); i = i + 1) freqMap[normalized[i]] = 1;
+    return this.embeddingFromFrequencies(freqMap, system.config.dimensions);
+}
+
+buildSegmentRows = func(segments, system) {
+    rows = [];
+    for (i = 0; i < segments.count(); i = i + 1) {
+        row = segments[i];
+        rows.add({
+            docIndex: row.docIndex,
+            segmentIndex: row.segmentIndex,
+            text: this.asText(row.text),
+            tokens: row.tokens,
+            normalizedTokens: row.normalizedTokens,
+            embedding: this.embeddingForTokens(system, row.tokens, "segment_" + stringify(i))
+        });
+    }
+    return rows;
+}
+
+extractRelations = func(segments) {
+    categoryRows = [];
+    capabilityRows = [];
+    attributeRows = [];
+    for (i = 0; i < segments.count(); i = i + 1) {
+        row = segments[i];
+        toks = row.normalizedTokens;
+        if (toks.count() < 3) continue;
+        subject = toks[0];
+
+        if ((toks[1] == "is" || toks[1] == "are") && toks.count() >= 3) {
+            if (toks[2] == "known" || toks[2] == "like") {
+                attributeRows.add({topic: subject, text: row.text});
+            } else {
+                categoryRows.add({topic: subject, parent: toks[2], text: row.text});
+            }
+        }
+        if (toks[1] == "can" && toks.count() >= 3) capabilityRows.add({topic: subject, action: this.joinTokens(toks, 2), text: row.text});
+        if ((toks[1] == "has" || toks[1] == "have") && toks.count() >= 3) attributeRows.add({topic: subject, attribute: this.joinTokens(toks, 2), text: row.text});
+        if ((toks[1] == "belong" || toks[1] == "belongs") && toks.count() >= 4 && toks[2] == "to") categoryRows.add({topic: subject, parent: toks[3], text: row.text});
+    }
+    return {
+        categoryRows: categoryRows,
+        capabilityRows: capabilityRows,
+        attributeRows: attributeRows
+    };
+}
+
+scoreTopics = func(system, inputTokens) {
+    normalized = this.uniqueTokens(this.normalizeTokens(inputTokens));
+    rows = [];
+    foreach(word in system.topicIndex.props) {
+        score = 0;
+        if (this.containsToken(normalized, word)) score = score + 1.2;
+        if (defined(system.cooc[word])) {
+            foreach(other in system.cooc[word].props) {
+                if (this.containsToken(normalized, other)) score = score + 0.2;
+            }
+        }
+        if (score > 0) rows.add({word: word, score: score});
+    }
+
+    if (rows.count() == 0) {
+        for (i = 0; i < normalized.count(); i = i + 1) {
+            token = normalized[i];
+            if (!defined(system.termEmbeddings[token])) continue;
+            rows.add({word: token, score: 0.4});
+        }
+    }
+
+    rows = this.sortRowsDesc(rows, "score");
+    return this.sliceRows(rows, system.config.topicLimit);
+}
+
+parentTopics = func(system, topics) {
+    rows = [];
+    seen = {};
+    for (i = 0; i < topics.count(); i = i + 1) {
+        topic = topics[i].word;
+        if (!defined(system.parentIndex[topic])) continue;
+        parent = system.parentIndex[topic];
+        key = topic + "|" + parent;
+        if (defined(seen[key])) continue;
+        seen[key] = true;
+        rows.add({word: parent, fromTopic: topic, score: topics[i].score * 0.8});
+    }
+    return rows;
+}
+
+detectIntent = func(inputText, topics) {
+    tokens = this.normalizeTokens(this.tokens(inputText));
+    if (tokens.count() >= 2 && (tokens[0] == "can" || tokens[0] == "could")) return {relation: "capability_of", intent: "capability_check"};
+    if (tokens.count() >= 2 && tokens[0] == "what" && tokens[1] == "is") return {relation: "category_of", intent: "define"};
+    if (tokens.count() >= 2 && tokens[0] == "who" && tokens[1] == "is") return {relation: "category_of", intent: "define"};
+    if (tokens.count() >= 2 && tokens[0] == "tell" && tokens[1] == "me") return {relation: "explain_topic", intent: "explain"};
+    if (this.containsToken(tokens, "compare") || topics.count() >= 2) return {relation: "compare_topics", intent: "compare"};
+    if (this.containsToken(tokens, "have") || this.containsToken(tokens, "has")) return {relation: "attribute_of", intent: "attribute_query"};
+    if (topics.count() > 0) return {relation: "explain_topic", intent: "explain"};
+    return {relation: "related_to", intent: "relation_query"};
+}
+
+topicWordMap = func(rows) {
+    out = {};
+    for (i = 0; i < rows.count(); i = i + 1) {
+        if (defined(rows[i].word)) out[rows[i].word] = true;
+    }
+    return out;
+}
+
+tokenOverlap = func(queryTokens, segmentTokens) {
+    if (!defined(queryTokens) || queryTokens.count() == 0) return 0;
+    query = this.uniqueTokens(this.normalizeTokens(queryTokens));
+    segment = this.uniqueTokens(this.normalizeTokens(segmentTokens));
+    hits = 0;
+    for (i = 0; i < query.count(); i = i + 1) {
+        if (this.containsToken(segment, query[i])) hits = hits + 1;
+    }
+    return query.count() == 0 ? 0 : hits / query.count();
+}
+
+topicHitScore = func(segmentTokens, topicWords, parentWords) {
+    segment = this.uniqueTokens(this.normalizeTokens(segmentTokens));
+    hits = 0;
+    for (i = 0; i < segment.count(); i = i + 1) {
+        token = segment[i];
+        if (defined(topicWords[token])) hits = hits + 1;
+        else if (defined(parentWords[token])) hits = hits + 0.5;
+    }
+    return hits > 1 ? 1 : hits;
+}
+
+sliceRows = func(rows, limit) {
+    out = [];
+    maxItems = defined(limit) ? limit : rows.count();
+    for (i = 0; i < rows.count() && i < maxItems; i = i + 1) out.add(rows[i]);
+    return out;
+}
+
+buildEvidence = func(system, topics, queryTokens, limit) {
+    topicWords = this.topicWordMap(topics);
+    rows = [];
+    for (i = 0; i < system.segments.count(); i = i + 1) {
+        segment = system.segments[i];
+        overlap = this.tokenOverlap(queryTokens, segment.tokens);
+        topicScore = this.topicHitScore(segment.tokens, topicWords, {});
+        score = (overlap * 0.6) + (topicScore * 0.4);
+        if (score <= 0) continue;
+        rows.add({
+            text: segment.text,
+            score: score,
+            overlap: overlap,
+            topicScore: topicScore
+        });
+    }
+    rows = this.sortRowsDesc(rows, "score");
+    return this.sliceRows(rows, limit);
+}
+
+analyze = func(system, inputText, limit) {
+    maxTopics = defined(limit) ? limit : system.config.topicLimit;
+    inputTokens = this.tokens(inputText);
+    topics = this.scoreTopics(system, inputTokens);
+    topics = this.sliceRows(topics, maxTopics);
+    parents = this.parentTopics(system, topics);
+    intentInfo = this.detectIntent(inputText, topics);
+    evidence = this.buildEvidence(system, topics, inputTokens, system.config.segmentLimit);
+    return {
+        input: inputText,
+        topics: topics,
+        parentTopics: parents,
+        relationsRequested: [{relation: intentInfo.relation, score: 1}],
+        rulesMatched: [],
+        matchedRule: null,
+        intent: intentInfo.intent,
+        intentSource: "relation",
+        evidence: {
+            inputKeywords: this.uniqueTokens(this.normalizeTokens(inputTokens)),
+            matchingSegments: evidence,
+            parentSegments: []
+        }
+    };
+}
+
+evidenceScoreMap = func(rows) {
+    out = {};
+    for (i = 0; i < rows.count(); i = i + 1) out[this.asText(rows[i].text)] = rows[i].score;
+    return out;
+}
+
+clamp01 = func(value) {
+    if (value < 0) return 0;
+    if (value > 1) return 1;
+    return value;
+}
+
+rankSegments = func(system, analysis, queryTokens, queryEmbedding, limit) {
+    weights = system.config.scoreWeights;
+    topicWords = this.topicWordMap(analysis.topics);
+    parentWords = this.topicWordMap(analysis.parentTopics);
+    evidenceScores = this.evidenceScoreMap(analysis.evidence.matchingSegments);
+
+    ranked = [];
+    for (i = 0; i < system.segments.count(); i = i + 1) {
+        segment = system.segments[i];
+        lexical = this.tokenOverlap(queryTokens, segment.tokens);
+        topicScore = this.topicHitScore(segment.tokens, topicWords, parentWords);
+        embedScore = (this.cosineSimilarity(queryEmbedding, segment.embedding) + 1) / 2;
+        embedScore = this.clamp01(embedScore);
+        evidenceScore = defined(evidenceScores[segment.text]) ? evidenceScores[segment.text] : 0;
+        finalScore = (weights.evidence * evidenceScore) +
+                     (weights.embedding * embedScore) +
+                     (weights.lexical * lexical) +
+                     (weights.topic * topicScore);
+
+        ranked.add({
+            text: segment.text,
+            score: finalScore,
+            lexicalScore: lexical,
+            embeddingScore: embedScore,
+            evidenceScore: evidenceScore,
+            topicScore: topicScore,
+            docIndex: segment.docIndex,
+            segmentIndex: segment.segmentIndex
+        });
+    }
+
+    ranked = this.sortRowsDesc(ranked, "score");
+    out = [];
+    for (i = 0; i < ranked.count() && i < limit; i = i + 1) {
+        row = ranked[i];
+        row.rank = i + 1;
+        out.add(row);
+    }
+    return out;
+}
+
+ensureSentence = func(text) {
+    value = this.asText(text);
+    if (value == "") return value;
+    last = value[value.length - 1];
+    if (last == "." || last == "!" || last == "?") return value;
+    return value + ".";
+}
+
+joinCandidateTexts = func(candidates, limit) {
+    maxItems = defined(limit) ? limit : candidates.count();
+    text = "";
+    for (i = 0; i < candidates.count() && i < maxItems; i = i + 1) {
+        if (text != "") text = text + " ";
+        text = text + this.ensureSentence(candidates[i].text);
+    }
+    return text;
+}
+
+topicLabel = func(analysis) {
+    if (!defined(analysis) || !defined(analysis.topics) || analysis.topics.count() == 0) return "";
+    return this.asText(analysis.topics[0].word);
+}
+
+findRelationAnswer = func(system, analysis) {
+    topic = this.topicLabel(analysis);
+    if (topic == "") return "";
+
+    if (analysis.intent == "define") {
+        for (i = 0; i < system.relations.categoryRows.count(); i = i + 1) {
+            row = system.relations.categoryRows[i];
+            if (row.topic == topic) return this.ensureSentence(row.text);
+        }
+    }
+
+    if (analysis.intent == "capability_check") {
+        for (i = 0; i < system.relations.capabilityRows.count(); i = i + 1) {
+            row = system.relations.capabilityRows[i];
+            if (row.topic == topic) return this.ensureSentence(row.text);
+        }
+    }
+
+    if (analysis.intent == "attribute_query") {
+        for (i = 0; i < system.relations.attributeRows.count(); i = i + 1) {
+            row = system.relations.attributeRows[i];
+            if (row.topic == topic) return this.ensureSentence(row.text);
+        }
+    }
+
+    return "";
+}
+
+composeAnswer = func(system, result) {
+    analysis = result.analysis;
+    candidates = result.candidates;
+    topic = this.topicLabel(analysis);
+    relationAnswer = this.findRelationAnswer(system, analysis);
+
+    if (!defined(candidates) || candidates.count() == 0) {
+        return "I could not ground a response for \"" + result.input + "\" in the current corpus.";
+    }
+
+    if (analysis.intent == "compare") {
+        if (candidates.count() > 1) return "Closest comparison evidence: " + this.ensureSentence(candidates[0].text) + " " + this.ensureSentence(candidates[1].text);
+        return "Closest comparison evidence: " + this.ensureSentence(candidates[0].text);
+    }
+
+    if (analysis.intent == "explore") return "Closest evidence I found: " + this.ensureSentence(candidates[0].text);
+
+    if (analysis.intent == "explain") {
+        if (topic != "") return topic + ": " + this.joinCandidateTexts(candidates, 2);
+        return this.joinCandidateTexts(candidates, 2);
+    }
+
+    if (analysis.intent == "define" || analysis.intent == "capability_check" ||
+        analysis.intent == "attribute_query" || analysis.intent == "relation_query") {
+        if (relationAnswer != "") {
+            if (candidates.count() > 0 && this.ensureSentence(candidates[0].text) != relationAnswer && candidates[0].score > 0.35) {
+                return relationAnswer + " " + this.ensureSentence(candidates[0].text);
+            }
+            return relationAnswer;
+        }
+        if (candidates.count() > 1 && candidates[1].score > 0.35) return this.ensureSentence(candidates[0].text) + " " + this.ensureSentence(candidates[1].text);
+        return this.ensureSentence(candidates[0].text);
+    }
+
+    return this.ensureSentence(candidates[0].text);
+}
+
+train = func(corpusInput, config) {
+    cfg = defined(config) && config != null ? config : this.defaultConfig();
+    docs = this.normalizeDocs(corpusInput);
+    rawSegments = this.buildSegments(docs);
+    relations = this.extractRelations(rawSegments);
+    cooc = this.semanticCoOccurrence(docs, cfg.semanticWindow);
+    vocab = this.buildVocabulary(docs, cooc, cfg.vocabLimit);
+    termEmbeddings = this.buildTermEmbeddings(vocab, cooc, cfg.dimensions);
+
+    topicIndex = {};
+    parentIndex = {};
+    for (i = 0; i < relations.categoryRows.count(); i = i + 1) {
+        row = relations.categoryRows[i];
+        topicIndex[row.topic] = true;
+        if (defined(row.parent)) topicIndex[row.parent] = true;
+        if (defined(row.parent)) parentIndex[row.topic] = row.parent;
+    }
+    for (i = 0; i < relations.capabilityRows.count(); i = i + 1) topicIndex[relations.capabilityRows[i].topic] = true;
+    for (i = 0; i < relations.attributeRows.count(); i = i + 1) topicIndex[relations.attributeRows[i].topic] = true;
+    for (i = 0; i < vocab.count(); i = i + 1) {
+        if (!defined(topicIndex[vocab[i]]) && vocab[i].length > 2) topicIndex[vocab[i]] = true;
+    }
+
+    system = {
+        config: cfg,
+        docs: docs,
+        cooc: cooc,
+        vocab: vocab,
+        termEmbeddings: termEmbeddings,
+        relations: relations,
+        topicIndex: topicIndex,
+        parentIndex: parentIndex,
+        segments: []
+    };
+    system.segments = this.buildSegmentRows(rawSegments, system);
+    return system;
+}
+
+answer = func(system, inputText, limit) {
+    maxItems = defined(limit) ? limit : system.config.segmentLimit;
+    analysis = this.analyze(system, inputText, system.config.topicLimit);
+    queryTokens = this.tokens(inputText);
+    queryEmbedding = this.embeddingForTokens(system, queryTokens, "query");
+    candidates = this.rankSegments(system, analysis, queryTokens, queryEmbedding, maxItems);
+
+    result = {
+        input: inputText,
+        intent: analysis.intent,
+        analysis: analysis,
+        queryTokens: queryTokens,
+        candidates: candidates,
+        answer: ""
+    };
+    result.answer = this.composeAnswer(system, result);
+    return result;
+}
+
+reply = func(system, inputText, limit) {
+    return this.answer(system, inputText, limit);
+}
+
+render = func(result) {
+    lines = [];
+    lines.add("Input: " + this.asText(result.input));
+    lines.add("Intent: " + this.asText(result.intent));
+    lines.add("Answer: " + this.asText(result.answer));
+    lines.add("");
+    lines.add("Top evidence:");
+    for (i = 0; i < result.candidates.count(); i = i + 1) {
+        row = result.candidates[i];
+        lines.add(stringify(row.rank) + ". score=" + stringify(row.score) + " text=" + this.asText(row.text));
+    }
+    return lines;
+}

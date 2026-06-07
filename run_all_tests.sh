@@ -65,6 +65,13 @@ echo "== Running report tests =="
 )
 
 echo
+echo "== Running respond tests =="
+(
+  cd "$ROOT_DIR/respond"
+  "$NS_BIN" tests/run_tests.ns
+)
+
+echo
 echo "== Running decision-tree tests =="
 (
   cd "$ROOT_DIR/decision-tree"

@@ -1,0 +1,57 @@
+[test]
+definition_requests_should_return_a_direct_grounded_answer = func(t) {
+    respond = import("./respond.ns").respond;
+
+    corpus = "
+    poodles are dogs
+    dogs are animals
+    poodles have curly coats
+    dogs can swim
+    ";
+
+    system = respond.train(corpus, respond.defaultConfig());
+    result = respond.answer(system, "what is a poodle", 3);
+
+    t.equal(result.intent, "define", "definition request should preserve the inferred intent");
+    t.truthy(result.candidates.count() > 0, "definition request should produce ranked evidence");
+    t.truthy(regex_test(result.answer, "poodles are dogs") || regex_test(result.answer, "dogs are animals"), "definition answer should stay grounded in corpus evidence");
+};
+
+[test]
+capability_requests_should_surface_the_behavior_answer = func(t) {
+    respond = import("./respond.ns").respond;
+
+    corpus = "
+    dogs are animals
+    fish are animals
+    dogs can swim
+    birds can fly
+    ";
+
+    system = respond.train(corpus, respond.defaultConfig());
+    result = respond.answer(system, "can dogs swim", 3);
+
+    t.equal(result.intent, "capability_check", "capability request should preserve the inferred intent");
+    t.truthy(regex_test(result.answer, "dogs can swim"), "capability answer should surface the learned behavior");
+    t.truthy(result.candidates[0].score > 0, "top capability evidence should receive a positive score");
+};
+
+[test]
+semantic_ranking_should_find_billing_evidence_for_invoice_requests = func(t) {
+    respond = import("./respond.ns").respond;
+
+    corpus = "
+    invoices belong to billing
+    receipts belong to billing
+    billing pages let users download invoices
+    account pages show payment history
+    ";
+
+    system = respond.train(corpus, respond.defaultConfig());
+    result = respond.answer(system, "tell me about invoices", 3);
+    rendered = respond.render(result);
+
+    t.truthy(result.candidates.count() > 0, "invoice request should produce candidates");
+    t.truthy(regex_test(result.answer, "invoice") || regex_test(result.answer, "billing"), "invoice answer should stay within invoice or billing evidence");
+    t.truthy(rendered.count() >= 4, "render should expose a compact human-readable summary");
+};
