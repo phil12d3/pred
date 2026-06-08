@@ -220,10 +220,11 @@
           <li>5. Public functions</li>
           <li>6. Config and option fields</li>
           <li>7. Model object properties</li>
-          <li>8. Prediction and generation result shapes</li>
-          <li>9. Internal behavior: counting, backoff, and sampling</li>
-          <li>10. Worked examples</li>
-          <li>11. Practical advice and caveats</li>
+          <li>8. Result, state, and persistence shapes</li>
+          <li>9. Dialogue mode</li>
+          <li>10. Internal behavior: counting, backoff, and sampling</li>
+          <li>11. Worked examples</li>
+          <li>12. Practical advice and caveats</li>
         </ul>
       </div>
     </section>
@@ -290,11 +291,17 @@ ng = pkg.ngram;</code></div>
 
       <p>Public functions:</p>
       <div class="prop"><span class="name">ngram.defaultConfig()</span>Returns the base configuration object.</div>
+      <div class="prop"><span class="name">ngram.defaultDialogueConfig()</span>Returns the baseline dialogue configuration with role markers and a dialogue stop token.</div>
       <div class="prop"><span class="name">ngram.sequence(value, config)</span>Turns input into a sequence array according to the mode.</div>
       <div class="prop"><span class="name">ngram.train(data, order, config)</span>Builds a trained model from sequence examples.</div>
       <div class="prop"><span class="name">ngram.predictNext(model, history, limit)</span>Returns ranked next-item candidates for a history.</div>
       <div class="prop"><span class="name">ngram.generate(model, start, options)</span>Generates a continuation from a starting sequence.</div>
+      <div class="prop"><span class="name">ngram.resume(model, state, input, options)</span>Convenience wrapper for continuing generation from a saved state object.</div>
       <div class="prop"><span class="name">ngram.render(sequenceValues, config)</span>Converts a sequence array back into output form, mainly for text modes.</div>
+      <div class="prop"><span class="name">ngram.saveModel(model, path)</span>Saves a trained model to disk using the same compressed-value style used elsewhere in the repo.</div>
+      <div class="prop"><span class="name">ngram.loadModel(path)</span>Loads a previously saved model from disk.</div>
+      <div class="prop"><span class="name">ngram.trainDialogue(conversations, order, config)</span>Builds a dialogue-oriented n-gram model with explicit user/assistant turn markers.</div>
+      <div class="prop"><span class="name">ngram.reply(model, userText, state, options)</span>Runs one user turn against a dialogue model and returns only the assistant side plus updated dialogue state.</div>
     </section>
 
     <section class="section">
@@ -338,7 +345,12 @@ ng = pkg.ngram;</code></div>
       <div class="code"><code>cfg = ng.defaultConfig();</code></div>
       <p><strong>Typical use:</strong> inspect available fields, copy them, then override only what you need.</p>
 
-      <h3>5.2 sequence(value, config)</h3>
+      <h3>5.2 defaultDialogueConfig()</h3>
+      <p><strong>What it does:</strong> returns the baseline configuration for dialogue training and dialogue replies.</p>
+      <div class="code"><code>dcfg = ng.defaultDialogueConfig();</code></div>
+      <p>This configuration is separate because dialogue mode has extra concepts that plain sequence generation does not need: user markers, assistant markers, and turn stop markers.</p>
+
+      <h3>5.3 sequence(value, config)</h3>
       <p><strong>What it does:</strong> normalizes one input into an array sequence.</p>
       <p><strong>Why it matters:</strong> the model always trains and predicts on arrays internally. This helper defines how strings or arrays become that internal sequence.</p>
 
@@ -359,7 +371,7 @@ ng.sequence([1, 2, 3], {unit: "items"});
         <li>If the value is a non-string scalar, it becomes a one-item array.</li>
       </ul>
 
-      <h3>5.3 train(data, order, config)</h3>
+      <h3>5.4 train(data, order, config)</h3>
       <p><strong>What it does:</strong> builds a model by counting how often each context is followed by each next item.</p>
 
       <div class="code"><code>model = ng.train(
@@ -382,7 +394,7 @@ ng.sequence([1, 2, 3], {unit: "items"});
         <li><code>[first, second] -&gt; third item</code></li>
       </ul>
 
-      <h3>5.4 predictNext(model, history, limit)</h3>
+      <h3>5.5 predictNext(model, history, limit)</h3>
       <p><strong>What it does:</strong> returns the observed next-item choices for a given history, ranked by count.</p>
 
       <div class="code"><code>rows = ng.predictNext(model, [1, 2], 5);</code></div>
@@ -399,7 +411,7 @@ ng.sequence([1, 2, 3], {unit: "items"});
         <strong>Backoff behavior:</strong> if the model cannot match the full context, it tries a shorter one. For example, if order is 3 and history is <code>[9,1,2]</code>, but only <code>[1,2]</code> is known, the model uses <code>[1,2]</code>.
       </div>
 
-      <h3>5.5 generate(model, start, options)</h3>
+      <h3>5.6 generate(model, start, options)</h3>
       <p><strong>What it does:</strong> generates one continuation path by repeatedly predicting the next item and sampling from the candidate probabilities.</p>
 
       <div class="code"><code>result = ng.generate(model, "ab", {maxSteps: 5, seed: 7});</code></div>
@@ -414,8 +426,15 @@ ng.sequence([1, 2, 3], {unit: "items"});
       </ol>
 
       <p><strong>Stop behavior:</strong> if the chosen next value equals the model stop token, generation ends and the stop token is <em>not</em> appended to the visible returned sequence.</p>
+      <p><strong>State behavior:</strong> the returned state object does preserve the stop marker internally. That is important when you want later calls to continue after a turn boundary instead of pretending the stop never happened.</p>
 
-      <h3>5.6 render(sequenceValues, config)</h3>
+      <h3>5.7 resume(model, state, input, options)</h3>
+      <p><strong>What it does:</strong> calls <code>generate(...)</code> with a prior state object already attached.</p>
+      <div class="code"><code>first = ng.generate(model, "hello", {maxSteps: 4});
+next = ng.resume(model, first.state, "how", {maxSteps: 4});</code></div>
+      <p>Use this when you want explicit multi-step continuation and you do not want to manually reattach the prior state object yourself.</p>
+
+      <h3>5.8 render(sequenceValues, config)</h3>
       <p><strong>What it does:</strong> converts an internal sequence array back into output form.</p>
 
       <div class="code"><code>ng.render(["h", "e", "l", "l", "o"], {unit: "chars"});
@@ -428,12 +447,46 @@ ng.render([1, 2, 3], {unit: "items"});
 // [1, 2, 3]</code></div>
 
       <p>For text modes this is the function that turns arrays back into strings. For item mode it returns an array copy.</p>
+
+      <h3>5.9 saveModel(model, path)</h3>
+      <p><strong>What it does:</strong> serializes a trained model to disk.</p>
+      <div class="code"><code>saved = ng.saveModel(model, "./tmp/ngram_model.bin");
+printline(saved.kind);   // ngram.model</code></div>
+      <p>The file format stores a wrapped object with a model kind, a version number, the model payload, and a small metadata summary.</p>
+
+      <h3>5.10 loadModel(path)</h3>
+      <p><strong>What it does:</strong> restores a model saved by <code>saveModel(...)</code>.</p>
+      <div class="code"><code>restored = ng.loadModel("./tmp/ngram_model.bin");
+rows = ng.predictNext(restored, "poodles are", 5);</code></div>
+
+      <h3>5.11 trainDialogue(conversations, order, config)</h3>
+      <p><strong>What it does:</strong> builds a dialogue-oriented model with explicit role boundaries.</p>
+      <div class="code"><code>dialogues = [
+  [
+    {user: "hello there", assistant: "how are you"},
+    {user: "not great", assistant: "sorry to hear that"}
+  ]
+];
+
+model = ng.trainDialogue(dialogues, 3, {seed: 17});</code></div>
+      <p>This is different from plain <code>train(...)</code>. Dialogue training inserts special markers such as <code>&lt;U&gt;</code>, <code>&lt;A&gt;</code>, and <code>&lt;STOP&gt;</code> so the model knows when one side is speaking and when a turn has ended.</p>
+
+      <h3>5.12 reply(model, userText, state, options)</h3>
+      <p><strong>What it does:</strong> generates only the assistant turn for a dialogue model.</p>
+      <div class="code"><code>first = ng.reply(model, "hello there", null, {maxSteps: 6, seed: 17});
+second = ng.reply(model, "not great", first.state, {maxSteps: 6});</code></div>
+      <p>Use <code>reply(...)</code> when you want turn-based conversation behavior. This is the API that matches: user says something, model answers, then the next user turn starts after a boundary marker rather than continuing the previous assistant text literally.</p>
     </section>
 
     <section class="section">
       <h2>6. Config and Option Fields</h2>
-      <p>The module uses the same general config shape for training helpers and generation helpers. Not every field affects every function, but the full set is small and easy to inspect.</p>
+      <p>The module now has two related config families:</p>
+      <ul>
+        <li>plain sequence config for <code>train</code>, <code>predictNext</code>, and <code>generate</code></li>
+        <li>dialogue config for <code>trainDialogue</code> and <code>reply</code></li>
+      </ul>
 
+      <h3>6.1 Plain Sequence Config</h3>
       <table>
         <tr>
           <th>Field</th>
@@ -480,9 +533,63 @@ ng.render([1, 2, 3], {unit: "items"});
           <td><code>32</code> in <code>generate()</code></td>
           <td>Maximum number of generation steps before stopping with reason <code>"max_steps"</code>.</td>
         </tr>
+        <tr>
+          <td><code>state</code></td>
+          <td>none</td>
+          <td>Optional continuation state returned by a previous <code>generate(...)</code> call.</td>
+        </tr>
       </table>
 
-      <h3>6.1 Training-Time vs Generation-Time Use</h3>
+      <h3>6.2 Dialogue Config</h3>
+      <table>
+        <tr>
+          <th>Field</th>
+          <th>Default</th>
+          <th>Meaning</th>
+        </tr>
+        <tr>
+          <td><code>order</code></td>
+          <td><code>2</code></td>
+          <td>Dialogue context length. In practice, larger values are often needed than in flat text because role markers and multi-token turns consume context slots.</td>
+        </tr>
+        <tr>
+          <td><code>unit</code></td>
+          <td><code>"tokens"</code></td>
+          <td>Dialogue mode is token-based.</td>
+        </tr>
+        <tr>
+          <td><code>lowercase</code></td>
+          <td><code>true</code></td>
+          <td>Lowercases dialogue text before tokenization.</td>
+        </tr>
+        <tr>
+          <td><code>separator</code></td>
+          <td><code>" "</code></td>
+          <td>Used when assistant reply tokens are rendered back into text.</td>
+        </tr>
+        <tr>
+          <td><code>userToken</code></td>
+          <td><code>"&lt;U&gt;"</code></td>
+          <td>Inserted before each user turn.</td>
+        </tr>
+        <tr>
+          <td><code>assistantToken</code></td>
+          <td><code>"&lt;A&gt;"</code></td>
+          <td>Inserted before each assistant turn.</td>
+        </tr>
+        <tr>
+          <td><code>stopToken</code></td>
+          <td><code>"&lt;STOP&gt;"</code></td>
+          <td>Marks the end of one assistant turn.</td>
+        </tr>
+        <tr>
+          <td><code>seed</code></td>
+          <td><code>42</code></td>
+          <td>Deterministic seed for dialogue reply generation.</td>
+        </tr>
+      </table>
+
+      <h3>6.3 Training-Time vs Generation-Time Use</h3>
       <p>Some fields matter mostly during training:</p>
       <ul>
         <li><code>order</code></li>
@@ -497,6 +604,7 @@ ng.render([1, 2, 3], {unit: "items"});
         <li><code>seed</code></li>
         <li><code>maxSteps</code></li>
         <li><code>separator</code> when rendering token-mode text</li>
+        <li><code>state</code> when continuing from a prior generation</li>
       </ul>
     </section>
 
@@ -557,7 +665,7 @@ ng.render([1, 2, 3], {unit: "items"});
     </section>
 
     <section class="section">
-      <h2>8. Prediction and Generation Result Shapes</h2>
+      <h2>8. Result, State, and Persistence Shapes</h2>
 
       <h3>8.1 predictNext() Rows</h3>
       <p><code>predictNext()</code> returns an array of rows like this:</p>
@@ -584,6 +692,7 @@ ng.render([1, 2, 3], {unit: "items"});
   terminated: true,
   reason: "stop_token",
   seed: 642666333,
+  state: {...},
   steps: [
     {context: ["a","b"], order: 2, value: "c", probability: 0.5},
     {context: ["b","c"], order: 2, value: "a", probability: 1}
@@ -596,13 +705,91 @@ ng.render([1, 2, 3], {unit: "items"});
       <div class="prop"><span class="name">terminated</span>True only when generation stopped because the configured stop token was selected.</div>
       <div class="prop"><span class="name">reason</span>Why generation stopped. One of <code>"stop_token"</code>, <code>"no_transition"</code>, or <code>"max_steps"</code>.</div>
       <div class="prop"><span class="name">seed</span>The updated pseudo-random seed after generation finished.</div>
+      <div class="prop"><span class="name">state</span>Serializable continuation object for a future <code>generate(..., {state: ...})</code> or <code>resume(...)</code> call.</div>
       <div class="prop"><span class="name">steps</span>Per-step log of chosen values and matched contexts.</div>
+
+      <h3>8.3 generate() State Object</h3>
+      <div class="code"><code>{
+  kind: "ngram.state",
+  version: 1,
+  history: ["hello", "there", "stop"],
+  seed: 123456,
+  stopped: true,
+  reason: "stop_token",
+  order: 1,
+  unit: "tokens",
+  stopToken: "stop"
+}</code></div>
+      <p>This state object stores the internal history, not just the visible output. That is why the stop token appears in <code>history</code> even though it is not shown in <code>rendered</code>.</p>
+
+      <h3>8.4 saveModel() Result</h3>
+      <div class="code"><code>{
+  path: "./tmp/ngram_model.bin",
+  saved: true,
+  kind: "ngram.model",
+  version: 1,
+  metadata: {
+    order: 2,
+    unit: "tokens",
+    sequences: 3,
+    observations: 12,
+    contexts: 9,
+    vocabularySize: 6
+  }
+}</code></div>
+
+      <h3>8.5 reply() Result</h3>
+      <div class="code"><code>{
+  input: "not great",
+  tokens: ["sorry", "to", "hear", "that"],
+  rendered: "sorry to hear that",
+  reason: "stop_token",
+  terminated: true,
+  seed: 123456,
+  steps: [...],
+  state: {
+    kind: "ngram.dialogue.state",
+    history: ["&lt;U&gt;", "hello", "there", "&lt;A&gt;", ...],
+    ...
+  }
+}</code></div>
+      <p>The key distinction is that <code>reply(...)</code> returns only the assistant turn as visible text, while the state keeps the full encoded dialogue history.</p>
     </section>
 
     <section class="section">
-      <h2>9. Internal Behavior: Counting, Backoff, and Sampling</h2>
+      <h2>9. Dialogue Mode</h2>
+      <p>Dialogue mode is the right tool when your next user message should start a new turn rather than continue the assistant text literally.</p>
 
-      <h3>9.1 Counting During Training</h3>
+      <h3>9.1 Why Plain Continuation Is Not Enough</h3>
+      <p>Suppose you trained a plain token model on:</p>
+      <div class="code"><code>hello there -> how are you
+not great -> sorry to hear that</code></div>
+      <p>If you simply append all turns into one flat stream, a later user input like <code>not great</code> may be interpreted as if it must continue the last assistant text exactly. That is not how dialogue works.</p>
+
+      <h3>9.2 Dialogue Encoding</h3>
+      <p>Dialogue mode solves that by training on an encoded token stream such as:</p>
+      <div class="code"><code>&lt;U&gt; hello there &lt;A&gt; how are you &lt;STOP&gt;
+&lt;U&gt; not great &lt;A&gt; sorry to hear that &lt;STOP&gt;</code></div>
+      <p>This tells the model:</p>
+      <ul>
+        <li>who is speaking</li>
+        <li>where the assistant turn starts</li>
+        <li>where the turn ends</li>
+      </ul>
+
+      <h3>9.3 Mixed Dialogue Items</h3>
+      <p>The dialogue helpers are string/token oriented, but the core model still supports mixed items. If you want fully custom mixed-item dialogue, you can always encode role markers yourself and train with <code>unit: "items"</code>.</p>
+      <div class="code"><code>[
+  "&lt;U&gt;", "temp", 25, "status", "high",
+  "&lt;A&gt;", "warning",
+  "&lt;STOP&gt;"
+]</code></div>
+    </section>
+
+    <section class="section">
+      <h2>10. Internal Behavior: Counting, Backoff, and Sampling</h2>
+
+      <h3>10.1 Counting During Training</h3>
       <p>For each position in a training sequence, the model records one observation:</p>
       <div class="formula">context -&gt; next_value</div>
 
@@ -621,7 +808,7 @@ ng.render([1, 2, 3], {unit: "items"});
         <li><code>[2,3] -&gt; stopToken</code></li>
       </ul>
 
-      <h3>9.2 Backoff During Prediction</h3>
+      <h3>10.2 Backoff During Prediction</h3>
       <p>The model tries to match the longest possible suffix of the provided history.</p>
 
       <div class="code"><code>history = [9, 1, 2]
@@ -637,13 +824,13 @@ order   = 3</code></div>
 
       <p>This is useful because generation would otherwise stop too early whenever the exact longest context was unseen.</p>
 
-      <h3>9.3 Probability Calculation</h3>
+      <h3>10.3 Probability Calculation</h3>
       <p>Inside one matched context bucket, probabilities are simple empirical frequencies:</p>
       <div class="formula">probability(next) = count(next after context) / total observations for that context</div>
 
       <p>No smoothing is currently applied. That means an unseen continuation has probability 0.</p>
 
-      <h3>9.4 Sampling During Generation</h3>
+      <h3>10.4 Sampling During Generation</h3>
       <p>The package uses a small deterministic pseudo-random generator. Given the same seed and model, generation is reproducible.</p>
       <p>Sampling works like this:</p>
       <ul>
@@ -659,9 +846,10 @@ order   = 3</code></div>
     </section>
 
     <section class="section">
-      <h2>10. Worked Examples</h2>
+      <h2>11. Worked Examples</h2>
+      <p>The repo now includes a larger set of runnable scripts in <code>ngram/examples/</code>. The short examples below explain the main patterns and which example file to look at.</p>
 
-      <h3>10.1 Next Number Prediction</h3>
+      <h3>11.1 Next Number Prediction</h3>
       <div class="code"><code>pkg = import("./ngram.ns");
 ng = pkg.ngram;
 
@@ -675,7 +863,7 @@ rows = ng.predictNext(model, [1, 2], 5);
 printline(rows[0].value);        // 3
 printline(rows[0].probability);  // 0.666667 roughly</code></div>
 
-      <h3>10.2 Character Generation</h3>
+      <h3>11.2 Character Generation</h3>
       <div class="code"><code>charModel = ng.train(
   ["abba", "abca"],
   2,
@@ -685,7 +873,7 @@ printline(rows[0].probability);  // 0.666667 roughly</code></div>
 result = ng.generate(charModel, "ab", {maxSteps: 5, seed: 7});
 printline(result.rendered);   // "abba" or "abca" depending on path</code></div>
 
-      <h3>10.3 Token Generation</h3>
+      <h3>11.3 Token Generation</h3>
       <div class="code"><code>tokenModel = ng.train(
   ["the cat sat stop", "the cat slept stop", "the dog ran stop"],
   1,
@@ -695,7 +883,7 @@ printline(result.rendered);   // "abba" or "abca" depending on path</code></div>
 result = ng.generate(tokenModel, "the cat", {maxSteps: 4, seed: 9});
 printline(result.rendered);   // for example: "the cat slept"</code></div>
 
-      <h3>10.4 Lowercasing Text</h3>
+      <h3>11.4 Lowercasing Text</h3>
       <div class="code"><code>model = ng.train(
   ["Hello world", "hello there"],
   1,
@@ -703,7 +891,7 @@ printline(result.rendered);   // for example: "the cat slept"</code></div>
 );</code></div>
       <p>This causes <code>Hello</code> and <code>hello</code> to be treated as the same token.</p>
 
-      <h3>10.5 Inspecting the Learned Next Choices</h3>
+      <h3>11.5 Inspecting the Learned Next Choices</h3>
       <div class="code"><code>model = ng.train(
   [[10, 20, 30], [10, 20, 40], [10, 20, 30], [10, 50, 60]],
   2,
@@ -722,7 +910,7 @@ for (i = 0; i < rows.count(); i = i + 1) {
 }</code></div>
       <p>This is a good first debugging pattern. It shows exactly what the model thinks can come next, how often each continuation was seen, and which context length actually matched.</p>
 
-      <h3>10.6 Backoff to a Shorter Known Context</h3>
+      <h3>11.6 Backoff to a Shorter Known Context</h3>
       <div class="code"><code>model = ng.train(
   [[1, 2, 3], [1, 2, 4]],
   3,
@@ -736,7 +924,7 @@ printline("matched context = ", stringify(rows[0].context));
 printline("top next = ", rows[0].value);</code></div>
       <p>Even though the full history is <code>[9,1,2]</code>, the model may only know the suffix <code>[1,2]</code>. In that case it backs off and still returns a useful answer instead of failing immediately.</p>
 
-      <h3>10.7 Numeric Generation With a Stop Value</h3>
+      <h3>11.7 Numeric Generation With a Stop Value</h3>
       <div class="code"><code>model = ng.train(
   [
     [2, 4, 6, -1],
@@ -754,7 +942,7 @@ printline("reason = ", result.reason);
 printline("terminated = ", result.terminated);</code></div>
       <p>This shows that stop tokens do not need to be strings. A numeric sentinel like <code>-1</code> can mark sequence termination too.</p>
 
-      <h3>10.8 Token Prediction for Phrase Completion</h3>
+      <h3>11.8 Token Prediction for Phrase Completion</h3>
       <div class="code"><code>model = ng.train(
   [
     "machine learning model stop",
@@ -772,7 +960,7 @@ for (i = 0; i < rows.count(); i = i + 1) {
 }</code></div>
       <p>This pattern is useful when you do not want full generation yet. You just want to inspect the model’s ranked next-word suggestions after a phrase.</p>
 
-      <h3>10.9 Reading Generation Steps</h3>
+      <h3>11.9 Reading Generation Steps</h3>
       <div class="code"><code>model = ng.train(
   ["abba", "abca"],
   2,
@@ -791,7 +979,7 @@ for (i = 0; i < result.steps.count(); i = i + 1) {
 }</code></div>
       <p>The <code>steps</code> array is useful when you want to explain why a generated sequence took a particular path.</p>
 
-      <h3>10.10 Generating Until No Transition Exists</h3>
+      <h3>11.10 Generating Until No Transition Exists</h3>
       <div class="code"><code>model = ng.train(
   [[1, 2, 3]],
   2,
@@ -804,7 +992,7 @@ printline("sequence = ", stringify(result.sequence));
 printline("reason = ", result.reason);   // likely "no_transition"</code></div>
       <p>If there is no stop token and no further continuation is known, generation ends with reason <code>"no_transition"</code>.</p>
 
-      <h3>10.11 Using sequence() and render() Directly</h3>
+      <h3>11.11 Using sequence() and render() Directly</h3>
       <div class="code"><code>chars = ng.sequence("Nova", {unit: "chars"});
 tokens = ng.sequence("Nova learns fast", {unit: "tokens"});
 
@@ -814,7 +1002,7 @@ printline(ng.render(chars, {unit: "chars"}));
 printline(ng.render(tokens, {unit: "tokens", separator: " "}));</code></div>
       <p>These helpers are useful when you want to inspect exactly how the module sees your inputs before training.</p>
 
-      <h3>10.12 Starting From an Empty Sequence</h3>
+      <h3>11.12 Starting From an Empty Sequence</h3>
       <div class="code"><code>model = ng.train(
   [
     "red blue stop",
@@ -828,32 +1016,83 @@ printline(ng.render(tokens, {unit: "tokens", separator: " "}));</code></div>
 result = ng.generate(model, "", {maxSteps: 4, seed: 4});
 printline(result.rendered);</code></div>
       <p>Because the model learns empty-context starts too, generation can begin from nothing. In effect, it asks: "what items usually begin sequences in this training set?"</p>
+
+      <h3>11.13 Saving Then Loading a Model</h3>
+      <div class="code"><code>model = ng.train(
+  ["poodles are dogs", "cats are animals", "dogs are animals"],
+  2,
+  {unit: "tokens", lowercase: true, stopToken: "&lt;END&gt;"}
+);
+
+ng.saveModel(model, "./tmp/ngram_model.bin");
+restored = ng.loadModel("./tmp/ngram_model.bin");
+
+rows = ng.predictNext(restored, "poodles are", 5);</code></div>
+      <p>See the runnable scripts <code>examples/save_model.ns</code> and <code>examples/load_and_query_model.ns</code>.</p>
+
+      <h3>11.14 Stateful Continuation</h3>
+      <div class="code"><code>first = ng.generate(model, "hello", {maxSteps: 4});
+second = ng.generate(model, "how", {state: first.state, maxSteps: 4});
+third = ng.resume(model, second.state, "hello", {maxSteps: 4});</code></div>
+      <p>This is plain sequence continuation. It is useful when the next input really should continue the same internal stream. See <code>examples/stateful_continuation.ns</code>.</p>
+
+      <h3>11.15 Dialogue Reply</h3>
+      <div class="code"><code>dialogues = [
+  [
+    {user: "hello there", assistant: "how are you"},
+    {user: "not great", assistant: "sorry to hear that"}
+  ],
+  [
+    {user: "hello there", assistant: "how are you"},
+    {user: "i am great", assistant: "that is good"}
+  ]
+];
+
+model = ng.trainDialogue(dialogues, 3, {seed: 17});
+first = ng.reply(model, "hello there", null, {maxSteps: 6, seed: 17});
+second = ng.reply(model, "not great", first.state, {maxSteps: 6});</code></div>
+      <p>This is the turn-based API. It is the right choice when each new user message should start after a dialogue boundary instead of continuing the previous assistant text literally. See <code>examples/dialogue_reply.ns</code>.</p>
+
+      <h3>11.16 Embedding-Assisted Token Prediction</h3>
+      <div class="code"><code>// Build token embeddings from a small corpus, train ngram on embedding sequences,
+// then resolve the predicted embedding back to the nearest token.</code></div>
+      <p>See <code>examples/embedding_token_prediction.ns</code>. This is mainly a hybrid demonstration of how <code>ngram</code> can be paired with the repo’s embedding module.</p>
     </section>
 
     <section class="section">
-      <h2>11. Practical Advice and Caveats</h2>
+      <h2>12. Practical Advice and Caveats</h2>
 
-      <h3>11.1 Choosing the Order</h3>
+      <h3>12.1 Choosing the Order</h3>
       <ul>
         <li>Use smaller orders like 1 or 2 when training data is limited.</li>
         <li>Use larger orders when you want more local structure and have enough repeated data.</li>
         <li>If order is too large relative to the data, exact contexts become sparse and the model falls back often.</li>
       </ul>
+      <p>For dialogue models, role markers and multi-token turns consume context positions. That often means dialogue examples need a slightly larger order than flat text examples.</p>
 
-      <h3>11.2 Stop Tokens</h3>
+      <h3>12.2 Stop Tokens</h3>
       <ul>
         <li>Use a stop token when you want generation to know where sequences end.</li>
         <li>For text, a synthetic token like <code>"&lt;END&gt;"</code> is often convenient in char mode.</li>
         <li>For token mode, a word like <code>"stop"</code> works if it is not confused with regular content.</li>
       </ul>
+      <p>In dialogue mode, the default stop marker is <code>&lt;STOP&gt;</code> and it marks the end of one assistant turn.</p>
 
-      <h3>11.3 No Smoothing</h3>
+      <h3>12.3 No Smoothing</h3>
       <p>This implementation does not invent probability mass for unseen next items. If the model never saw a continuation, it cannot predict it. That keeps the behavior simple and transparent.</p>
 
-      <h3>11.4 Tokenization Is Simple</h3>
+      <h3>12.4 Tokenization Is Simple</h3>
       <p>The token-mode splitter is intentionally lightweight. It is useful for small demos and straightforward corpora, but it is not a full natural-language tokenizer.</p>
 
-      <h3>11.5 What This Model Cannot Do</h3>
+      <h3>12.5 Continuation vs Dialogue</h3>
+      <p>There are now two different continuation ideas in this package:</p>
+      <ul>
+        <li><strong>Plain stateful continuation:</strong> continue one sequence stream with <code>generate(..., {state: ...})</code> or <code>resume(...)</code>.</li>
+        <li><strong>Dialogue continuation:</strong> continue a turn-based interaction with <code>reply(...)</code>.</li>
+      </ul>
+      <p>If the next input should behave like a new user turn, prefer dialogue mode. If it should literally continue the same stream, use plain continuation.</p>
+
+      <h3>12.6 What This Model Cannot Do</h3>
       <ul>
         <li>It cannot reason about long-range meaning.</li>
         <li>It cannot generalize beyond observed local patterns the way large language models do.</li>
@@ -864,10 +1103,24 @@ printline(result.rendered);</code></div>
         <strong>Best mental model:</strong> this package is a compact, inspectable sequence memory. It remembers what followed what, and then plays those probabilities back during prediction and generation.
       </div>
 
-      <h3>11.6 Running the Package</h3>
+      <h3>12.7 Running the Package</h3>
       <div class="code"><code>../../ns/bin/ns tests/run_tests.ns
 ../../ns/bin/ns examples/demo.ns</code></div>
-      <p>Those commands assume you are running them from inside the <code>ngram/</code> directory.</p>
+      <p>Those commands assume you are running them from inside the <code>ngram/</code> directory. For the full current example set, also see:</p>
+      <ul>
+        <li><code>examples/next_number_prediction.ns</code></li>
+        <li><code>examples/backoff_prediction.ns</code></li>
+        <li><code>examples/numeric_generation.ns</code></li>
+        <li><code>examples/token_phrase_completion.ns</code></li>
+        <li><code>examples/generation_steps.ns</code></li>
+        <li><code>examples/sequence_and_render.ns</code></li>
+        <li><code>examples/empty_start_generation.ns</code></li>
+        <li><code>examples/embedding_token_prediction.ns</code></li>
+        <li><code>examples/save_model.ns</code></li>
+        <li><code>examples/load_and_query_model.ns</code></li>
+        <li><code>examples/stateful_continuation.ns</code></li>
+        <li><code>examples/dialogue_reply.ns</code></li>
+      </ul>
     </section>
   </div>
 </body>

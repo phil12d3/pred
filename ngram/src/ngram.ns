@@ -740,3 +740,47 @@ loadModel = func(path) {
     }
     return wrapped;
 }
+
+saveState = func(state, path) {
+    if (!defined(state) || state == null) throw("ngram.saveState requires a state object");
+    this.ensureParentDirectory(path);
+
+    stateKind = defined(state.kind) ? state.kind : "ngram.state";
+    wrapped = {
+        kind: "ngram.saved_state",
+        version: 1,
+        payload: state,
+        metadata: {
+            stateKind: stateKind,
+            stopped: defined(state.stopped) ? state.stopped : false,
+            reason: defined(state.reason) ? state.reason : "",
+            order: defined(state.order) ? state.order : 0,
+            unit: defined(state.unit) ? state.unit : "",
+            historyCount: defined(state.history) ? state.history.count() : 0
+        }
+    };
+
+    compress_to_file(wrapped, path);
+    return {
+        path: path,
+        saved: true,
+        kind: wrapped.kind,
+        version: wrapped.version,
+        metadata: wrapped.metadata
+    };
+}
+
+loadState = func(path) {
+    wrapped = decompress_from_file(path);
+    if (!defined(wrapped) || wrapped == null) throw("ngram.loadState could not load state from " + this.asText(path));
+    if (defined(wrapped.kind) && wrapped.kind == "ngram.saved_state") {
+        if (!defined(wrapped.version) || wrapped.version != 1) {
+            throw("ngram.loadState does not support saved state version " + stringify(wrapped.version));
+        }
+        if (!defined(wrapped.payload) || wrapped.payload == null) {
+            throw("ngram.loadState found no payload in " + this.asText(path));
+        }
+        return wrapped.payload;
+    }
+    return wrapped;
+}

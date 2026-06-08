@@ -103,3 +103,41 @@ dialogue_reply_uses_turn_boundaries_instead_of_raw_stream_continuation = func(t)
     t.equal(second.rendered, "sorry to hear that", "next user turn is interpreted after dialogue markers, not as raw token continuation");
     t.equal(second.reason, "stop_token", "dialogue replies still terminate on the stop token");
 };
+
+[test]
+plain_and_dialogue_states_can_be_saved_and_loaded = func(t) {
+    pkg = import("./ngram.ns");
+
+    plainModel = pkg.ngram.train(
+        ["red blue stop", "red green stop"],
+        1,
+        {unit: "tokens", stopToken: "stop", separator: " ", seed: 9}
+    );
+    plainResult = pkg.ngram.generate(plainModel, "red", {maxSteps: 4, seed: 9});
+    plainPath = "./tmp/plain_state.bin";
+    plainSaved = pkg.ngram.saveState(plainResult.state, plainPath);
+    plainRestored = pkg.ngram.loadState(plainPath);
+
+    dialogueModel = pkg.ngram.trainDialogue(
+        [
+            [
+                {user: "hello there", assistant: "how are you"},
+                {user: "not great", assistant: "sorry to hear that"}
+            ]
+        ],
+        3,
+        {seed: 17}
+    );
+    dialogueResult = pkg.ngram.reply(dialogueModel, "hello there", null, {maxSteps: 6, seed: 17});
+    dialoguePath = "./tmp/dialogue_state.bin";
+    dialogueSaved = pkg.ngram.saveState(dialogueResult.state, dialoguePath);
+    dialogueRestored = pkg.ngram.loadState(dialoguePath);
+    resumedDialogue = pkg.ngram.reply(dialogueModel, "not great", dialogueRestored, {maxSteps: 6});
+
+    t.equal(plainSaved.kind, "ngram.saved_state", "saveState wraps plain continuation state");
+    t.equal(plainRestored.kind, "ngram.state", "loadState restores plain continuation state");
+    t.equal(plainRestored.history[plainRestored.history.count() - 1], "stop", "plain restored state preserves internal stop marker");
+    t.equal(dialogueSaved.kind, "ngram.saved_state", "saveState wraps dialogue state");
+    t.equal(dialogueRestored.kind, "ngram.dialogue.state", "loadState restores dialogue state");
+    t.equal(resumedDialogue.rendered, "sorry to hear that", "restored dialogue state can continue a later reply");
+};
