@@ -1,0 +1,28 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+dialogues = [
+    [
+        {user: "hello there", assistant: "how are you"},
+        {user: "not great", assistant: "sorry to hear that"}
+    ],
+    [
+        {user: "hello there", assistant: "how are you"},
+        {user: "i am great", assistant: "that is good"}
+    ]
+];
+
+model = ng.trainDialogue(dialogues, 3, {seed: 17});
+
+first = ng.reply(model, "hello there", null, {maxSteps: 6, seed: 17});
+second = ng.reply(model, "not great", first.state, {maxSteps: 6});
+
+printline("=== Dialogue Reply ===");
+printline("user: hello there");
+printline("assistant: ", first.rendered);
+printline("");
+printline("user: not great");
+printline("assistant: ", second.rendered);
+printline("");
+printline("Encoded dialogue history:");
+printline("  ", stringify(second.state.history));

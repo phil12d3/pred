@@ -1,0 +1,26 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+    [
+        "hello there stop",
+        "how are you stop",
+        "hello again stop"
+    ],
+    1,
+    {unit: "tokens", stopToken: "stop", separator: " ", seed: 11}
+);
+
+first = ng.generate(model, "hello", {maxSteps: 4, seed: 11});
+second = ng.generate(model, "how", {state: first.state, maxSteps: 4});
+third = ng.resume(model, second.state, "hello", {maxSteps: 4});
+
+printline("=== Stateful Continuation ===");
+printline("turn 1 -> ", first.rendered, " | reason=", first.reason);
+printline("turn 2 -> ", second.rendered, " | reason=", second.reason);
+printline("turn 3 -> ", third.rendered, " | reason=", third.reason);
+printline("");
+printline("Internal state after turn 3:");
+printline("  kind = ", third.state.kind);
+printline("  stopped = ", third.state.stopped);
+printline("  history = ", stringify(third.state.history));

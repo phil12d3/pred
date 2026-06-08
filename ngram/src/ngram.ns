@@ -10,6 +10,20 @@ defaultConfig = func() {
     };
 }
 
+defaultDialogueConfig = func() {
+    return {
+        order: 2,
+        unit: "tokens",
+        lowercase: true,
+        separator: " ",
+        userToken: "<U>",
+        assistantToken: "<A>",
+        stopToken: "<STOP>",
+        addStopToken: false,
+        seed: 42
+    };
+}
+
 copyArray = func(values) {
     out = [];
     if (!defined(values) || values == null) return out;
@@ -26,8 +40,17 @@ configWith = func(config) {
     return merged;
 }
 
+dialogueConfigWith = func(config) {
+    merged = this.defaultDialogueConfig();
+    if (defined(config) && config != null) {
+        foreach(name in config.props) merged[name] = config[name];
+    }
+    return merged;
+}
+
 asText = func(value) {
-    if (!defined(value) || value == null) return "";
+    if (!defined(value)) return "";
+    if (type(value).typename == "Null") return "";
     if (type(value).typename == "String") return value;
     return stringify(value);
 }
@@ -377,6 +400,99 @@ weightedChoice = func(rows, seed) {
     return {choice: rows[rows.count() - 1], seed: rnd.seed, random: cutoff};
 }
 
+stateFromResult = func(model, history, seed, reason, terminated) {
+    return {
+        kind: "ngram.state",
+        version: 1,
+        history: this.copyArray(history),
+        seed: seed,
+        stopped: terminated,
+        reason: reason,
+        order: model.order,
+        unit: model["unit"],
+        stopToken: model.stopToken
+    };
+}
+
+dialogueStateFromResult = func(model, history, seed, reason, terminated, config) {
+    settings = this.dialogueConfigWith(config);
+    return {
+        kind: "ngram.dialogue.state",
+        version: 1,
+        history: this.copyArray(history),
+        seed: seed,
+        stopped: terminated,
+        reason: reason,
+        order: model.order,
+        unit: model["unit"],
+        userToken: settings.userToken,
+        assistantToken: settings.assistantToken,
+        stopToken: settings.stopToken
+    };
+}
+
+appendArray = func(target, values) {
+    for (i = 0; i < values.count(); i = i + 1) target.add(values[i]);
+    return target;
+}
+
+dialoguePromptSequence = func(userText, config) {
+    settings = this.dialogueConfigWith(config);
+    tokens = this.sequence(userText, {
+        unit: "tokens",
+        lowercase: settings.lowercase,
+        separator: settings.separator
+    });
+    seq = [settings.userToken];
+    this.appendArray(seq, tokens);
+    seq.add(settings.assistantToken);
+    return seq;
+}
+
+dialogueConversationSequence = func(turns, config) {
+    settings = this.dialogueConfigWith(config);
+    seq = [];
+    if (!defined(turns) || turns == null) return seq;
+
+    for (i = 0; i < turns.count(); i = i + 1) {
+        turn = turns[i];
+        userText = defined(turn.user) ? turn.user : "";
+        assistantText = defined(turn.assistant) ? turn.assistant : "";
+
+        seq.add(settings.userToken);
+        this.appendArray(seq, this.sequence(userText, {
+            unit: "tokens",
+            lowercase: settings.lowercase,
+            separator: settings.separator
+        }));
+        seq.add(settings.assistantToken);
+        this.appendArray(seq, this.sequence(assistantText, {
+            unit: "tokens",
+            lowercase: settings.lowercase,
+            separator: settings.separator
+        }));
+        seq.add(settings.stopToken);
+    }
+
+    return seq;
+}
+
+dialogueTrainingSequences = func(conversations, config) {
+    rows = [];
+    settings = this.dialogueConfigWith(config);
+    if (!defined(conversations) || conversations == null) return rows;
+
+    if (type(conversations).typename == "Array") {
+        for (i = 0; i < conversations.count(); i = i + 1) {
+            rows.add(this.dialogueConversationSequence(conversations[i], settings));
+        }
+        return rows;
+    }
+
+    rows.add(this.dialogueConversationSequence(conversations, settings));
+    return rows;
+}
+
 render = func(sequenceValues, config) {
     settings = this.configWith(config);
     mode = this.asText(settings.itemMode);
@@ -410,15 +526,33 @@ generate = func(model, start, options) {
         foreach(name in options.props) settings[name] = options[name];
     }
 
-    history = this.sequence(start, settings);
-    sequenceValues = this.copyArray(history);
+    priorHistory = [];
+    stateValue = settings.state;
+    if (defined(stateValue)) {
+        if (stateValue != null) {
+            if (defined(stateValue.history)) {
+                priorHistory = this.copyArray(stateValue.history);
+            }
+        }
+    }
+
+    inputSequence = this.sequence(start, settings);
+    history = this.copyArray(priorHistory);
+    for (i = 0; i < inputSequence.count(); i = i + 1) history.add(inputSequence[i]);
+
+    sequenceValues = this.copyArray(inputSequence);
     seed = settings.seed;
+    if (defined(stateValue)) {
+        if (stateValue != null) {
+            if (defined(stateValue.seed)) seed = stateValue.seed;
+        }
+    }
     maxSteps = defined(settings.maxSteps) && settings.maxSteps > 0 ? settings.maxSteps : 32;
     reason = "max_steps";
     terminated = false;
     steps = [];
 
-    for (i = 0; i < maxSteps; i = i + 1) {
+    for (stepIndex = 0; stepIndex < maxSteps; stepIndex = stepIndex + 1) {
         predictions = this.predictNext(model, history, 0);
         if (predictions.count() == 0) {
             reason = "no_transition";
@@ -437,8 +571,9 @@ generate = func(model, start, options) {
 
         stopValue = model.stopToken;
         if (defined(stopValue)) {
-            if (stopValue != null) {
-                if (row.value == stopValue) {
+            if (type(stopValue).typename != "Null") {
+                if (this.tokenKey(row.value) == this.tokenKey(stopValue)) {
+                    history.add(row.value);
                     reason = "stop_token";
                     terminated = true;
                     break;
@@ -456,7 +591,112 @@ generate = func(model, start, options) {
         terminated: terminated,
         reason: reason,
         seed: seed,
-        steps: steps
+        steps: steps,
+        state: this.stateFromResult(model, history, seed, reason, terminated)
+    };
+}
+
+resume = func(model, state, input, options) {
+    nextOptions = {};
+    if (defined(options) && options != null) {
+        foreach(name in options.props) nextOptions[name] = options[name];
+    }
+    nextOptions.state = state;
+    return this.generate(model, input, nextOptions);
+}
+
+trainDialogue = func(conversations, order, config) {
+    settings = this.dialogueConfigWith(config);
+    rows = this.dialogueTrainingSequences(conversations, settings);
+    model = this.train(rows, defined(order) ? order : settings.order, {
+        unit: "items",
+        lowercase: false,
+        separator: settings.separator,
+        stopToken: settings.stopToken,
+        addStopToken: false,
+        seed: settings.seed
+    });
+    model.kind = "ngram.dialogue";
+    model.dialogue = {
+        userToken: settings.userToken,
+        assistantToken: settings.assistantToken,
+        stopToken: settings.stopToken,
+        separator: settings.separator,
+        lowercase: settings.lowercase
+    };
+    return model;
+}
+
+reply = func(model, userText, state, options) {
+    dialogueConfig = defined(model.dialogue) ? model.dialogue : {};
+    settings = this.dialogueConfigWith(dialogueConfig);
+    extra = defined(options) && options != null ? options : {};
+    prompt = this.dialoguePromptSequence(userText, settings);
+    priorHistory = [];
+    seed = settings.seed;
+    if (defined(state)) {
+        if (type(state).typename != "Null") {
+            if (defined(state.history)) priorHistory = this.copyArray(state.history);
+            if (defined(state.seed)) seed = state.seed;
+        }
+    }
+    if (defined(extra.seed)) seed = extra.seed;
+
+    history = this.copyArray(priorHistory);
+    this.appendArray(history, prompt);
+
+    answerTokens = [];
+    steps = [];
+    maxSteps = defined(extra.maxSteps) && extra.maxSteps > 0 ? extra.maxSteps : 32;
+    reason = "max_steps";
+    terminated = false;
+    stopKey = this.tokenKey(settings.stopToken);
+
+    for (stepIndex = 0; stepIndex < maxSteps; stepIndex = stepIndex + 1) {
+        predictions = this.predictNext(model, history, 0);
+        if (predictions.count() == 0) {
+            reason = "no_transition";
+            break;
+        }
+
+        chosen = this.weightedChoice(predictions, seed);
+        seed = chosen.seed;
+        row = chosen.choice;
+        steps.add({
+            context: this.copyArray(row.context),
+            order: row.order,
+            value: row.value,
+            probability: row.probability
+        });
+
+        if (this.tokenKey(row.value) == stopKey) {
+            history.add(row.value);
+            reason = "stop_token";
+            terminated = true;
+            break;
+        }
+
+        answerTokens.add(row.value);
+        history.add(row.value);
+    }
+
+    replyText = "";
+    joiner = defined(settings.separator) ? settings.separator : " ";
+    for (i = 0; i < answerTokens.count(); i = i + 1) {
+        if (i > 0) replyText = replyText + joiner;
+        replyText = replyText + this.asText(answerTokens[i]);
+    }
+    dialogueState = this.dialogueStateFromResult(model, history, seed, reason, terminated, settings);
+
+    return {
+        input: userText,
+        tokens: answerTokens,
+        rendered: replyText,
+        reason: reason,
+        terminated: terminated,
+        seed: seed,
+        steps: steps,
+        state: dialogueState
     };
 }
 

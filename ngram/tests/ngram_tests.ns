@@ -51,3 +51,55 @@ token_mode_supports_text_sequences = func(t) {
     t.equal(result.reason, "stop_token", "token mode generation respects the configured stop token");
     t.truthy(result.rendered == "red blue" || result.rendered == "red green", "render joins generated token sequences back into text");
 };
+
+[test]
+generate_returns_state_and_supports_continuation = func(t) {
+    pkg = import("./ngram.ns");
+    model = pkg.ngram.train(
+        [
+            "hello there stop",
+            "how are you stop"
+        ],
+        1,
+        {unit: "tokens", stopToken: "stop", separator: " ", seed: 11}
+    );
+
+    first = pkg.ngram.generate(model, "hello", {maxSteps: 4, seed: 11});
+    second = pkg.ngram.generate(model, "how", {state: first.state, maxSteps: 4});
+    third = pkg.ngram.resume(model, second.state, "hello", {maxSteps: 4});
+
+    t.equal(first.reason, "stop_token", "first turn stops on the configured stop token");
+    t.equal(first.state.kind, "ngram.state", "generate returns a serializable state object");
+    t.equal(first.state.stopped, true, "state records whether generation stopped on the stop token");
+    t.equal(first.state.history[first.state.history.count() - 1], "stop", "state history preserves the internal stop marker");
+    t.equal(second.rendered, "how are you", "continued generation renders only the new visible turn");
+    t.equal(second.reason, "stop_token", "continued generation can still terminate on the stop token");
+    t.equal(third.rendered, "hello there", "resume alias continues from prior state with a new prompt");
+};
+
+[test]
+dialogue_reply_uses_turn_boundaries_instead_of_raw_stream_continuation = func(t) {
+    pkg = import("./ngram.ns");
+    model = pkg.ngram.trainDialogue(
+        [
+            [
+                {user: "hello there", assistant: "how are you"},
+                {user: "not great", assistant: "sorry to hear that"}
+            ],
+            [
+                {user: "hello there", assistant: "how are you"},
+                {user: "i am great", assistant: "that is good"}
+            ]
+        ],
+        3,
+        {seed: 17}
+    );
+
+    first = pkg.ngram.reply(model, "hello there", null, {maxSteps: 6, seed: 17});
+    second = pkg.ngram.reply(model, "not great", first.state, {maxSteps: 6});
+
+    t.equal(first.rendered, "how are you", "reply generates only the assistant turn");
+    t.equal(first.state.kind, "ngram.dialogue.state", "reply returns dialogue-specific state");
+    t.equal(second.rendered, "sorry to hear that", "next user turn is interpreted after dialogue markers, not as raw token continuation");
+    t.equal(second.reason, "stop_token", "dialogue replies still terminate on the stop token");
+};
