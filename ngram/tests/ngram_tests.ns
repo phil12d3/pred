@@ -13,6 +13,124 @@ numeric_sequences_train_counts_and_probabilities = func(t) {
 };
 
 [test]
+kind_constants_expose_enum_like_strings = func(t) {
+    pkg = import("./ngram.ns");
+
+    t.equal(pkg.ngram.kind.text, "text", "kind.text exposes the text kind string");
+    t.equal(pkg.ngram.kind.numbers, "numbers", "kind.numbers exposes the numbers kind string");
+    t.equal(pkg.ngram.kind.dialogue, "dialogue", "kind.dialogue exposes the dialogue kind string");
+    t.equal(pkg.ngram.kind.items, "items", "kind.items exposes the items kind string");
+};
+
+[test]
+unified_train_and_infer_hide_low_level_routing = func(t) {
+    pkg = import("./ngram.ns");
+
+    textModel = pkg.ngram.train([
+        "poodles are dogs",
+        "dogs are animals"
+    ], null, {
+        order: 2,
+        lowercase: true,
+        seed: 21
+    });
+
+    textResult = pkg.ngram.infer(textModel, "poodles are", {maxSteps: 4, seed: 21});
+
+    dialogueModel = pkg.ngram.train([
+        ["hello there", "how are you", "not great", "sorry to hear that"]
+    ], null, {
+        order: 3,
+        lowercase: true,
+        seed: 17
+    });
+
+    first = pkg.ngram.infer(dialogueModel, "hello there", {maxSteps: 6, seed: 17});
+    second = pkg.ngram.infer(dialogueModel, "not great", {state: first.state, maxSteps: 6});
+
+    t.equal(textModel.kind, "ngram.unified", "train(config) builds the unified high-level model");
+    t.equal(textResult.output, "dogs", "infer returns text output without exposing generate or predictNext");
+    t.equal(first.output, "how are you", "infer can answer from turn-based text training data");
+    t.equal(second.output, "sorry to hear that", "infer can continue a later turn from saved state");
+};
+
+[test]
+unified_infer_supports_numeric_sequences = func(t) {
+    pkg = import("./ngram.ns");
+
+    model = pkg.ngram.train([
+        [1, 2, 3],
+        [1, 2, 4],
+        [1, 2, 3]
+    ], null, {
+        order: 2,
+        seed: 11
+    });
+
+    result = pkg.ngram.infer(model, [1, 2], {maxSteps: 2, seed: 11});
+
+    t.equal(result.output, 3, "infer returns the numeric continuation from the unified model");
+    t.equal(result.state.kind, "ngram.state", "infer still returns serializable continuation state");
+};
+
+[test]
+unified_model_can_train_text_numbers_and_turns_together = func(t) {
+    pkg = import("./ngram.ns");
+
+    model = pkg.ngram.train([
+        "poodles are dogs",
+        [1, 2, 3],
+        ["hello there", "how are you", "not great", "sorry to hear that"]
+    ], null, {
+        order: 3,
+        lowercase: true,
+        seed: 17
+    });
+
+    textResult = pkg.ngram.infer(model, "poodles are", {maxSteps: 4, seed: 17});
+    numberResult = pkg.ngram.infer(model, [1, 2], {maxSteps: 2, seed: 17});
+    firstTurn = pkg.ngram.infer(model, "hello there", {maxSteps: 6, seed: 17});
+    secondTurn = pkg.ngram.infer(model, "not great", {state: firstTurn.state, maxSteps: 6});
+
+    t.equal(model.kind, "ngram.unified", "mixed training data still builds one unified model");
+    t.equal(textResult.output, "dogs", "one unified model can answer text prompts");
+    t.equal(numberResult.output, 3, "one unified model can answer numeric prompts");
+    t.equal(firstTurn.output, "how are you", "one unified model can answer turn-based text prompts");
+    t.equal(secondTurn.output, "sorry to hear that", "one unified model can continue turn-based state");
+};
+
+[test]
+kinds_helper_moves_kind_dispatch_out_of_examples = func(t) {
+    pkg = import("./ngram.ns");
+
+    datasetModel = pkg.kinds.trainDataset([
+        {
+            kind: pkg.ngram.kind.text,
+            data: ["poodles are dogs", "dogs are animals"]
+        },
+        {
+            kind: pkg.ngram.kind.dialogue,
+            data: [[{user: "hello there", assistant: "how are you"}]]
+        }
+    ], {seed: 21});
+
+    textResult = pkg.kinds.infer(datasetModel, {
+        kind: pkg.ngram.kind.text,
+        input: "poodles are"
+    }, {limit: 5});
+
+    dialogueResult = pkg.kinds.infer(datasetModel, {
+        kind: pkg.ngram.kind.dialogue,
+        input: "hello there"
+    }, {maxSteps: 6, seed: 17});
+
+    t.equal(datasetModel.kind, "ngram.kinds.dataset", "kinds.trainDataset builds one dataset-level system");
+    t.equal(textResult.output, "dogs", "kinds.infer returns one text output without exposing predictNext");
+    t.equal(dialogueResult.output, "how are you", "kinds.infer returns one dialogue output without exposing reply");
+    t.equal(dialogueResult.state.kind, "ngram.dialogue.state", "kinds.infer still returns dialogue state for follow-up turns");
+};
+
+[test]
 generation_uses_backoff_when_full_context_is_missing = func(t) {
     pkg = import("./ngram.ns");
     model = pkg.ngram.train([[1, 2, 3], [1, 2, 4]], 3, {unit: "items", addStopToken: false});

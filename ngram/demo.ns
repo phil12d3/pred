@@ -1,0 +1,73 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+file = open("data.txt", filemode.read);
+d = parse(file.read());
+file.close();
+
+printline("Training...");
+
+progressHook = func(info) {
+    phase = "";
+    if (defined(info.phase)) phase = info.phase;
+
+    if (phase == "normalized_unified" || phase == "normalized") {
+        rowsText = "?";
+        if (defined(info.rows)) rowsText = stringify(info.rows);
+        printline("  [progress] phase=", phase, " rows=", rowsText);
+        return null;
+    }
+
+    if (phase == "sequence") {
+        indexText = "?";
+        totalText = "?";
+        lengthText = "?";
+        if (defined(info.index)) indexText = stringify(info.index);
+        if (defined(info.total)) totalText = stringify(info.total);
+        if (defined(info.length)) lengthText = stringify(info.length);
+        printline("  [progress] sequence ", indexText, "/", totalText, " length=", lengthText);
+        return null;
+    }
+
+    if (phase == "complete") {
+        sequencesText = "?";
+        observationsText = "?";
+        contextsText = "?";
+        if (defined(info.sequences)) sequencesText = stringify(info.sequences);
+        if (defined(info.observations)) observationsText = stringify(info.observations);
+        if (defined(info.contexts)) contextsText = stringify(info.contexts);
+        printline("  [progress] complete sequences=", sequencesText, " observations=", observationsText, " contexts=", contextsText);
+        return null;
+    }
+
+    printline("  [progress] phase=", phase);
+    return null;
+};
+
+trainConfig = {
+    order: 3,
+    lowercase: true,
+    seed: 17
+};
+trainConfig.progress = progressHook;
+
+model = ng.train(d, null, trainConfig);
+
+
+textResult = ng.infer(model, "poodles are", {maxSteps: 4, seed: 17});
+numberResult = ng.infer(model, [1, 2], {maxSteps: 2, seed: 17});
+firstTurn = ng.infer(model, "hello there", {maxSteps: 6, seed: 17});
+secondTurn = ng.infer(model, "not great", {state: firstTurn.state, maxSteps: 6});
+
+printline("=== Mixed Unified Dataset ===");
+printline("");
+printline("text input = poodles are");
+printline("text output = ", textResult.output);
+printline("");
+printline("number input = [1,2]");
+printline("number output = ", stringify(numberResult.output));
+printline("");
+printline("dialogue input 1 = hello there");
+printline("dialogue output 1 = ", firstTurn.output);
+printline("dialogue input 2 = not great");
+printline("dialogue output 2 = ", secondTurn.output);

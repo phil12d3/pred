@@ -1,3 +1,22 @@
 // ngram umbrella module
 
 ngram = import("./src/ngram.ns");
+kindsModule = import("./src/kinds.ns");
+kinds = {
+    kind: ngram.kind,
+    trainExample: func(example, overrideConfig) {
+        return kindsModule.trainExample(ngram, example, overrideConfig);
+    },
+    query: func(system, input, options) {
+        return kindsModule.query(ngram, system, input, options);
+    },
+    generate: func(system, input, options) {
+        return kindsModule.generate(ngram, system, input, options);
+    },
+    trainDataset: func(dataset, overrideConfig) {
+        return kindsModule.trainDataset(ngram, dataset, overrideConfig);
+    },
+    infer: func(datasetModel, request, options) {
+        return kindsModule.infer(ngram, datasetModel, request, options);
+    }
+};

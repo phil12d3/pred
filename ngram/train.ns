@@ -1,0 +1,107 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+read_text_file = func(path) {
+    f = open(path, filemode.read);
+    text = "";
+    while (true) {
+        ch = f.read_char();
+        if (ch == null || ch == "") break;
+        text = text + ch;
+    }
+    f.close();
+    return text;
+}
+
+usage = func() {
+    printline("Usage:");
+    printline("  ../ns/bin/ns train.ns");
+    printline("  ../ns/bin/ns train.ns -dataPath ./data.txt -modelPath ./tmp/ngram_model.bin");
+    printline("");
+    printline("Optional:");
+    printline("  -order 3");
+    printline("  -lowercase true");
+    printline("  -seed 17");
+}
+
+progressHook = func(info) {
+    phase = "";
+    if (defined(info.phase)) phase = info.phase;
+
+    if (phase == "normalized_unified" || phase == "normalized") {
+        rowsText = "?";
+        if (defined(info.rows)) rowsText = stringify(info.rows);
+        printline("[train] phase=", phase, " rows=", rowsText);
+        return null;
+    }
+
+    if (phase == "sequence") {
+        indexText = "?";
+        totalText = "?";
+        if (defined(info.index)) indexText = stringify(info.index);
+        if (defined(info.total)) totalText = stringify(info.total);
+        printline("[train] sequence ", indexText, "/", totalText);
+        return null;
+    }
+
+    if (phase == "complete") {
+        sequencesText = "?";
+        observationsText = "?";
+        contextsText = "?";
+        if (defined(info.sequences)) sequencesText = stringify(info.sequences);
+        if (defined(info.observations)) observationsText = stringify(info.observations);
+        if (defined(info.contexts)) contextsText = stringify(info.contexts);
+        printline("[train] complete sequences=", sequencesText, " observations=", observationsText, " contexts=", contextsText);
+        return null;
+    }
+
+    printline("[train] phase=", phase);
+    return null;
+}
+
+if (defined(args.help) || defined(args.h)) {
+    usage();
+    exit(0);
+}
+
+dataPath = "./data.txt";
+if (defined(args.dataPath) && args.dataPath != null && args.dataPath != "") dataPath = args.dataPath;
+
+modelPath = "./tmp/ngram_model.bin";
+if (defined(args.modelPath) && args.modelPath != null && args.modelPath != "") modelPath = args.modelPath;
+
+order = 3;
+if (defined(args.order) && args.order != null && args.order != "") order = args.order;
+
+lowercase = true;
+if (defined(args.lowercase)) lowercase = args.lowercase;
+
+seed = 17;
+if (defined(args.seed) && args.seed != null && args.seed != "") seed = args.seed;
+
+printline("[train] reading data from ", dataPath);
+rawText = read_text_file(dataPath);
+data = parse(rawText);
+
+trainConfig = {
+    order: order,
+    lowercase: lowercase,
+    seed: seed
+};
+trainConfig.progress = progressHook;
+
+printline("[train] training model");
+model = ng.train(data, null, trainConfig);
+
+printline("[train] saving model to ", modelPath);
+saved = ng.saveModel(model, modelPath);
+
+printline("[train] done");
+printline("path = ", saved.path);
+printline("kind = ", saved.kind);
+printline("version = ", saved.version);
+printline("order = ", saved.metadata.order);
+printline("unit = ", saved.metadata.unit);
+printline("sequences = ", saved.metadata.sequences);
+printline("observations = ", saved.metadata.observations);
+printline("contexts = ", saved.metadata.contexts);

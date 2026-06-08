@@ -1,3 +1,10 @@
+kind = {
+    text: "text",
+    numbers: "numbers",
+    dialogue: "dialogue",
+    items: "items"
+};
+
 defaultConfig = func() {
     return {
         order: 2,
@@ -210,6 +217,244 @@ trainingSequences = func(data, config) {
     return rows;
 }
 
+internalStopToken = func() {
+    return {
+        kind: "ngram.internal.stop",
+        version: 1
+    };
+}
+
+isArrayOfStrings = func(values) {
+    if (!defined(values) || values == null) return false;
+    if (type(values).typename != "Array") return false;
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (type(values[i]).typename != "String") return false;
+    }
+    return true;
+}
+
+tokenSettings = func(config) {
+    settings = this.configWith(config);
+    return {
+        unit: "tokens",
+        itemMode: "tokens",
+        lowercase: settings.lowercase,
+        separator: settings.separator
+    };
+}
+
+tokenSequence = func(text, config) {
+    return this.sequence(text, this.tokenSettings(config));
+}
+
+normalizeUnifiedEntry = func(entry, rows, config, stopToken, meta) {
+    if (!defined(entry) || entry == null) return rows;
+
+    entryType = type(entry).typename;
+    if (entryType == "String") {
+        rows.add(this.tokenSequence(entry, config));
+        return rows;
+    }
+
+    if (entryType != "Array") {
+        rows.add([entry]);
+        return rows;
+    }
+
+    if (this.isArrayOfStrings(entry)) {
+        meta.turns = true;
+        row = [];
+        for (i = 0; i < entry.count(); i = i + 1) {
+            turnTokens = this.tokenSequence(entry[i], config);
+            this.appendArray(row, turnTokens);
+            row.add(stopToken);
+        }
+        rows.add(row);
+        return rows;
+    }
+
+    containsArray = false;
+    for (i = 0; i < entry.count(); i = i + 1) {
+        if (type(entry[i]).typename == "Array") {
+            containsArray = true;
+            break;
+        }
+    }
+
+    if (containsArray) {
+        for (i = 0; i < entry.count(); i = i + 1) {
+            this.normalizeUnifiedEntry(entry[i], rows, config, stopToken, meta);
+        }
+        return rows;
+    }
+
+    rows.add(this.copyArray(entry));
+    return rows;
+}
+
+unifiedTrainingRows = func(data, config) {
+    settings = this.configWith(config);
+    stopToken = this.internalStopToken();
+    rows = [];
+    meta = {
+        turns: false
+    };
+
+    if (!defined(data) || data == null) {
+        return {
+            rows: rows,
+            stopToken: stopToken,
+            turns: meta.turns
+        };
+    }
+
+    if (type(data).typename != "Array") {
+        this.normalizeUnifiedEntry(data, rows, settings, stopToken, meta);
+        return {
+            rows: rows,
+            stopToken: stopToken,
+            turns: meta.turns
+        };
+    }
+
+    if (data.count() == 0) {
+        return {
+            rows: rows,
+            stopToken: stopToken,
+            turns: meta.turns
+        };
+    }
+
+    if (this.isArrayOfStrings(data)) {
+        for (i = 0; i < data.count(); i = i + 1) {
+            rows.add(this.tokenSequence(data[i], settings));
+        }
+        return {
+            rows: rows,
+            stopToken: stopToken,
+            turns: meta.turns
+        };
+    }
+
+    containsArray = false;
+    for (i = 0; i < data.count(); i = i + 1) {
+        if (type(data[i]).typename == "Array") {
+            containsArray = true;
+            break;
+        }
+    }
+
+    if (!containsArray) {
+        rows.add(this.copyArray(data));
+        return {
+            rows: rows,
+            stopToken: stopToken,
+            turns: meta.turns
+        };
+    }
+
+    for (i = 0; i < data.count(); i = i + 1) {
+        this.normalizeUnifiedEntry(data[i], rows, settings, stopToken, meta);
+    }
+
+    return {
+        rows: rows,
+        stopToken: stopToken,
+        turns: meta.turns
+    };
+}
+
+unifiedPromptSequence = func(input, model, forceTurns) {
+    if (!defined(input) || input == null) return [];
+    useTurns = model.unified.turns;
+    if (defined(forceTurns)) useTurns = forceTurns;
+    if (type(input).typename == "String") {
+        row = this.tokenSequence(input, {
+            lowercase: model.unified.lowercase,
+            separator: model.unified.separator
+        });
+        if (useTurns) row.add(model.stopToken);
+        return row;
+    }
+    if (type(input).typename == "Array") {
+        if (this.isArrayOfStrings(input)) {
+            row = [];
+            for (i = 0; i < input.count(); i = i + 1) {
+                turnTokens = this.tokenSequence(input[i], {
+                    lowercase: model.unified.lowercase,
+                    separator: model.unified.separator
+                });
+                this.appendArray(row, turnTokens);
+                row.add(model.stopToken);
+            }
+            return row;
+        }
+        return this.copyArray(input);
+    }
+    return [input];
+}
+
+stripStopTokens = func(values, stopToken) {
+    out = [];
+    stopKey = this.tokenKey(stopToken);
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (this.tokenKey(values[i]) != stopKey) out.add(values[i]);
+    }
+    return out;
+}
+
+tailSequence = func(fullSequence, promptCount) {
+    out = [];
+    start = promptCount;
+    if (start < 0) start = 0;
+    for (i = start; i < fullSequence.count(); i = i + 1) out.add(fullSequence[i]);
+    return out;
+}
+
+renderUnifiedOutput = func(values, input, model) {
+    if (type(input).typename == "String") {
+        return this.render(values, {
+            unit: "tokens",
+            itemMode: "tokens",
+            separator: model.unified.separator
+        });
+    }
+
+    if (this.isArrayOfStrings(input)) {
+        return this.render(values, {
+            unit: "tokens",
+            itemMode: "tokens",
+            separator: model.unified.separator
+        });
+    }
+
+    if (values.count() == 1) return values[0];
+    return this.copyArray(values);
+}
+
+inferUnifiedWithPrompt = func(model, input, settings, forceTurns) {
+    prompt = this.unifiedPromptSequence(input, model, forceTurns);
+    allowedTypes = this.allowedTypesForInput(input);
+    runSettings = {};
+    foreach(name in settings.props) runSettings[name] = settings[name];
+    if (defined(allowedTypes) && allowedTypes != null) runSettings.allowedTypes = allowedTypes;
+
+    generated = this.generate(model, prompt, runSettings);
+    produced = this.tailSequence(generated.sequence, prompt.count());
+    visible = this.stripStopTokens(produced, model.stopToken);
+    return {
+        input: input,
+        output: this.renderUnifiedOutput(visible, input, model),
+        sequence: visible,
+        reason: generated.reason,
+        terminated: generated.terminated,
+        seed: generated.seed,
+        steps: generated.steps,
+        state: generated.state,
+        raw: generated
+    };
+}
+
 tokenKey = func(value) {
     text = this.asText(value);
     return type(value).typename + ":" + text.length + ":" + text;
@@ -265,12 +510,25 @@ appendStopToken = func(sequenceValues, stopToken, enabled) {
     return out;
 }
 
-train = func(data, order, config) {
+trainCore = func(data, order, config) {
     settings = this.configWith(config);
     n = defined(order) && order > 0 ? order : settings.order;
     if (n < 1) n = 1;
+    progressHook = null;
+    if (defined(settings.progress)) progressHook = settings.progress;
 
     sequences = this.trainingSequences(data, settings);
+    if (defined(progressHook)) {
+        if (type(progressHook).typename != "Null") {
+            progressHook({
+                phase: "normalized",
+                order: n,
+                rows: sequences.count(),
+                unit: settings["unit"],
+                itemMode: settings.itemMode
+            });
+        }
+    }
     model = {
         type: "ngram",
         order: n,
@@ -288,10 +546,22 @@ train = func(data, order, config) {
         vocabularySize: 0
     };
 
+    totalRows = sequences.count();
     for (si = 0; si < sequences.count(); si = si + 1) {
         seq = this.appendStopToken(sequences[si], settings.stopToken, settings.addStopToken);
         if (seq.count() == 0) continue;
         model.sequences = model.sequences + 1;
+        if (defined(progressHook)) {
+            if (type(progressHook).typename != "Null") {
+                progressHook({
+                    phase: "sequence",
+                    index: si + 1,
+                    total: totalRows,
+                    length: seq.count(),
+                    observations: model.observations
+                });
+            }
+        }
         for (i = 0; i < seq.count(); i = i + 1) {
             contextLength = i < n ? i : n;
             context = [];
@@ -303,7 +573,68 @@ train = func(data, order, config) {
     }
 
     model.contexts = this.countProps(model.transitions);
+    if (defined(progressHook)) {
+        if (type(progressHook).typename != "Null") {
+            progressHook({
+                phase: "complete",
+                order: model.order,
+                sequences: model.sequences,
+                observations: model.observations,
+                contexts: model.contexts,
+                vocabularySize: model.vocabularySize
+            });
+        }
+    }
     return model;
+}
+
+trainUnified = func(data, config) {
+    settings = this.configWith(config);
+    normalized = this.unifiedTrainingRows(data, settings);
+    normalizedStopToken = normalized.stopToken;
+    normalizedTurns = normalized.turns;
+    progressHook = null;
+    if (defined(settings.progress)) progressHook = settings.progress;
+    if (defined(progressHook)) {
+        if (type(progressHook).typename != "Null") {
+            progressHook({
+                phase: "normalized_unified",
+                rows: normalized.rows.count(),
+                turns: normalizedTurns,
+                separator: settings.separator,
+                lowercase: settings.lowercase
+            });
+        }
+    }
+    coreConfig = {};
+    coreConfig.unit = "items";
+    coreConfig.lowercase = false;
+    coreConfig.separator = settings.separator;
+    coreConfig.stopToken = normalizedStopToken;
+    coreConfig.addStopToken = true;
+    coreConfig.seed = settings.seed;
+    coreConfig.progress = progressHook;
+    model = this.trainCore(normalized.rows, settings.order, coreConfig);
+    model.kind = "ngram.unified";
+    model.unified = {};
+    model.unified.lowercase = settings.lowercase;
+    model.unified.separator = settings.separator;
+    model.unified.turns = normalizedTurns;
+    return model;
+}
+
+train = func(data, order, config) {
+    if (defined(config) && config != null) {
+        if (defined(order) && order != null && type(order).typename == "Number") {
+            return this.trainCore(data, order, config);
+        }
+        return this.trainUnified(data, config);
+    }
+    if (defined(order) && order != null) {
+        if (type(order).typename == "Number") return this.trainCore(data, order, null);
+        return this.trainUnified(data, order);
+    }
+    return this.trainUnified(data, {});
 }
 
 sortRows = func(rows) {
@@ -334,6 +665,48 @@ bucketRows = func(bucket) {
         });
     }
     return this.sortRows(rows);
+}
+
+filterPredictionRows = func(rows, allowedTypes, stopToken) {
+    if (!defined(allowedTypes) || allowedTypes == null || allowedTypes.count() == 0) return rows;
+
+    out = [];
+    stopKey = null;
+    if (defined(stopToken) && stopToken != null) stopKey = this.tokenKey(stopToken);
+
+    for (i = 0; i < rows.count(); i = i + 1) {
+        row = rows[i];
+        keep = false;
+        if (defined(stopKey) && stopKey != null && this.tokenKey(row.value) == stopKey) keep = true;
+        else {
+            valueType = type(row.value).typename;
+            for (j = 0; j < allowedTypes.count(); j = j + 1) {
+                if (valueType == allowedTypes[j]) {
+                    keep = true;
+                    break;
+                }
+            }
+        }
+        if (keep) out.add(row);
+    }
+
+    if (out.count() == 0) return out;
+
+    total = 0;
+    for (i = 0; i < out.count(); i = i + 1) total = total + out[i].probability;
+    if (total <= 0) return out;
+
+    normalized = [];
+    for (i = 0; i < out.count(); i = i + 1) {
+        normalized.add({
+            value: out[i].value,
+            count: out[i].count,
+            probability: out[i].probability / total,
+            context: this.copyArray(out[i].context),
+            order: out[i].order
+        });
+    }
+    return normalized;
 }
 
 predictionContext = func(model, history) {
@@ -398,6 +771,26 @@ weightedChoice = func(rows, seed) {
     }
 
     return {choice: rows[rows.count() - 1], seed: rnd.seed, random: cutoff};
+}
+
+allowedTypesForInput = func(input) {
+    if (!defined(input) || input == null) return null;
+    inputType = type(input).typename;
+    if (inputType == "String") return ["String"];
+    if (inputType != "Array") return [inputType];
+    if (input.count() == 0) return null;
+
+    allStrings = true;
+    allNumbers = true;
+    for (i = 0; i < input.count(); i = i + 1) {
+        entryType = type(input[i]).typename;
+        if (entryType != "String") allStrings = false;
+        if (entryType != "Number") allNumbers = false;
+    }
+
+    if (allStrings) return ["String"];
+    if (allNumbers) return ["Number"];
+    return null;
 }
 
 stateFromResult = func(model, history, seed, reason, terminated) {
@@ -547,13 +940,20 @@ generate = func(model, start, options) {
             if (defined(stateValue.seed)) seed = stateValue.seed;
         }
     }
-    maxSteps = defined(settings.maxSteps) && settings.maxSteps > 0 ? settings.maxSteps : 32;
+    maxSteps = 32;
+    if (defined(settings.maxSteps)) {
+        maxStepsValue = settings.maxSteps;
+        if (maxStepsValue > 0) maxSteps = maxStepsValue;
+    }
     reason = "max_steps";
     terminated = false;
     steps = [];
 
     for (stepIndex = 0; stepIndex < maxSteps; stepIndex = stepIndex + 1) {
         predictions = this.predictNext(model, history, 0);
+        if (defined(settings.allowedTypes)) {
+            predictions = this.filterPredictionRows(predictions, settings.allowedTypes, model.stopToken);
+        }
         if (predictions.count() == 0) {
             reason = "no_transition";
             break;
@@ -608,7 +1008,7 @@ resume = func(model, state, input, options) {
 trainDialogue = func(conversations, order, config) {
     settings = this.dialogueConfigWith(config);
     rows = this.dialogueTrainingSequences(conversations, settings);
-    model = this.train(rows, defined(order) ? order : settings.order, {
+    model = this.trainCore(rows, defined(order) ? order : settings.order, {
         unit: "items",
         lowercase: false,
         separator: settings.separator,
@@ -697,6 +1097,65 @@ reply = func(model, userText, state, options) {
         seed: seed,
         steps: steps,
         state: dialogueState
+    };
+}
+
+infer = func(model, input, options) {
+    if (!defined(model) || model == null) throw("ngram.infer requires a trained model");
+    settings = {};
+    if (defined(options) && options != null) {
+        foreach(name in options.props) settings[name] = options[name];
+    }
+
+    if (defined(model.kind) && model.kind == "ngram.unified") {
+        hasState = false;
+        stateValue = null;
+        if (defined(settings.state)) {
+            stateValue = settings.state;
+            if (stateValue != null) hasState = true;
+        }
+        primaryTurns = hasState;
+        primary = this.inferUnifiedWithPrompt(model, input, settings, primaryTurns);
+
+        inputType = type(input).typename;
+        outputType = type(primary.output).typename;
+        if (!hasState && inputType == "String" && model.unified.turns) {
+            if (outputType == "String" && primary.output == "") {
+                return this.inferUnifiedWithPrompt(model, input, settings, true);
+            }
+        }
+
+        return primary;
+    }
+
+    if (defined(model.dialogue) && model.dialogue != null) {
+        stateValue = null;
+        if (defined(settings.state)) stateValue = settings.state;
+        return this.reply(model, input, stateValue, settings);
+    }
+
+    prompt = this.sequence(input, {
+        unit: model["unit"],
+        itemMode: model.itemMode,
+        lowercase: model.lowercase,
+        separator: model.separator
+    });
+    generated = this.generate(model, input, settings);
+    produced = this.tailSequence(generated.sequence, prompt.count());
+    return {
+        input: input,
+        output: this.render(produced, {
+            unit: model["unit"],
+            itemMode: model.itemMode,
+            separator: model.separator
+        }),
+        sequence: produced,
+        reason: generated.reason,
+        terminated: generated.terminated,
+        seed: generated.seed,
+        steps: generated.steps,
+        state: generated.state,
+        raw: generated
     };
 }
 

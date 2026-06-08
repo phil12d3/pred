@@ -1,0 +1,251 @@
+copyObject = func(value) {
+    out = {};
+    if (!defined(value)) return out;
+    if (type(value).typename == "Null") return out;
+    foreach(name in value.props) out[name] = value[name];
+    return out;
+}
+
+mergeConfig = func(baseConfig, overrideA, overrideB) {
+    out = this.copyObject(baseConfig);
+    if (defined(overrideA) && overrideA != null) {
+        foreach(name in overrideA.props) out[name] = overrideA[name];
+    }
+    if (defined(overrideB) && overrideB != null) {
+        foreach(name in overrideB.props) out[name] = overrideB[name];
+    }
+    return out;
+}
+
+defaultsForKind = func(ng, kindName) {
+    kindText = ng.kind.text;
+    kindNumbers = ng.kind.numbers;
+    kindItems = ng.kind.items;
+    kindDialogue = ng.kind.dialogue;
+
+    if (kindName == kindText) {
+        return {
+            order: 2,
+            config: {
+                unit: "tokens",
+                lowercase: true,
+                stopToken: "<END>",
+                seed: 42
+            }
+        };
+    }
+    if (kindName == kindNumbers) {
+        return {
+            order: 2,
+            config: {
+                unit: "items",
+                addStopToken: false
+            }
+        };
+    }
+    if (kindName == kindItems) {
+        return {
+            order: 2,
+            config: {
+                unit: "items",
+                addStopToken: false
+            }
+        };
+    }
+    if (kindName == kindDialogue) {
+        return {
+            order: 3,
+            config: {
+                seed: 42
+            }
+        };
+    }
+    throw("ngram.kinds.defaultsForKind does not support kind " + ng.asText(kindName));
+}
+
+trainExample = func(ng, example, overrideConfig) {
+    if (!defined(example)) throw("ngram.kinds.trainExample requires an example object");
+    if (type(example).typename == "Null") throw("ngram.kinds.trainExample requires an example object");
+    if (!defined(example.kind)) throw("ngram.kinds.trainExample requires example.kind");
+
+    exampleKind = example.kind;
+    defaults = this.defaultsForKind(ng, exampleKind);
+    order = defaults.order;
+    if (defined(example.order)) order = example.order;
+
+    exampleConfig = {};
+    if (defined(example.config)) exampleConfig = example.config;
+    config = this.mergeConfig(defaults.config, exampleConfig, overrideConfig);
+
+    model = null;
+    kindDialogue = ng.kind.dialogue;
+    if (exampleKind == kindDialogue) {
+        model = ng.trainDialogue(example.data, order, config);
+    } else {
+        model = ng.train(example.data, order, config);
+    }
+
+    exampleName = "";
+    if (defined(example.name)) exampleName = example.name;
+
+    return {
+        kind: "ngram.kinds.model",
+        version: 1,
+        itemKind: exampleKind,
+        name: exampleName,
+        order: order,
+        config: config,
+        model: model
+    };
+}
+
+query = func(ng, system, input, options) {
+    if (!defined(system) || system == null) throw("ngram.kinds.query requires a trained system");
+    settings = defined(options) && options != null ? options : {};
+
+    kindDialogue = ng.kind.dialogue;
+    systemKind = system.itemKind;
+    if (systemKind == kindDialogue) {
+        stateValue = null;
+        if (defined(settings.state)) stateValue = settings.state;
+        reply = ng.reply(system.model, input, stateValue, settings);
+        return {
+            kind: systemKind,
+            mode: "reply",
+            reply: reply
+        };
+    }
+
+    limit = defined(settings.limit) ? settings.limit : 5;
+    rows = ng.predictNext(system.model, input, limit);
+    return {
+        kind: system.kind,
+        mode: "predict",
+        rows: rows
+    };
+}
+
+generate = func(ng, system, input, options) {
+    if (!defined(system) || system == null) throw("ngram.kinds.generate requires a trained system");
+    kindDialogue = ng.kind.dialogue;
+    systemKind = system.itemKind;
+    if (systemKind == kindDialogue) {
+        stateValue = null;
+        if (defined(options) && options != null && defined(options.state)) stateValue = options.state;
+        return ng.reply(system.model, input, stateValue, options);
+    }
+    return ng.generate(system.model, input, options);
+}
+
+appendTrainingRows = func(target, value) {
+    if (!defined(value)) return target;
+    if (type(value).typename == "Null") return target;
+    if (type(value).typename == "Array") {
+        for (i = 0; i < value.count(); i = i + 1) target.add(value[i]);
+        return target;
+    }
+    target.add(value);
+    return target;
+}
+
+trainDataset = func(ng, dataset, overrideConfig) {
+    if (!defined(dataset)) throw("ngram.kinds.trainDataset requires a dataset");
+    if (type(dataset).typename == "Null") throw("ngram.kinds.trainDataset requires a dataset");
+
+    grouped = {
+        text: [],
+        numbers: [],
+        dialogue: [],
+        items: []
+    };
+
+    for (i = 0; i < dataset.count(); i = i + 1) {
+        entry = dataset[i];
+        if (!defined(entry.kind)) throw("ngram.kinds.trainDataset requires entry.kind");
+        payload = null;
+        if (defined(entry.data)) payload = entry.data;
+        else if (defined(entry.value)) payload = entry.value;
+
+        if (entry.kind == ng.kind.text) this.appendTrainingRows(grouped.text, payload);
+        else if (entry.kind == ng.kind.numbers) this.appendTrainingRows(grouped.numbers, payload);
+        else if (entry.kind == ng.kind.dialogue) this.appendTrainingRows(grouped.dialogue, payload);
+        else if (entry.kind == ng.kind.items) this.appendTrainingRows(grouped.items, payload);
+        else throw("ngram.kinds.trainDataset does not support kind " + ng.asText(entry.kind));
+    }
+
+    models = {};
+    if (grouped.text.count() > 0) {
+        models.text = this.trainExample(ng, {kind: ng.kind.text, data: grouped.text}, overrideConfig);
+    }
+    if (grouped.numbers.count() > 0) {
+        models.numbers = this.trainExample(ng, {kind: ng.kind.numbers, data: grouped.numbers}, overrideConfig);
+    }
+    if (grouped.dialogue.count() > 0) {
+        models.dialogue = this.trainExample(ng, {kind: ng.kind.dialogue, data: grouped.dialogue}, overrideConfig);
+    }
+    if (grouped.items.count() > 0) {
+        models.items = this.trainExample(ng, {kind: ng.kind.items, data: grouped.items}, overrideConfig);
+    }
+
+    return {
+        kind: "ngram.kinds.dataset",
+        version: 1,
+        models: models
+    };
+}
+
+infer = func(ng, datasetModel, request, options) {
+    if (!defined(datasetModel) || type(datasetModel).typename == "Null") throw("ngram.kinds.infer requires a dataset model");
+    if (!defined(request) || type(request).typename == "Null") throw("ngram.kinds.infer requires a request object");
+    if (!defined(request.kind)) throw("ngram.kinds.infer requires request.kind");
+
+    key = request.kind;
+    if (!defined(datasetModel.models[key])) throw("ngram.kinds.infer has no trained model for kind " + ng.asText(key));
+    system = datasetModel.models[key];
+    settings = defined(options) && options != null ? options : {};
+    input = null;
+    if (defined(request.input)) input = request.input;
+    else if (defined(request.query)) input = request.query;
+    systemKind = system.itemKind;
+
+    if (systemKind == ng.kind.dialogue) {
+        stateValue = null;
+        if (defined(request.state)) stateValue = request.state;
+        else if (defined(settings.state)) stateValue = settings.state;
+        reply = ng.reply(system.model, input, stateValue, settings);
+        return {
+            kind: systemKind,
+            output: reply.rendered,
+            state: reply.state,
+            raw: reply
+        };
+    }
+
+    useGeneration = false;
+    if (defined(request.generate) && request.generate) useGeneration = true;
+    if (defined(request.state) && type(request.state).typename != "Null") useGeneration = true;
+    if (defined(settings.state) && type(settings.state).typename != "Null") useGeneration = true;
+
+    if (useGeneration) {
+        generationOptions = this.copyObject(settings);
+        if (defined(request.state)) generationOptions.state = request.state;
+        generated = ng.generate(system.model, input, generationOptions);
+        output = defined(generated.rendered) ? generated.rendered : generated.sequence;
+        return {
+            kind: systemKind,
+            output: output,
+            state: generated.state,
+            raw: generated
+        };
+    }
+
+    limit = defined(settings.limit) ? settings.limit : 5;
+    rows = ng.predictNext(system.model, input, limit);
+    output = rows.count() > 0 ? rows[0].value : null;
+    return {
+        kind: systemKind,
+        output: output,
+        rows: rows,
+        raw: rows
+    };
+}

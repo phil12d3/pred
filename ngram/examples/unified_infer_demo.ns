@@ -1,0 +1,51 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+printline("=== Unified Train/Infer Demo ===");
+
+textModel = ng.train([
+    "poodles are dogs",
+    "cats are animals",
+    "dogs are animals"
+], null, {
+    order: 2,
+    lowercase: true,
+    seed: 21
+});
+
+textResult = ng.infer(textModel, "poodles are", {maxSteps: 4, seed: 21});
+printline("");
+printline("text input = poodles are");
+printline("text output = ", textResult.output);
+
+numberModel = ng.train([
+    [1, 2, 3],
+    [1, 2, 4],
+    [1, 2, 3]
+], null, {
+    order: 2,
+    seed: 21
+});
+
+numberResult = ng.infer(numberModel, [1, 2], {maxSteps: 2, seed: 21});
+printline("");
+printline("number input = [1,2]");
+printline("number output = ", stringify(numberResult.output));
+
+dialogueModel = ng.train([
+    ["how are you", "i'm good, how are you", "i'm fine thanks", "that's great"],
+    ["hello there", "how are you", "not great", "sorry to hear that"]
+], null, {
+    order: 3,
+    lowercase: true,
+    seed: 17
+});
+
+first = ng.infer(dialogueModel, "hello there", {maxSteps: 6, seed: 17});
+second = ng.infer(dialogueModel, "not great", {state: first.state, maxSteps: 6});
+
+printline("");
+printline("dialogue input 1 = hello there");
+printline("dialogue output 1 = ", first.output);
+printline("dialogue input 2 = not great");
+printline("dialogue output 2 = ", second.output);

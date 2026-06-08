@@ -307,8 +307,83 @@ ng = pkg.ngram;</code></div>
     <section class="section">
       <h2>4. Training Data Formats</h2>
       <p>The module accepts different shapes depending on what you want to model.</p>
+      <p>If you want to ask another AI to generate training data for this package, this is the most important rule: <strong>the training data should be a single array, and each element in that array should be one training example.</strong></p>
 
-      <h3>4.1 Numeric or General Item Sequences</h3>
+      <h3>4.1 AI-Ready Data Contract</h3>
+      <p>When generating data for the unified <code>ng.train(data, null, config)</code> API, use one outer array and only these example shapes inside it:</p>
+      <table>
+        <tr>
+          <th>Example shape</th>
+          <th>Meaning</th>
+          <th>Example</th>
+        </tr>
+        <tr>
+          <td><code>"some text here"</code></td>
+          <td>One plain text training example.</td>
+          <td><code>"poodles are dogs"</code></td>
+        </tr>
+        <tr>
+          <td><code>[1, 2, 3]</code></td>
+          <td>One numeric or item sequence.</td>
+          <td><code>[1, 2, 3]</code></td>
+        </tr>
+        <tr>
+          <td><code>["turn one", "turn two", "turn three"]</code></td>
+          <td>One turn-based text example. Each string is one turn in order.</td>
+          <td><code>["hello there", "how are you", "not great", "sorry to hear that"]</code></td>
+        </tr>
+      </table>
+
+      <p>That means a valid mixed dataset can look like this:</p>
+      <div class="code"><code>data = [
+  "poodles are dogs",
+  "cats are animals",
+  [1, 2, 3],
+  [1, 2, 4],
+  ["hello there", "how are you", "not great", "sorry to hear that"]
+];
+
+model = ng.train(data, null, {
+  order: 3,
+  lowercase: true,
+  seed: 17
+});</code></div>
+
+      <div class="note">
+        <strong>Important:</strong> do not wrap plain text in another array unless you mean turn-by-turn text. For example, <code>"hello there"</code> means plain text, but <code>["hello there", "how are you"]</code> means one multi-turn exchange.
+      </div>
+
+      <h3>4.2 What An AI Should Output</h3>
+      <p>If you want an AI to generate training data for you, ask it to return only a literal array in one of the valid shapes above. Do not ask it to return explanations, labels, or objects unless you plan to rewrite them yourself.</p>
+
+      <p><strong>Good prompt to another AI:</strong></p>
+      <div class="code"><code>Generate ngram training data as a single array literal for ns.
+
+Rules:
+- Return only the array.
+- Each element must be exactly one training example.
+- A plain text example must be a single string.
+- A numeric sequence must be an array of numbers.
+- A turn-based dialogue example must be an array of strings, where each string is one turn.
+- Do not use objects.
+- Do not include labels, comments, markdown, or explanations.
+
+Example valid output:
+[
+  "poodles are dogs",
+  [1, 2, 3],
+  ["hello there", "how are you", "not great", "sorry to hear that"]
+]</code></div>
+
+      <p><strong>Bad output formats:</strong></p>
+      <ul>
+        <li><code>{kind: "text", value: "poodles are dogs"}</code> because the unified trainer does not need public kind labels.</li>
+        <li><code>{user: "hello", assistant: "hi"}</code> because the unified trainer now expects turn-based text as arrays of strings.</li>
+        <li><code>"text: poodles are dogs"</code> because the label becomes part of the learned sequence.</li>
+        <li><code>[["poodles are dogs"]]</code> if you only meant one plain text example, because that shape means one turn-based example with one turn.</li>
+      </ul>
+
+      <h3>4.3 Numeric or General Item Sequences</h3>
       <div class="code"><code>model = ng.train(
   [[1, 2, 3], [1, 2, 4], [1, 2, 3]],
   2,
@@ -316,7 +391,7 @@ ng = pkg.ngram;</code></div>
 );</code></div>
       <p>Use <code>unit: "items"</code> when your data is already an array of values and should not be split further.</p>
 
-      <h3>4.2 Character-Level Text</h3>
+      <h3>4.4 Character-Level Text</h3>
       <div class="code"><code>model = ng.train(
   ["abba", "abca"],
   2,
@@ -324,13 +399,26 @@ ng = pkg.ngram;</code></div>
 );</code></div>
       <p>Use <code>unit: "chars"</code> when you want each character to be one item in the sequence.</p>
 
-      <h3>4.3 Token-Level Text</h3>
+      <h3>4.5 Token-Level Text</h3>
       <div class="code"><code>model = ng.train(
   ["red blue stop", "red green stop"],
   1,
   {unit: "tokens", stopToken: "stop", separator: " "}
 );</code></div>
       <p>Use <code>unit: "tokens"</code> when you want strings split into word-like pieces first.</p>
+
+      <h3>4.6 Unified Plain-Shape Training</h3>
+      <p>The newer high-level path is usually simpler than manually choosing <code>unit</code> values. It lets you mix plain text, numbers, and turn-based text in one model:</p>
+      <div class="code"><code>model = ng.train([
+  "poodles are dogs",
+  [1, 2, 3],
+  ["hello there", "how are you", "not great", "sorry to hear that"]
+], null, {
+  order: 3,
+  lowercase: true,
+  seed: 17
+});</code></div>
+      <p>Use this path when you want one model and one inference function without public type tags like <code>&lt;TEXT&gt;</code>, <code>&lt;U&gt;</code>, or <code>&lt;A&gt;</code>.</p>
 
       <div class="note">
         <strong>How token mode tokenizes:</strong> it splits on common whitespace and punctuation. It is intended to be simple and practical, not linguistically complete.

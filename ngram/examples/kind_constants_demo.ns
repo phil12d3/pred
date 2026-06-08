@@ -1,0 +1,68 @@
+pkg = import("./ngram.ns");
+kinds = pkg.kinds;
+ng = pkg.ngram;
+
+examples = [
+    {
+        kind: ng.kind.text,
+        name: "text phrase completion",
+        data: ["poodles are dogs", "cats are animals", "dogs are animals"],
+        query: "poodles are"
+    },
+    {
+        kind: ng.kind.numbers,
+        name: "numeric next-step prediction",
+        data: [[1, 2, 3], [1, 2, 4], [1, 2, 3]],
+        query: [1, 2]
+    },
+    {
+        kind: ng.kind.dialogue,
+        name: "dialogue reply",
+        data: [
+            [
+                {user: "hello there", assistant: "how are you"},
+                {user: "not great", assistant: "sorry to hear that"}
+            ]
+        ],
+        query: "hello there"
+    },
+    {
+        kind: ng.kind.items,
+        name: "mixed item sequence",
+        data: [
+            ["<TEXT>", "temp", 25, "high"],
+            ["<TEXT>", "temp", 25, "warning"],
+            ["<TEXT>", "temp", 20, "ok"]
+        ],
+        query: ["<TEXT>", "temp", 25]
+    }
+];
+
+printline("=== Kind Constants Demo ===");
+printline("This example uses one training function and one inference function.");
+
+datasetModel = kinds.trainDataset(examples, {seed: 21});
+
+requests = [
+    {kind: ng.kind.text, name: "text phrase completion", input: "poodles are"},
+    {kind: ng.kind.numbers, name: "numeric next-step prediction", input: [1, 2]},
+    {kind: ng.kind.dialogue, name: "dialogue reply", input: "hello there"},
+    {kind: ng.kind.items, name: "mixed item sequence", input: ["<TEXT>", "temp", 25]}
+];
+
+for (i = 0; i < requests.count(); i = i + 1) {
+    req = requests[i];
+    printline("");
+    printline("--- ", req.name, " ---");
+    printline("kind = ", req.kind);
+
+    result = kinds.infer(datasetModel, req, {limit: 5, maxSteps: 6, seed: 21});
+    queryText = stringify(req.input);
+    if (type(req.input).typename == "String") queryText = req.input;
+
+    outputText = stringify(result.output);
+    if (type(result.output).typename == "String") outputText = result.output;
+
+    printline("input = ", queryText);
+    printline("output = ", outputText);
+}

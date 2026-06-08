@@ -1,0 +1,91 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+decode_cli_text = func(text) {
+    s = stringify(text);
+    out = "";
+    i = 0;
+    while (i < s.length) {
+        ch = s[i];
+        if (ch == "\\" && i + 1 < s.length) {
+            next = s[i + 1];
+            if (next == "n") {
+                out = out + "\n";
+                i = i + 2;
+                continue;
+            }
+            if (next == "t") {
+                out = out + "\t";
+                i = i + 2;
+                continue;
+            }
+            if (next == "\"" || next == "'") {
+                out = out + next;
+                i = i + 2;
+                continue;
+            }
+        }
+        out = out + ch;
+        i = i + 1;
+    }
+    if (out.length >= 2) {
+        first = out[0];
+        last = out[out.length - 1];
+        if ((first == "\"" && last == "\"") || (first == "'" && last == "'")) {
+            trimmed = "";
+            for (ti = 1; ti < out.length - 1; ti = ti + 1) trimmed = trimmed + out[ti];
+            out = trimmed;
+        }
+    }
+    return out;
+}
+
+parse_query_input = func(rawQuery) {
+    decoded = decode_cli_text(rawQuery);
+    if (decoded.length > 0 && decoded[0] == "[") {
+        return parse(decoded);
+    }
+    return decoded;
+}
+
+usage = func() {
+    printline("Usage:");
+    printline("  ../ns/bin/ns talk.ns -query \"poodles are\"");
+    printline("  ../ns/bin/ns talk.ns -query \"[1,2]\" -modelPath ./tmp/ngram_model.bin");
+    printline("");
+    printline("Optional:");
+    printline("  -maxSteps 6");
+    printline("  -seed 17");
+}
+
+if (defined(args.help) || defined(args.h)) {
+    usage();
+    exit(0);
+}
+
+if (!defined(args.query) || args.query == null || args.query == "") {
+    printline("Missing -query.");
+    usage();
+    exit(1);
+}
+
+modelPath = "./tmp/ngram_model.bin";
+if (defined(args.modelPath) && args.modelPath != null && args.modelPath != "") modelPath = args.modelPath;
+
+maxStepsValue = 6;
+if (defined(args.maxSteps) && args.maxSteps != null && args.maxSteps != "") maxStepsValue = args.maxSteps;
+
+seedValue = 17;
+if (defined(args.seed) && args.seed != null && args.seed != "") seedValue = args.seed;
+
+queryValue = parse_query_input(args.query);
+
+model = ng.loadModel(modelPath);
+inferOptions = {};
+inferOptions.maxSteps = maxStepsValue;
+inferOptions.seed = seedValue;
+result = ng.infer(model, queryValue, inferOptions);
+
+printline("input = ", stringify(queryValue));
+printline("output = ", stringify(result.output));
+printline("reason = ", result.reason);
