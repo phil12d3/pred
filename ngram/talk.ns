@@ -72,7 +72,7 @@ if (!defined(args.query) || args.query == null || args.query == "") {
 modelPath = "./tmp/ngram_model.bin";
 if (defined(args.modelPath) && args.modelPath != null && args.modelPath != "") modelPath = args.modelPath;
 
-maxStepsValue = 6;
+maxStepsValue = 32;
 if (defined(args.maxSteps) && args.maxSteps != null && args.maxSteps != "") maxStepsValue = args.maxSteps;
 
 seedValue = 17;
@@ -86,6 +86,6 @@ inferOptions.maxSteps = maxStepsValue;
 inferOptions.seed = seedValue;
 result = ng.infer(model, queryValue, inferOptions);
 
-printline("input = ", stringify(queryValue));
-printline("output = ", stringify(result.output));
-printline("reason = ", result.reason);
+printline("input = {queryValue}");
+printline("output = {result.output}");
+printline("reason = {result.reason}");
