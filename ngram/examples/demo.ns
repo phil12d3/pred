@@ -1,0 +1,29 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+printline("=== ngram demo ===");
+
+printline("");
+printline("Numeric sequence model:");
+numericModel = ng.train([[1, 2, 3], [1, 2, 4], [1, 2, 3]], 2, {unit: "items", addStopToken: false});
+numericNext = ng.predictNext(numericModel, [1, 2], 5);
+for (i = 0; i < numericNext.count(); i = i + 1) {
+    row = numericNext[i];
+    printline("  next=", row.value, " count=", row.count, " p=", row.probability);
+}
+
+printline("");
+printline("Character text model:");
+charModel = ng.train(["abba", "abca"], 2, {unit: "chars", stopToken: "<END>", seed: 7});
+charResult = ng.generate(charModel, "ab", {maxSteps: 5, seed: 7});
+printline("  generated=", charResult.rendered, " reason=", charResult.reason);
+
+printline("");
+printline("Token text model:");
+tokenModel = ng.train(
+    ["the cat sat stop", "the cat slept stop", "the dog ran stop"],
+    1,
+    {unit: "tokens", stopToken: "stop", separator: " "}
+);
+tokenResult = ng.generate(tokenModel, "the cat", {maxSteps: 4, seed: 9, separator: " "});
+printline("  generated=", tokenResult.rendered, " reason=", tokenResult.reason);

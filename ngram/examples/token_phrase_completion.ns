@@ -1,0 +1,21 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+    [
+        "machine learning model stop",
+        "machine learning pipeline stop",
+        "machine learning model stop"
+    ],
+    2,
+    {unit: "tokens", stopToken: "stop", separator: " "}
+);
+
+rows = ng.predictNext(model, "machine learning", 5);
+
+printline("=== Token Phrase Completion ===");
+printline("Prompt: machine learning");
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline("  ", row.value, " -> p=", row.probability, " count=", row.count);
+}

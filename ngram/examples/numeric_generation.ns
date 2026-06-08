@@ -1,0 +1,20 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+    [
+        [2, 4, 6, -1],
+        [2, 4, 8, -1],
+        [2, 5, 7, -1]
+    ],
+    2,
+    {unit: "items", stopToken: -1, addStopToken: false, seed: 12}
+);
+
+result = ng.generate(model, [2], {maxSteps: 6, seed: 12});
+
+printline("=== Numeric Generation ===");
+printline("Generated sequence: ", stringify(result.sequence));
+printline("Rendered output: ", stringify(result.rendered));
+printline("Stop reason: ", result.reason);
+printline("Terminated by stop token: ", result.terminated);

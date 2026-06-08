@@ -1,0 +1,19 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+    [
+        "red blue stop",
+        "red green stop",
+        "blue yellow stop"
+    ],
+    1,
+    {unit: "tokens", stopToken: "stop", separator: " "}
+);
+
+result = ng.generate(model, "", {maxSteps: 4, seed: 4});
+
+printline("=== Empty Start Generation ===");
+printline("Generated text: ", result.rendered);
+printline("Stop reason: ", result.reason);
+printline("Visible sequence: ", stringify(result.sequence));

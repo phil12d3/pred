@@ -1,0 +1,23 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+    [[1, 2, 3], [1, 2, 4]],
+    3,
+    {unit: "items", addStopToken: false}
+);
+
+rows = ng.predictNext(model, [9, 1, 2], 5);
+
+printline("=== Backoff Prediction ===");
+printline("Requested history: [9, 1, 2]");
+if (rows.count() == 0) {
+    printline("No predictions found.");
+} else {
+    printline("Matched shorter context: ", stringify(rows[0].context));
+    printline("Matched order: ", rows[0].order);
+    for (i = 0; i < rows.count(); i = i + 1) {
+        row = rows[i];
+        printline("  next=", row.value, " p=", row.probability);
+    }
+}

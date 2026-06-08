@@ -1,0 +1,28 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+docs = [
+    "Poodles are dogs.",
+    "Cats are animals.",
+    "dogs are animals"
+];
+
+model = ng.train(docs, 2, {
+    unit: "tokens",
+    lowercase: true,
+    stopToken: "<END>",
+    seed: 21
+});
+
+path = "./tmp/ngram_model.bin";
+saved = ng.saveModel(model, path);
+
+printline("=== Save ngram Model ===");
+printline("Saved to: ", saved.path);
+printline("Kind: ", saved.kind);
+printline("Version: ", saved.version);
+printline("Order: ", saved.metadata.order);
+printline("Unit: ", saved.metadata.unit);
+printline("Sequences: ", saved.metadata.sequences);
+printline("Contexts: ", saved.metadata.contexts);
+printline("Vocabulary size: ", saved.metadata.vocabularySize);

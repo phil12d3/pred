@@ -1,0 +1,53 @@
+[test]
+numeric_sequences_train_counts_and_probabilities = func(t) {
+    pkg = import("./ngram.ns");
+    model = pkg.ngram.train([[1, 2, 3], [1, 2, 4], [1, 2, 3]], 2, {unit: "items", addStopToken: false});
+
+    rows = pkg.ngram.predictNext(model, [1, 2], 5);
+
+    t.equal(model.order, 2, "model stores requested order");
+    t.equal(rows.count(), 2, "predictNext returns both observed numeric continuations");
+    t.equal(rows[0].value, 3, "most common numeric continuation ranks first");
+    t.equal(rows[0].count, 2, "most common numeric continuation count is tracked");
+    t.truthy(rows[0].probability > rows[1].probability, "probabilities reflect observed numeric frequency");
+};
+
+[test]
+generation_uses_backoff_when_full_context_is_missing = func(t) {
+    pkg = import("./ngram.ns");
+    model = pkg.ngram.train([[1, 2, 3], [1, 2, 4]], 3, {unit: "items", addStopToken: false});
+
+    rows = pkg.ngram.predictNext(model, [9, 1, 2], 5);
+
+    t.equal(rows.count(), 2, "predictNext backs off to the longest known suffix context");
+    t.equal(rows[0].order, 2, "backoff reports the matched context length");
+};
+
+[test]
+character_generation_stops_on_stop_token = func(t) {
+    pkg = import("./ngram.ns");
+    model = pkg.ngram.train(["abba", "abca"], 2, {unit: "chars", stopToken: "<END>", seed: 7});
+
+    result = pkg.ngram.generate(model, "ab", {maxSteps: 5, seed: 7});
+
+    t.equal(result.reason, "stop_token", "character generation stops when the stop token is chosen");
+    t.truthy(result.terminated, "generation marks stop-token termination");
+    t.truthy(result.rendered == "abba" || result.rendered == "abca", "generated character text follows learned training paths");
+};
+
+[test]
+token_mode_supports_text_sequences = func(t) {
+    pkg = import("./ngram.ns");
+    model = pkg.ngram.train(
+        ["red blue stop", "red green stop", "red blue stop"],
+        1,
+        {unit: "tokens", stopToken: "stop", separator: " "}
+    );
+
+    rows = pkg.ngram.predictNext(model, "red", 5);
+    result = pkg.ngram.generate(model, "red", {maxSteps: 4, seed: 5, separator: " "});
+
+    t.equal(rows[0].value, "blue", "token mode learns word-level next-token frequencies");
+    t.equal(result.reason, "stop_token", "token mode generation respects the configured stop token");
+    t.truthy(result.rendered == "red blue" || result.rendered == "red green", "render joins generated token sequences back into text");
+};

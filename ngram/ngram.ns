@@ -1,0 +1,3 @@
+// ngram umbrella module
+
+ngram = import("./src/ngram.ns");

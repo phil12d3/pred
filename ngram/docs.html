@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ngram Documentation</title>
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --panel: #fffdfa;
+      --ink: #1f2933;
+      --muted: #52606d;
+      --line: #d8d2c7;
+      --accent: #0f766e;
+      --accent2: #b45309;
+      --accent3: #1d4ed8;
+      --radius: 14px;
+      --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+      --max: 1160px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at 0% 0%, #eefcf8 0, rgba(238, 252, 248, 0) 28%),
+        radial-gradient(circle at 100% 10%, #fff0df 0, rgba(255, 240, 223, 0) 30%),
+        linear-gradient(180deg, #fcfbf8 0%, #f3efe8 100%);
+      color: var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.66;
+    }
+
+    body { padding: 28px 16px 48px; }
+
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+
+    .hero, .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 18px;
+      background:
+        linear-gradient(180deg, rgba(15,118,110,0.08), rgba(29,78,216,0.03)),
+        var(--panel);
+    }
+
+    .section {
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      letter-spacing: 0.01em;
+    }
+
+    h1 { font-size: 2.35rem; margin-bottom: 10px; }
+    h2 {
+      font-size: 1.52rem;
+      margin: 26px 0 12px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin: 18px 0 8px;
+      color: var(--accent);
+    }
+
+    p { margin: 10px 0; }
+    ul { margin: 8px 0 8px 22px; }
+    li { margin: 5px 0; }
+
+    .muted { color: var(--muted); }
+
+    .toc {
+      columns: 2;
+      gap: 24px;
+    }
+
+    .code, .diagram, .note, .prop, .formula {
+      border-radius: 10px;
+      margin: 10px 0 14px;
+    }
+
+    .code {
+      background: #f8fafc;
+      border-left: 4px solid var(--accent);
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .code code {
+      display: block;
+      white-space: pre;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.92rem;
+      color: #102a43;
+    }
+
+    .diagram {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    .diagram svg {
+      width: 100%;
+      min-width: 760px;
+      height: auto;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+    }
+
+    .diagram text {
+      fill: #102a43;
+      font-size: 12px;
+    }
+
+    .prop {
+      border: 1px solid var(--line);
+      background: #fffdf7;
+      padding: 10px;
+    }
+
+    .prop .name {
+      display: block;
+      color: var(--accent);
+      font-family: "Courier New", Courier, monospace;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+
+    .note {
+      background: #fff7ed;
+      border-left: 4px solid var(--accent2);
+      padding: 10px 12px;
+    }
+
+    .formula {
+      background: #f4f7fb;
+      border: 1px solid #d9e2ec;
+      padding: 10px 12px;
+      font-family: "Courier New", Courier, monospace;
+      white-space: pre-wrap;
+      color: #16324f;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      margin-right: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      background: #fffdfa;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+    }
+
+    th {
+      background: #f7faf9;
+      color: #12324a;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    @media (max-width: 920px) {
+      .toc { columns: 1; }
+      h1 { font-size: 1.95rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>ngram Documentation</h1>
+      <p class="muted">Beginner-friendly reference for the <code>ngram</code> module in <code>ns</code>. This guide explains what an n-gram model is, how this implementation trains and generates sequences, what each public function does, and what the returned objects mean.</p>
+      <p class="muted">The goal of this package is simple sequence prediction from observed counts. It does not use neural networks, embeddings, or transformers. It just counts what tends to follow a given context, turns those counts into probabilities, and samples from them.</p>
+      <p class="muted"><span class="tag">Import</span> Use <code>pkg = import("./ngram.ns")</code> and then <code>ng = pkg.ngram</code>.</p>
+    </section>
+
+    <section class="section">
+      <h2>Table of Contents</h2>
+      <div class="toc">
+        <ul>
+          <li>1. What this module is for</li>
+          <li>2. The basic idea behind n-grams</li>
+          <li>3. What the module exposes</li>
+          <li>4. Training data formats</li>
+          <li>5. Public functions</li>
+          <li>6. Config and option fields</li>
+          <li>7. Model object properties</li>
+          <li>8. Prediction and generation result shapes</li>
+          <li>9. Internal behavior: counting, backoff, and sampling</li>
+          <li>10. Worked examples</li>
+          <li>11. Practical advice and caveats</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>1. What This Module Is For</h2>
+      <p>The <code>ngram</code> module learns short sequence patterns from data. You give it examples of sequences, and it learns which item usually comes next after a context of up to <code>n</code> previous items.</p>
+      <p>It supports three common modes:</p>
+      <ul>
+        <li><strong>Numeric item mode:</strong> arrays such as <code>[1, 2, 3, 4]</code></li>
+        <li><strong>Character mode:</strong> strings treated as one character at a time, such as <code>"hello"</code></li>
+        <li><strong>Token mode:</strong> strings split into words/tokens, such as <code>"hello world again"</code></li>
+      </ul>
+      <p>This makes it useful for small sequence demos, toy predictive systems, simple text generation, next-step prediction, or teaching how probabilistic sequence models work.</p>
+
+      <div class="note">
+        <strong>Important:</strong> This is a local frequency model, not a semantic model. It only knows what followed what in the training data. It does not "understand" meaning.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>2. The Basic Idea Behind n-Grams</h2>
+      <p>An n-gram model looks at the last <code>n</code> items of context and asks: <em>what usually came next after this context in the training data?</em></p>
+
+      <h3>2.1 Example With Numbers</h3>
+      <div class="code"><code>Training sequences:
+[1, 2, 3]
+[1, 2, 4]
+[1, 2, 3]</code></div>
+
+      <p>If <code>n = 2</code>, then the context <code>[1, 2]</code> is followed by:</p>
+      <ul>
+        <li><code>3</code> two times</li>
+        <li><code>4</code> one time</li>
+      </ul>
+
+      <p>So the predicted next-item distribution becomes:</p>
+      <div class="formula">P(3 | [1,2]) = 2 / 3
+P(4 | [1,2]) = 1 / 3</div>
+
+      <h3>2.2 Example With Text</h3>
+      <div class="code"><code>Training strings:
+"abba"
+"abca"</code></div>
+
+      <p>In character mode with <code>n = 2</code>, the context <code>"ab"</code> has been followed by both <code>"b"</code> and <code>"c"</code>. So generation from <code>"ab"</code> may continue as either <code>"abba"</code> or <code>"abca"</code>, depending on the probability draw.</p>
+
+      <h3>2.3 What "Order" Means Here</h3>
+      <p>In this package, the <code>order</code> argument means the maximum context length. So:</p>
+      <ul>
+        <li><code>order = 1</code> means look back up to 1 item</li>
+        <li><code>order = 2</code> means look back up to 2 items</li>
+        <li><code>order = 3</code> means look back up to 3 items</li>
+      </ul>
+
+      <p>The model also learns shorter contexts automatically at sequence starts, because the first item has no history, the second item has only one item of history, and so on.</p>
+    </section>
+
+    <section class="section">
+      <h2>3. What the Module Exposes</h2>
+      <p>The umbrella import exposes one namespace:</p>
+      <div class="code"><code>pkg = import("./ngram.ns");
+ng = pkg.ngram;</code></div>
+
+      <p>Public functions:</p>
+      <div class="prop"><span class="name">ngram.defaultConfig()</span>Returns the base configuration object.</div>
+      <div class="prop"><span class="name">ngram.sequence(value, config)</span>Turns input into a sequence array according to the mode.</div>
+      <div class="prop"><span class="name">ngram.train(data, order, config)</span>Builds a trained model from sequence examples.</div>
+      <div class="prop"><span class="name">ngram.predictNext(model, history, limit)</span>Returns ranked next-item candidates for a history.</div>
+      <div class="prop"><span class="name">ngram.generate(model, start, options)</span>Generates a continuation from a starting sequence.</div>
+      <div class="prop"><span class="name">ngram.render(sequenceValues, config)</span>Converts a sequence array back into output form, mainly for text modes.</div>
+    </section>
+
+    <section class="section">
+      <h2>4. Training Data Formats</h2>
+      <p>The module accepts different shapes depending on what you want to model.</p>
+
+      <h3>4.1 Numeric or General Item Sequences</h3>
+      <div class="code"><code>model = ng.train(
+  [[1, 2, 3], [1, 2, 4], [1, 2, 3]],
+  2,
+  {unit: "items", addStopToken: false}
+);</code></div>
+      <p>Use <code>unit: "items"</code> when your data is already an array of values and should not be split further.</p>
+
+      <h3>4.2 Character-Level Text</h3>
+      <div class="code"><code>model = ng.train(
+  ["abba", "abca"],
+  2,
+  {unit: "chars", stopToken: "&lt;END&gt;"}
+);</code></div>
+      <p>Use <code>unit: "chars"</code> when you want each character to be one item in the sequence.</p>
+
+      <h3>4.3 Token-Level Text</h3>
+      <div class="code"><code>model = ng.train(
+  ["red blue stop", "red green stop"],
+  1,
+  {unit: "tokens", stopToken: "stop", separator: " "}
+);</code></div>
+      <p>Use <code>unit: "tokens"</code> when you want strings split into word-like pieces first.</p>
+
+      <div class="note">
+        <strong>How token mode tokenizes:</strong> it splits on common whitespace and punctuation. It is intended to be simple and practical, not linguistically complete.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>5. Public Functions</h2>
+
+      <h3>5.1 defaultConfig()</h3>
+      <p><strong>What it does:</strong> returns the baseline settings used by the module when you do not override them.</p>
+      <div class="code"><code>cfg = ng.defaultConfig();</code></div>
+      <p><strong>Typical use:</strong> inspect available fields, copy them, then override only what you need.</p>
+
+      <h3>5.2 sequence(value, config)</h3>
+      <p><strong>What it does:</strong> normalizes one input into an array sequence.</p>
+      <p><strong>Why it matters:</strong> the model always trains and predicts on arrays internally. This helper defines how strings or arrays become that internal sequence.</p>
+
+      <div class="code"><code>ng.sequence("hello", {unit: "chars"});
+// ["h", "e", "l", "l", "o"]
+
+ng.sequence("hello world", {unit: "tokens"});
+// ["hello", "world"]
+
+ng.sequence([1, 2, 3], {unit: "items"});
+// [1, 2, 3]</code></div>
+
+      <p><strong>Input rules:</strong></p>
+      <ul>
+        <li>If the value is already an array, it is copied as-is.</li>
+        <li>If the value is a string and mode is <code>chars</code>, it becomes one character per array element.</li>
+        <li>If the value is a string and mode is <code>tokens</code>, it is tokenized into word-like pieces.</li>
+        <li>If the value is a non-string scalar, it becomes a one-item array.</li>
+      </ul>
+
+      <h3>5.3 train(data, order, config)</h3>
+      <p><strong>What it does:</strong> builds a model by counting how often each context is followed by each next item.</p>
+
+      <div class="code"><code>model = ng.train(
+  [[1, 2, 3], [1, 2, 4], [1, 2, 3]],
+  2,
+  {unit: "items", addStopToken: false}
+);</code></div>
+
+      <p><strong>Important behavior:</strong></p>
+      <ul>
+        <li>The model records contexts from length 0 up to the requested order.</li>
+        <li>If a <code>stopToken</code> is configured and <code>addStopToken</code> is enabled, the stop token is appended to training sequences if it is missing.</li>
+        <li>Each context bucket stores counts of possible next values.</li>
+      </ul>
+
+      <p><strong>Why shorter contexts exist:</strong> sequence starts do not have enough history yet, so the model also learns beginnings like:</p>
+      <ul>
+        <li><code>[] -&gt; first item</code></li>
+        <li><code>[first] -&gt; second item</code></li>
+        <li><code>[first, second] -&gt; third item</code></li>
+      </ul>
+
+      <h3>5.4 predictNext(model, history, limit)</h3>
+      <p><strong>What it does:</strong> returns the observed next-item choices for a given history, ranked by count.</p>
+
+      <div class="code"><code>rows = ng.predictNext(model, [1, 2], 5);</code></div>
+
+      <p><strong>What the function tries to do:</strong></p>
+      <ul>
+        <li>Convert the history into a sequence array</li>
+        <li>Try the longest suffix context first</li>
+        <li>If that exact context is unknown, back off to a shorter suffix</li>
+        <li>Return candidates with counts and probabilities</li>
+      </ul>
+
+      <div class="note">
+        <strong>Backoff behavior:</strong> if the model cannot match the full context, it tries a shorter one. For example, if order is 3 and history is <code>[9,1,2]</code>, but only <code>[1,2]</code> is known, the model uses <code>[1,2]</code>.
+      </div>
+
+      <h3>5.5 generate(model, start, options)</h3>
+      <p><strong>What it does:</strong> generates one continuation path by repeatedly predicting the next item and sampling from the candidate probabilities.</p>
+
+      <div class="code"><code>result = ng.generate(model, "ab", {maxSteps: 5, seed: 7});</code></div>
+
+      <p><strong>Generation loop:</strong></p>
+      <ol>
+        <li>Start from the given sequence</li>
+        <li>Find next-item candidates from the model</li>
+        <li>Choose one using the learned probabilities</li>
+        <li>Append it to history</li>
+        <li>Stop on stop token, missing transition, or max step count</li>
+      </ol>
+
+      <p><strong>Stop behavior:</strong> if the chosen next value equals the model stop token, generation ends and the stop token is <em>not</em> appended to the visible returned sequence.</p>
+
+      <h3>5.6 render(sequenceValues, config)</h3>
+      <p><strong>What it does:</strong> converts an internal sequence array back into output form.</p>
+
+      <div class="code"><code>ng.render(["h", "e", "l", "l", "o"], {unit: "chars"});
+// "hello"
+
+ng.render(["red", "blue"], {unit: "tokens", separator: " "});
+// "red blue"
+
+ng.render([1, 2, 3], {unit: "items"});
+// [1, 2, 3]</code></div>
+
+      <p>For text modes this is the function that turns arrays back into strings. For item mode it returns an array copy.</p>
+    </section>
+
+    <section class="section">
+      <h2>6. Config and Option Fields</h2>
+      <p>The module uses the same general config shape for training helpers and generation helpers. Not every field affects every function, but the full set is small and easy to inspect.</p>
+
+      <table>
+        <tr>
+          <th>Field</th>
+          <th>Default</th>
+          <th>Meaning</th>
+        </tr>
+        <tr>
+          <td><code>order</code></td>
+          <td><code>2</code></td>
+          <td>Maximum context length to learn or use. In practice, this is the n in the n-gram style context window.</td>
+        </tr>
+        <tr>
+          <td><code>unit</code></td>
+          <td><code>"chars"</code></td>
+          <td>Input interpretation mode. Allowed values are <code>"chars"</code>, <code>"tokens"</code>, and <code>"items"</code>.</td>
+        </tr>
+        <tr>
+          <td><code>lowercase</code></td>
+          <td><code>false</code></td>
+          <td>If true, text input is lowercased before sequence conversion. Useful when you want <code>"Hello"</code> and <code>"hello"</code> treated as the same item sequence.</td>
+        </tr>
+        <tr>
+          <td><code>separator</code></td>
+          <td><code>" "</code></td>
+          <td>String inserted between items when rendering token-mode output.</td>
+        </tr>
+        <tr>
+          <td><code>stopToken</code></td>
+          <td><code>null</code></td>
+          <td>Special token that ends generation when selected. This can be a word like <code>"stop"</code> or a synthetic marker like <code>"&lt;END&gt;"</code>.</td>
+        </tr>
+        <tr>
+          <td><code>addStopToken</code></td>
+          <td><code>true</code></td>
+          <td>If true and a stop token is configured, training sequences get that stop token appended when it is not already present.</td>
+        </tr>
+        <tr>
+          <td><code>seed</code></td>
+          <td><code>42</code></td>
+          <td>Deterministic pseudo-random seed used during generation if you do not override it per call.</td>
+        </tr>
+        <tr>
+          <td><code>maxSteps</code></td>
+          <td><code>32</code> in <code>generate()</code></td>
+          <td>Maximum number of generation steps before stopping with reason <code>"max_steps"</code>.</td>
+        </tr>
+      </table>
+
+      <h3>6.1 Training-Time vs Generation-Time Use</h3>
+      <p>Some fields matter mostly during training:</p>
+      <ul>
+        <li><code>order</code></li>
+        <li><code>unit</code></li>
+        <li><code>lowercase</code></li>
+        <li><code>stopToken</code></li>
+        <li><code>addStopToken</code></li>
+      </ul>
+
+      <p>Some fields matter mostly during generation:</p>
+      <ul>
+        <li><code>seed</code></li>
+        <li><code>maxSteps</code></li>
+        <li><code>separator</code> when rendering token-mode text</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>7. Model Object Properties</h2>
+      <p><code>train()</code> returns a plain object representing the learned counts and metadata. You can inspect it directly.</p>
+
+      <div class="code"><code>{
+  type: "ngram",
+  order: 2,
+  unit: "items",
+  itemMode: "items",
+  lowercase: false,
+  separator: " ",
+  stopToken: null,
+  addStopToken: false,
+  seed: 42,
+  sequences: 3,
+  observations: 9,
+  transitions: {...},
+  vocabulary: {...},
+  vocabularySize: 4,
+  contexts: 6
+}</code></div>
+
+      <div class="prop"><span class="name">type</span>Fixed string identifying the model kind. Currently <code>"ngram"</code>.</div>
+      <div class="prop"><span class="name">order</span>The maximum learned context length.</div>
+      <div class="prop"><span class="name">unit</span>The public mode name used to interpret inputs and outputs.</div>
+      <div class="prop"><span class="name">itemMode</span>Internal normalized copy of the mode. In practice this matches <code>unit</code>.</div>
+      <div class="prop"><span class="name">lowercase</span>Whether text was normalized to lowercase.</div>
+      <div class="prop"><span class="name">separator</span>Default separator for token rendering.</div>
+      <div class="prop"><span class="name">stopToken</span>The configured generation stop token, if any.</div>
+      <div class="prop"><span class="name">addStopToken</span>Whether stop tokens were auto-appended during training.</div>
+      <div class="prop"><span class="name">seed</span>Default deterministic seed stored with the model.</div>
+      <div class="prop"><span class="name">sequences</span>How many non-empty training sequences were used.</div>
+      <div class="prop"><span class="name">observations</span>Total context-to-next-item observations recorded.</div>
+      <div class="prop"><span class="name">transitions</span>Main learned mapping from contexts to next-item count buckets.</div>
+      <div class="prop"><span class="name">vocabulary</span>Map of seen item keys to original values.</div>
+      <div class="prop"><span class="name">vocabularySize</span>Number of unique items observed.</div>
+      <div class="prop"><span class="name">contexts</span>Number of distinct context buckets learned.</div>
+
+      <h3>7.1 What Is Inside transitions?</h3>
+      <p>Each context key points to a bucket shaped like this:</p>
+      <div class="code"><code>{
+  context: [1, 2],
+  total: 3,
+  nextCounts: {
+    "Number:1:3": 2,
+    "Number:1:4": 1
+  },
+  nextValues: {
+    "Number:1:3": 3,
+    "Number:1:4": 4
+  }
+}</code></div>
+
+      <p>This means the context <code>[1,2]</code> was seen three times in total, with next value <code>3</code> twice and <code>4</code> once.</p>
+    </section>
+
+    <section class="section">
+      <h2>8. Prediction and Generation Result Shapes</h2>
+
+      <h3>8.1 predictNext() Rows</h3>
+      <p><code>predictNext()</code> returns an array of rows like this:</p>
+      <div class="code"><code>{
+  value: 3,
+  count: 2,
+  probability: 0.666667,
+  context: [1, 2],
+  order: 2
+}</code></div>
+
+      <p>Field meanings:</p>
+      <div class="prop"><span class="name">value</span>The candidate next item.</div>
+      <div class="prop"><span class="name">count</span>How many times this item followed the matched context.</div>
+      <div class="prop"><span class="name">probability</span><code>count / total</code> within the matched context bucket.</div>
+      <div class="prop"><span class="name">context</span>The actual context that matched after any needed backoff.</div>
+      <div class="prop"><span class="name">order</span>The matched context length used for this prediction.</div>
+
+      <h3>8.2 generate() Result</h3>
+      <p><code>generate()</code> returns one object with the generated sequence plus step-by-step metadata.</p>
+      <div class="code"><code>{
+  sequence: ["a", "b", "c", "a"],
+  rendered: "abca",
+  terminated: true,
+  reason: "stop_token",
+  seed: 642666333,
+  steps: [
+    {context: ["a","b"], order: 2, value: "c", probability: 0.5},
+    {context: ["b","c"], order: 2, value: "a", probability: 1}
+  ]
+}</code></div>
+
+      <p>Main fields:</p>
+      <div class="prop"><span class="name">sequence</span>The generated visible sequence values. Stop token values are not appended here.</div>
+      <div class="prop"><span class="name">rendered</span>Rendered output form. String for text modes, array for item mode.</div>
+      <div class="prop"><span class="name">terminated</span>True only when generation stopped because the configured stop token was selected.</div>
+      <div class="prop"><span class="name">reason</span>Why generation stopped. One of <code>"stop_token"</code>, <code>"no_transition"</code>, or <code>"max_steps"</code>.</div>
+      <div class="prop"><span class="name">seed</span>The updated pseudo-random seed after generation finished.</div>
+      <div class="prop"><span class="name">steps</span>Per-step log of chosen values and matched contexts.</div>
+    </section>
+
+    <section class="section">
+      <h2>9. Internal Behavior: Counting, Backoff, and Sampling</h2>
+
+      <h3>9.1 Counting During Training</h3>
+      <p>For each position in a training sequence, the model records one observation:</p>
+      <div class="formula">context -&gt; next_value</div>
+
+      <p>Suppose the sequence is:</p>
+      <div class="code"><code>[1, 2, 3]</code></div>
+
+      <p>With <code>order = 2</code>, the observations are:</p>
+      <ul>
+        <li><code>[] -&gt; 1</code></li>
+        <li><code>[1] -&gt; 2</code></li>
+        <li><code>[1,2] -&gt; 3</code></li>
+      </ul>
+
+      <p>If a stop token is auto-appended, there is one more observation:</p>
+      <ul>
+        <li><code>[2,3] -&gt; stopToken</code></li>
+      </ul>
+
+      <h3>9.2 Backoff During Prediction</h3>
+      <p>The model tries to match the longest possible suffix of the provided history.</p>
+
+      <div class="code"><code>history = [9, 1, 2]
+order   = 3</code></div>
+
+      <p>It will try contexts in this order:</p>
+      <ul>
+        <li><code>[9,1,2]</code></li>
+        <li><code>[1,2]</code></li>
+        <li><code>[2]</code></li>
+        <li><code>[]</code></li>
+      </ul>
+
+      <p>This is useful because generation would otherwise stop too early whenever the exact longest context was unseen.</p>
+
+      <h3>9.3 Probability Calculation</h3>
+      <p>Inside one matched context bucket, probabilities are simple empirical frequencies:</p>
+      <div class="formula">probability(next) = count(next after context) / total observations for that context</div>
+
+      <p>No smoothing is currently applied. That means an unseen continuation has probability 0.</p>
+
+      <h3>9.4 Sampling During Generation</h3>
+      <p>The package uses a small deterministic pseudo-random generator. Given the same seed and model, generation is reproducible.</p>
+      <p>Sampling works like this:</p>
+      <ul>
+        <li>Build the candidate rows and their probabilities</li>
+        <li>Draw one random number between 0 and 1</li>
+        <li>Walk through the cumulative probability mass</li>
+        <li>Pick the row where the random number lands</li>
+      </ul>
+
+      <div class="note">
+        <strong>Why deterministic randomness?</strong> It makes examples, tests, and debugging repeatable. If you use the same seed, you get the same generated path.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>10. Worked Examples</h2>
+
+      <h3>10.1 Next Number Prediction</h3>
+      <div class="code"><code>pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+  [[1, 2, 3], [1, 2, 4], [1, 2, 3]],
+  2,
+  {unit: "items", addStopToken: false}
+);
+
+rows = ng.predictNext(model, [1, 2], 5);
+printline(rows[0].value);        // 3
+printline(rows[0].probability);  // 0.666667 roughly</code></div>
+
+      <h3>10.2 Character Generation</h3>
+      <div class="code"><code>charModel = ng.train(
+  ["abba", "abca"],
+  2,
+  {unit: "chars", stopToken: "&lt;END&gt;", seed: 7}
+);
+
+result = ng.generate(charModel, "ab", {maxSteps: 5, seed: 7});
+printline(result.rendered);   // "abba" or "abca" depending on path</code></div>
+
+      <h3>10.3 Token Generation</h3>
+      <div class="code"><code>tokenModel = ng.train(
+  ["the cat sat stop", "the cat slept stop", "the dog ran stop"],
+  1,
+  {unit: "tokens", stopToken: "stop", separator: " "}
+);
+
+result = ng.generate(tokenModel, "the cat", {maxSteps: 4, seed: 9});
+printline(result.rendered);   // for example: "the cat slept"</code></div>
+
+      <h3>10.4 Lowercasing Text</h3>
+      <div class="code"><code>model = ng.train(
+  ["Hello world", "hello there"],
+  1,
+  {unit: "tokens", lowercase: true}
+);</code></div>
+      <p>This causes <code>Hello</code> and <code>hello</code> to be treated as the same token.</p>
+
+      <h3>10.5 Inspecting the Learned Next Choices</h3>
+      <div class="code"><code>model = ng.train(
+  [[10, 20, 30], [10, 20, 40], [10, 20, 30], [10, 50, 60]],
+  2,
+  {unit: "items", addStopToken: false}
+);
+
+rows = ng.predictNext(model, [10, 20], 10);
+
+for (i = 0; i < rows.count(); i = i + 1) {
+  row = rows[i];
+  printline("next=", row.value,
+            " count=", row.count,
+            " p=", row.probability,
+            " context=", stringify(row.context),
+            " order=", row.order);
+}</code></div>
+      <p>This is a good first debugging pattern. It shows exactly what the model thinks can come next, how often each continuation was seen, and which context length actually matched.</p>
+
+      <h3>10.6 Backoff to a Shorter Known Context</h3>
+      <div class="code"><code>model = ng.train(
+  [[1, 2, 3], [1, 2, 4]],
+  3,
+  {unit: "items", addStopToken: false}
+);
+
+rows = ng.predictNext(model, [9, 1, 2], 5);
+
+printline("matched order = ", rows[0].order);
+printline("matched context = ", stringify(rows[0].context));
+printline("top next = ", rows[0].value);</code></div>
+      <p>Even though the full history is <code>[9,1,2]</code>, the model may only know the suffix <code>[1,2]</code>. In that case it backs off and still returns a useful answer instead of failing immediately.</p>
+
+      <h3>10.7 Numeric Generation With a Stop Value</h3>
+      <div class="code"><code>model = ng.train(
+  [
+    [2, 4, 6, -1],
+    [2, 4, 8, -1],
+    [2, 5, 7, -1]
+  ],
+  2,
+  {unit: "items", stopToken: -1, addStopToken: false, seed: 12}
+);
+
+result = ng.generate(model, [2], {maxSteps: 6, seed: 12});
+
+printline("sequence = ", stringify(result.sequence));
+printline("reason = ", result.reason);
+printline("terminated = ", result.terminated);</code></div>
+      <p>This shows that stop tokens do not need to be strings. A numeric sentinel like <code>-1</code> can mark sequence termination too.</p>
+
+      <h3>10.8 Token Prediction for Phrase Completion</h3>
+      <div class="code"><code>model = ng.train(
+  [
+    "machine learning model stop",
+    "machine learning pipeline stop",
+    "machine learning model stop"
+  ],
+  2,
+  {unit: "tokens", stopToken: "stop", separator: " "}
+);
+
+rows = ng.predictNext(model, "machine learning", 5);
+
+for (i = 0; i < rows.count(); i = i + 1) {
+  printline(rows[i].value, " -> ", rows[i].probability);
+}</code></div>
+      <p>This pattern is useful when you do not want full generation yet. You just want to inspect the model’s ranked next-word suggestions after a phrase.</p>
+
+      <h3>10.9 Reading Generation Steps</h3>
+      <div class="code"><code>model = ng.train(
+  ["abba", "abca"],
+  2,
+  {unit: "chars", stopToken: "&lt;END&gt;", seed: 7}
+);
+
+result = ng.generate(model, "ab", {maxSteps: 5, seed: 7});
+
+for (i = 0; i < result.steps.count(); i = i + 1) {
+  step = result.steps[i];
+  printline("step ", i,
+            " context=", stringify(step.context),
+            " order=", step.order,
+            " chose=", step.value,
+            " p=", step.probability);
+}</code></div>
+      <p>The <code>steps</code> array is useful when you want to explain why a generated sequence took a particular path.</p>
+
+      <h3>10.10 Generating Until No Transition Exists</h3>
+      <div class="code"><code>model = ng.train(
+  [[1, 2, 3]],
+  2,
+  {unit: "items", addStopToken: false}
+);
+
+result = ng.generate(model, [1, 2], {maxSteps: 10, seed: 3});
+
+printline("sequence = ", stringify(result.sequence));
+printline("reason = ", result.reason);   // likely "no_transition"</code></div>
+      <p>If there is no stop token and no further continuation is known, generation ends with reason <code>"no_transition"</code>.</p>
+
+      <h3>10.11 Using sequence() and render() Directly</h3>
+      <div class="code"><code>chars = ng.sequence("Nova", {unit: "chars"});
+tokens = ng.sequence("Nova learns fast", {unit: "tokens"});
+
+printline(stringify(chars));
+printline(stringify(tokens));
+printline(ng.render(chars, {unit: "chars"}));
+printline(ng.render(tokens, {unit: "tokens", separator: " "}));</code></div>
+      <p>These helpers are useful when you want to inspect exactly how the module sees your inputs before training.</p>
+
+      <h3>10.12 Starting From an Empty Sequence</h3>
+      <div class="code"><code>model = ng.train(
+  [
+    "red blue stop",
+    "red green stop",
+    "blue yellow stop"
+  ],
+  1,
+  {unit: "tokens", stopToken: "stop", separator: " "}
+);
+
+result = ng.generate(model, "", {maxSteps: 4, seed: 4});
+printline(result.rendered);</code></div>
+      <p>Because the model learns empty-context starts too, generation can begin from nothing. In effect, it asks: "what items usually begin sequences in this training set?"</p>
+    </section>
+
+    <section class="section">
+      <h2>11. Practical Advice and Caveats</h2>
+
+      <h3>11.1 Choosing the Order</h3>
+      <ul>
+        <li>Use smaller orders like 1 or 2 when training data is limited.</li>
+        <li>Use larger orders when you want more local structure and have enough repeated data.</li>
+        <li>If order is too large relative to the data, exact contexts become sparse and the model falls back often.</li>
+      </ul>
+
+      <h3>11.2 Stop Tokens</h3>
+      <ul>
+        <li>Use a stop token when you want generation to know where sequences end.</li>
+        <li>For text, a synthetic token like <code>"&lt;END&gt;"</code> is often convenient in char mode.</li>
+        <li>For token mode, a word like <code>"stop"</code> works if it is not confused with regular content.</li>
+      </ul>
+
+      <h3>11.3 No Smoothing</h3>
+      <p>This implementation does not invent probability mass for unseen next items. If the model never saw a continuation, it cannot predict it. That keeps the behavior simple and transparent.</p>
+
+      <h3>11.4 Tokenization Is Simple</h3>
+      <p>The token-mode splitter is intentionally lightweight. It is useful for small demos and straightforward corpora, but it is not a full natural-language tokenizer.</p>
+
+      <h3>11.5 What This Model Cannot Do</h3>
+      <ul>
+        <li>It cannot reason about long-range meaning.</li>
+        <li>It cannot generalize beyond observed local patterns the way large language models do.</li>
+        <li>It cannot invent new structure except by recombining seen local transitions.</li>
+      </ul>
+
+      <div class="note">
+        <strong>Best mental model:</strong> this package is a compact, inspectable sequence memory. It remembers what followed what, and then plays those probabilities back during prediction and generation.
+      </div>
+
+      <h3>11.6 Running the Package</h3>
+      <div class="code"><code>../../ns/bin/ns tests/run_tests.ns
+../../ns/bin/ns examples/demo.ns</code></div>
+      <p>Those commands assume you are running them from inside the <code>ngram/</code> directory.</p>
+    </section>
+  </div>
+</body>
+</html>

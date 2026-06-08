@@ -1,0 +1,20 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+    [[1, 2, 3], [1, 2, 4], [1, 2, 3]],
+    2,
+    {unit: "items", addStopToken: false}
+);
+
+rows = ng.predictNext(model, [1, 2], 5);
+
+printline("=== Next Number Prediction ===");
+printline("History: [1, 2]");
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline("  next=", row.value,
+              " count=", row.count,
+              " probability=", row.probability,
+              " context=", stringify(row.context));
+}

@@ -1,0 +1,134 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+embedLearn = import("../embed/src/learn.ns");
+
+sqrt = func(x) {
+    if (x <= 0) return 0;
+    guess = x / 2;
+    for (i = 0; i < 40; i = i + 1) {
+        guess = (guess + (x / guess)) / 2;
+    }
+    return guess;
+}
+
+cosineSimilarity = func(left, right) {
+    if (left.dims != right.dims) return 0;
+    if (left.dims == 0) return 1;
+
+    dot = 0;
+    magLeft = 0;
+    magRight = 0;
+    for (i = 0; i < left.dims; i = i + 1) {
+        a = left.values[i];
+        b = right.values[i];
+        dot = dot + (a * b);
+        magLeft = magLeft + (a * a);
+        magRight = magRight + (b * b);
+    }
+
+    if (magLeft <= 0 || magRight <= 0) return 0;
+    return dot / (sqrt(magLeft) * sqrt(magRight));
+}
+
+docs = [
+    "Poodles are dogs.",
+    "Cats are animals.",
+    "dogs are animals"
+];
+
+tokenRows = [];
+uniqueTokens = {};
+orderedTokens = [];
+
+for (di = 0; di < docs.count(); di = di + 1) {
+    tokens = ng.sequence(docs[di], {unit: "tokens", lowercase: true});
+    tokenRows.add(tokens);
+    for (ti = 0; ti < tokens.count(); ti = ti + 1) {
+        tok = tokens[ti];
+        if (!defined(uniqueTokens[tok])) {
+            uniqueTokens[tok] = true;
+            orderedTokens.add(tok);
+        }
+    }
+}
+
+corpus = {docs: docs};
+dimensions = 16;
+tokenEmbeddings = {};
+embeddingList = [];
+
+for (i = 0; i < orderedTokens.count(); i = i + 1) {
+    token = orderedTokens[i];
+    emb = embedLearn.fromCorpus(corpus, token, dimensions);
+    emb.metadata.token = token;
+    tokenEmbeddings[token] = emb;
+    embeddingList.add(emb);
+}
+
+embeddingRows = [];
+for (ri = 0; ri < tokenRows.count(); ri = ri + 1) {
+    row = [];
+    for (ti = 0; ti < tokenRows[ri].count(); ti = ti + 1) {
+        token = tokenRows[ri][ti];
+        row.add(tokenEmbeddings[token]);
+    }
+    embeddingRows.add(row);
+}
+
+model = ng.train(embeddingRows, 2, {unit: "items", addStopToken: false});
+
+prompt = "Poodles are";
+promptTokens = ng.sequence(prompt, {unit: "tokens", lowercase: true});
+promptEmbeddings = [];
+for (i = 0; i < promptTokens.count(); i = i + 1) {
+    token = promptTokens[i];
+    if (defined(tokenEmbeddings[token])) promptEmbeddings.add(tokenEmbeddings[token]);
+}
+
+rows = ng.predictNext(model, promptEmbeddings, 3);
+
+printline("=== Embedding-Based Token Prediction ===");
+printline("Training docs:");
+for (i = 0; i < docs.count(); i = i + 1) {
+    printline("  ", docs[i]);
+}
+
+printline("");
+printline("Prompt text: ", prompt);
+printline("Prompt tokens: ", stringify(promptTokens));
+printline("");
+
+if (rows.count() == 0) {
+    printline("No embedding prediction found.");
+} else {
+    predictedEmbedding = rows[0].value;
+    nearest = [];
+    for (i = 0; i < embeddingList.count(); i = i + 1) {
+        emb = embeddingList[i];
+        nearest.add({
+            embedding: emb,
+            similarity: cosineSimilarity(predictedEmbedding, emb)
+        });
+    }
+    for (i = 0; i < nearest.count(); i = i + 1) {
+        best = i;
+        for (j = i + 1; j < nearest.count(); j = j + 1) {
+            if (nearest[j].similarity > nearest[best].similarity) best = j;
+        }
+        if (best != i) {
+            tmp = nearest[i];
+            nearest[i] = nearest[best];
+            nearest[best] = tmp;
+        }
+    }
+    predictedToken = nearest[0].embedding.metadata.token;
+
+    printline("Top predicted embedding resolves to token: ", predictedToken);
+    printline("Prediction probability: ", rows[0].probability);
+    printline("");
+    printline("Nearest tokens to the predicted embedding:");
+    for (i = 0; i < nearest.count() && i < 3; i = i + 1) {
+        row = nearest[i];
+        printline("  ", row.embedding.metadata.token, " -> similarity=", row.similarity);
+    }
+}

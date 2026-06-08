@@ -1,0 +1,23 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+model = ng.train(
+    ["abba", "abca"],
+    2,
+    {unit: "chars", stopToken: "<END>", seed: 7}
+);
+
+result = ng.generate(model, "ab", {maxSteps: 5, seed: 7});
+
+printline("=== Generation Steps ===");
+printline("Rendered output: ", result.rendered);
+printline("Stop reason: ", result.reason);
+printline("");
+for (i = 0; i < result.steps.count(); i = i + 1) {
+    step = result.steps[i];
+    printline("step ", i,
+              " | context=", stringify(step.context),
+              " | order=", step.order,
+              " | chose=", step.value,
+              " | p=", step.probability);
+}

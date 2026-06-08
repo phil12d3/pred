@@ -1,0 +1,23 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+path = "./tmp/ngram_model.bin";
+model = ng.loadModel(path);
+
+rows = ng.predictNext(model, "poodles are", 5);
+result = ng.generate(model, "poodles are", {maxSteps: 4, seed: 21});
+
+printline("=== Load And Query ngram Model ===");
+printline("Loaded model order: ", model.order);
+printline("Loaded model unit: ", model["unit"]);
+printline("");
+printline("predictNext(\"poodles are\"):");
+for (i = 0; i < rows.count(); i = i + 1) {
+    row = rows[i];
+    printline("  ", row.value, " -> p=", row.probability, " count=", row.count);
+}
+
+printline("");
+printline("generate(\"poodles are\"):");
+printline("  rendered = ", result.rendered);
+printline("  reason = ", result.reason);

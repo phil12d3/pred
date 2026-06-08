@@ -1,0 +1,15 @@
+pkg = import("./ngram.ns");
+ng = pkg.ngram;
+
+chars = ng.sequence("Nova", {unit: "chars"});
+tokens = ng.sequence("Nova learns fast", {unit: "tokens"});
+items = ng.sequence([10, 20, 30], {unit: "items"});
+
+printline("=== Sequence And Render Helpers ===");
+printline("chars  = ", stringify(chars));
+printline("tokens = ", stringify(tokens));
+printline("items  = ", stringify(items));
+printline("");
+printline("render chars  -> ", ng.render(chars, {unit: "chars"}));
+printline("render tokens -> ", ng.render(tokens, {unit: "tokens", separator: " "}));
+printline("render items  -> ", stringify(ng.render(items, {unit: "items"})));

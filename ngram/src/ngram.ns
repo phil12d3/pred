@@ -1,0 +1,502 @@
+defaultConfig = func() {
+    return {
+        order: 2,
+        unit: "chars",
+        lowercase: false,
+        separator: " ",
+        stopToken: null,
+        addStopToken: true,
+        seed: 42
+    };
+}
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+configWith = func(config) {
+    merged = this.defaultConfig();
+    if (defined(config) && config != null) {
+        foreach(name in config.props) merged[name] = config[name];
+    }
+    merged.itemMode = merged["unit"];
+    return merged;
+}
+
+asText = func(value) {
+    if (!defined(value) || value == null) return "";
+    if (type(value).typename == "String") return value;
+    return stringify(value);
+}
+
+splitPath = func(path) {
+    parts = [];
+    current = "";
+    value = this.asText(path);
+    for (i = 0; i < value.length; i = i + 1) {
+        ch = value[i];
+        if (ch == "/") {
+            parts.add(current);
+            current = "";
+        } else {
+            current = current + ch;
+        }
+    }
+    parts.add(current);
+    return parts;
+}
+
+ensureDirectory = func(path) {
+    if (!defined(path) || path == null || path == "" || path == ".") return true;
+    parts = this.splitPath(path);
+    current = "";
+    isAbsolute = this.asText(path).length > 0 && this.asText(path)[0] == "/";
+    if (isAbsolute) current = "/";
+    for (i = 0; i < parts.count(); i = i + 1) {
+        part = parts[i];
+        if (!defined(part) || part == "" || part == ".") continue;
+        if (current == "") current = "./" + part;
+        else if (current == "/") current = "/" + part;
+        else current = current + "/" + part;
+        if (!exists(current)) mkdir(current);
+    }
+    return true;
+}
+
+ensureParentDirectory = func(path) {
+    parts = this.splitPath(path);
+    if (parts.count() <= 1) return true;
+    dir = "";
+    value = this.asText(path);
+    isAbsolute = value.length > 0 && value[0] == "/";
+    if (isAbsolute) dir = "/";
+    for (i = 0; i < parts.count() - 1; i = i + 1) {
+        part = parts[i];
+        if (!defined(part) || part == "" || part == ".") continue;
+        if (dir == "") dir = "./" + part;
+        else if (dir == "/") dir = "/" + part;
+        else dir = dir + "/" + part;
+    }
+    return this.ensureDirectory(dir);
+}
+
+toLowerText = func(text) {
+    s = this.asText(text);
+    out = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        if (ch == "A") ch = "a";
+        else if (ch == "B") ch = "b";
+        else if (ch == "C") ch = "c";
+        else if (ch == "D") ch = "d";
+        else if (ch == "E") ch = "e";
+        else if (ch == "F") ch = "f";
+        else if (ch == "G") ch = "g";
+        else if (ch == "H") ch = "h";
+        else if (ch == "I") ch = "i";
+        else if (ch == "J") ch = "j";
+        else if (ch == "K") ch = "k";
+        else if (ch == "L") ch = "l";
+        else if (ch == "M") ch = "m";
+        else if (ch == "N") ch = "n";
+        else if (ch == "O") ch = "o";
+        else if (ch == "P") ch = "p";
+        else if (ch == "Q") ch = "q";
+        else if (ch == "R") ch = "r";
+        else if (ch == "S") ch = "s";
+        else if (ch == "T") ch = "t";
+        else if (ch == "U") ch = "u";
+        else if (ch == "V") ch = "v";
+        else if (ch == "W") ch = "w";
+        else if (ch == "X") ch = "x";
+        else if (ch == "Y") ch = "y";
+        else if (ch == "Z") ch = "z";
+        out = out + ch;
+    }
+    return out;
+}
+
+tokenizeText = func(text, lowercase) {
+    s = lowercase ? this.toLowerText(text) : this.asText(text);
+    out = [];
+    current = "";
+    for (i = 0; i < s.length; i = i + 1) {
+        ch = s[i];
+        isAsciiAlphaNum = (ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z") || (ch >= "0" && ch <= "9");
+        isSeparator = ch == " " || ch == "\n" || ch == "\t" || ch == "\r" ||
+                      ch == "." || ch == "," || ch == "!" || ch == "?" ||
+                      ch == ";" || ch == ":" || ch == "(" || ch == ")" ||
+                      ch == "[" || ch == "]" || ch == "{" || ch == "}" ||
+                      ch == "\"" || ch == "'" || ch == "/" || ch == "\\" ||
+                      ch == "|" || ch == "-" || ch == "_" || ch == "+" ||
+                      ch == "=" || ch == "*" || ch == "&" || ch == "^" ||
+                      ch == "%" || ch == "$" || ch == "#" || ch == "@" ||
+                      ch == "<" || ch == ">" || ch == "~" || ch == "`" ||
+                      ch == "。" || ch == "、" || ch == "！" || ch == "？" || ch == "・";
+        if (isAsciiAlphaNum || !isSeparator) {
+            current = current + ch;
+        } else if (current != "") {
+            out.add(current);
+            current = "";
+        }
+    }
+    if (current != "") out.add(current);
+    return out;
+}
+
+sequence = func(value, config) {
+    settings = this.configWith(config);
+    if (!defined(value) || value == null) return [];
+
+    valueType = type(value).typename;
+    if (valueType == "Array") return this.copyArray(value);
+    if (valueType != "String") return [value];
+
+    text = value;
+    if (settings.lowercase) text = this.toLowerText(value);
+    mode = this.asText(settings.itemMode);
+    if (mode == "tokens") return this.tokenizeText(text, false);
+
+    out = [];
+    for (i = 0; i < text.length; i = i + 1) out.add(text[i]);
+    return out;
+}
+
+looksLikeDataset = func(data, settings) {
+    if (!defined(data) || data == null || type(data).typename != "Array" || data.count() == 0) return false;
+    firstType = type(data[0]).typename;
+    mode = this.asText(settings.itemMode);
+    if (firstType == "Array") return true;
+    if (firstType == "String" && (mode == "chars" || mode == "tokens")) return true;
+    return false;
+}
+
+trainingSequences = func(data, config) {
+    settings = this.configWith(config);
+    rows = [];
+
+    if (this.looksLikeDataset(data, settings)) {
+        for (i = 0; i < data.count(); i = i + 1) rows.add(this.sequence(data[i], settings));
+        return rows;
+    }
+
+    rows.add(this.sequence(data, settings));
+    return rows;
+}
+
+tokenKey = func(value) {
+    text = this.asText(value);
+    return type(value).typename + ":" + text.length + ":" + text;
+}
+
+contextKey = func(values) {
+    key = "";
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (i > 0) key = key + "|";
+        key = key + this.tokenKey(values[i]);
+    }
+    return key;
+}
+
+countProps = func(obj) {
+    if (!defined(obj) || obj == null) return 0;
+    total = 0;
+    foreach(name in obj.props) total = total + 1;
+    return total;
+}
+
+recordTransition = func(model, context, nextValue) {
+    key = this.contextKey(context);
+    nextKey = this.tokenKey(nextValue);
+
+    if (!defined(model.transitions[key])) {
+        model.transitions[key] = {
+            context: this.copyArray(context),
+            total: 0,
+            nextCounts: {},
+            nextValues: {}
+        };
+    }
+
+    bucket = model.transitions[key];
+    if (!defined(bucket.nextCounts[nextKey])) {
+        bucket.nextCounts[nextKey] = 0;
+        bucket.nextValues[nextKey] = nextValue;
+    }
+    bucket.nextCounts[nextKey] = bucket.nextCounts[nextKey] + 1;
+    bucket.total = bucket.total + 1;
+
+    if (!defined(model.vocabulary[nextKey])) {
+        model.vocabulary[nextKey] = nextValue;
+        model.vocabularySize = model.vocabularySize + 1;
+    }
+}
+
+appendStopToken = func(sequenceValues, stopToken, enabled) {
+    out = this.copyArray(sequenceValues);
+    if (!enabled || !defined(stopToken) || stopToken == null) return out;
+    if (out.count() == 0 || out[out.count() - 1] != stopToken) out.add(stopToken);
+    return out;
+}
+
+train = func(data, order, config) {
+    settings = this.configWith(config);
+    n = defined(order) && order > 0 ? order : settings.order;
+    if (n < 1) n = 1;
+
+    sequences = this.trainingSequences(data, settings);
+    model = {
+        type: "ngram",
+        order: n,
+        unit: settings["unit"],
+        itemMode: settings.itemMode,
+        lowercase: settings.lowercase,
+        separator: settings.separator,
+        stopToken: settings.stopToken,
+        addStopToken: settings.addStopToken,
+        seed: settings.seed,
+        sequences: 0,
+        observations: 0,
+        transitions: {},
+        vocabulary: {},
+        vocabularySize: 0
+    };
+
+    for (si = 0; si < sequences.count(); si = si + 1) {
+        seq = this.appendStopToken(sequences[si], settings.stopToken, settings.addStopToken);
+        if (seq.count() == 0) continue;
+        model.sequences = model.sequences + 1;
+        for (i = 0; i < seq.count(); i = i + 1) {
+            contextLength = i < n ? i : n;
+            context = [];
+            start = i - contextLength;
+            for (j = start; j < i; j = j + 1) context.add(seq[j]);
+            this.recordTransition(model, context, seq[i]);
+            model.observations = model.observations + 1;
+        }
+    }
+
+    model.contexts = this.countProps(model.transitions);
+    return model;
+}
+
+sortRows = func(rows) {
+    out = this.copyArray(rows);
+    for (i = 0; i < out.count(); i = i + 1) {
+        best = i;
+        for (j = i + 1; j < out.count(); j = j + 1) {
+            if (out[j].count > out[best].count) best = j;
+            else if (out[j].count == out[best].count && stringify(out[j].value) < stringify(out[best].value)) best = j;
+        }
+        if (best != i) {
+            tmp = out[i];
+            out[i] = out[best];
+            out[best] = tmp;
+        }
+    }
+    return out;
+}
+
+bucketRows = func(bucket) {
+    rows = [];
+    foreach(nextKey in bucket.nextCounts.props) {
+        count = bucket.nextCounts[nextKey];
+        rows.add({
+            value: bucket.nextValues[nextKey],
+            count: count,
+            probability: bucket.total > 0 ? count / bucket.total : 0
+        });
+    }
+    return this.sortRows(rows);
+}
+
+predictionContext = func(model, history) {
+    maxLength = model.order;
+    if (history.count() < maxLength) maxLength = history.count();
+
+    for (size = maxLength; size >= 0; size = size - 1) {
+        context = [];
+        start = history.count() - size;
+        for (i = start; i < history.count(); i = i + 1) {
+            if (i >= 0) context.add(history[i]);
+        }
+        key = this.contextKey(context);
+        if (defined(model.transitions[key])) return {context: context, bucket: model.transitions[key], order: size};
+    }
+
+    return null;
+}
+
+predictNext = func(model, history, limit) {
+    if (!defined(model) || model == null) return [];
+    past = this.sequence(history, {
+        unit: model["unit"],
+        itemMode: model.itemMode,
+        lowercase: model.lowercase,
+        separator: model.separator
+    });
+    matched = this.predictionContext(model, past);
+    if (!defined(matched) || matched == null) return [];
+
+    rows = this.bucketRows(matched.bucket);
+    maxItems = defined(limit) && limit > 0 ? limit : rows.count();
+    out = [];
+    for (i = 0; i < rows.count() && i < maxItems; i = i + 1) {
+        row = rows[i];
+        out.add({
+            value: row.value,
+            count: row.count,
+            probability: row.probability,
+            context: this.copyArray(matched.context),
+            order: matched.order
+        });
+    }
+    return out;
+}
+
+nextRandom = func(seed) {
+    seedNum = defined(seed) ? seed : 42;
+    nextSeed = (seedNum * 1103515245 + 12345) % 2147483648;
+    return {seed: nextSeed, value: nextSeed / 2147483648};
+}
+
+weightedChoice = func(rows, seed) {
+    if (!defined(rows) || rows == null || rows.count() == 0) return {choice: null, seed: seed};
+    rnd = this.nextRandom(seed);
+    cutoff = rnd.value;
+    cumulative = 0;
+
+    for (i = 0; i < rows.count(); i = i + 1) {
+        cumulative = cumulative + rows[i].probability;
+        if (cutoff <= cumulative || i == rows.count() - 1) return {choice: rows[i], seed: rnd.seed, random: cutoff};
+    }
+
+    return {choice: rows[rows.count() - 1], seed: rnd.seed, random: cutoff};
+}
+
+render = func(sequenceValues, config) {
+    settings = this.configWith(config);
+    mode = this.asText(settings.itemMode);
+    if (mode == "chars") {
+        out = "";
+        for (i = 0; i < sequenceValues.count(); i = i + 1) out = out + this.asText(sequenceValues[i]);
+        return out;
+    }
+    if (mode == "tokens") {
+        out = "";
+        separator = defined(settings.separator) ? settings.separator : " ";
+        for (i = 0; i < sequenceValues.count(); i = i + 1) {
+            if (i > 0) out = out + separator;
+            out = out + this.asText(sequenceValues[i]);
+        }
+        return out;
+    }
+    return this.copyArray(sequenceValues);
+}
+
+generate = func(model, start, options) {
+    settings = this.configWith({
+        unit: model["unit"],
+        itemMode: model.itemMode,
+        lowercase: model.lowercase,
+        separator: model.separator,
+        stopToken: model.stopToken,
+        seed: model.seed
+    });
+    if (defined(options) && options != null) {
+        foreach(name in options.props) settings[name] = options[name];
+    }
+
+    history = this.sequence(start, settings);
+    sequenceValues = this.copyArray(history);
+    seed = settings.seed;
+    maxSteps = defined(settings.maxSteps) && settings.maxSteps > 0 ? settings.maxSteps : 32;
+    reason = "max_steps";
+    terminated = false;
+    steps = [];
+
+    for (i = 0; i < maxSteps; i = i + 1) {
+        predictions = this.predictNext(model, history, 0);
+        if (predictions.count() == 0) {
+            reason = "no_transition";
+            break;
+        }
+
+        chosen = this.weightedChoice(predictions, seed);
+        seed = chosen.seed;
+        row = chosen.choice;
+        steps.add({
+            context: this.copyArray(row.context),
+            order: row.order,
+            value: row.value,
+            probability: row.probability
+        });
+
+        stopValue = model.stopToken;
+        if (defined(stopValue)) {
+            if (stopValue != null) {
+                if (row.value == stopValue) {
+                    reason = "stop_token";
+                    terminated = true;
+                    break;
+                }
+            }
+        }
+
+        sequenceValues.add(row.value);
+        history.add(row.value);
+    }
+
+    return {
+        sequence: sequenceValues,
+        rendered: this.render(sequenceValues, settings),
+        terminated: terminated,
+        reason: reason,
+        seed: seed,
+        steps: steps
+    };
+}
+
+saveModel = func(model, path) {
+    if (!defined(model) || model == null) throw("ngram.saveModel requires a trained model");
+    this.ensureParentDirectory(path);
+    wrapped = {
+        kind: "ngram.model",
+        version: 1,
+        payload: model,
+        metadata: {
+            order: defined(model.order) ? model.order : 0,
+            unit: defined(model["unit"]) ? model["unit"] : "",
+            sequences: defined(model.sequences) ? model.sequences : 0,
+            observations: defined(model.observations) ? model.observations : 0,
+            contexts: defined(model.contexts) ? model.contexts : 0,
+            vocabularySize: defined(model.vocabularySize) ? model.vocabularySize : 0
+        }
+    };
+    compress_to_file(wrapped, path);
+    return {
+        path: path,
+        saved: true,
+        kind: wrapped.kind,
+        version: wrapped.version,
+        metadata: wrapped.metadata
+    };
+}
+
+loadModel = func(path) {
+    wrapped = decompress_from_file(path);
+    if (!defined(wrapped) || wrapped == null) throw("ngram.loadModel could not load model from " + this.asText(path));
+    if (defined(wrapped.kind) && wrapped.kind == "ngram.model") {
+        if (!defined(wrapped.version) || wrapped.version != 1) {
+            throw("ngram.loadModel does not support model version " + stringify(wrapped.version));
+        }
+        if (!defined(wrapped.payload) || wrapped.payload == null) {
+            throw("ngram.loadModel found no payload in " + this.asText(path));
+        }
+        return wrapped.payload;
+    }
+    return wrapped;
+}
