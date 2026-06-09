@@ -485,7 +485,8 @@ recordTransition = func(model, context, nextValue) {
             context: this.copyArray(context),
             total: 0,
             nextCounts: {},
-            nextValues: {}
+            nextValues: {},
+            sortedRows: null
         };
     }
 
@@ -496,6 +497,7 @@ recordTransition = func(model, context, nextValue) {
     }
     bucket.nextCounts[nextKey] = bucket.nextCounts[nextKey] + 1;
     bucket.total = bucket.total + 1;
+    bucket.sortedRows = null;
 
     if (!defined(model.vocabulary[nextKey])) {
         model.vocabulary[nextKey] = nextValue;
@@ -655,6 +657,8 @@ sortRows = func(rows) {
 }
 
 bucketRows = func(bucket) {
+    if (defined(bucket.sortedRows) && type(bucket.sortedRows).typename != "Null") return bucket.sortedRows;
+
     rows = [];
     foreach(nextKey in bucket.nextCounts.props) {
         count = bucket.nextCounts[nextKey];
@@ -664,7 +668,8 @@ bucketRows = func(bucket) {
             probability: bucket.total > 0 ? count / bucket.total : 0
         });
     }
-    return this.sortRows(rows);
+    bucket.sortedRows = this.sortRows(rows);
+    return bucket.sortedRows;
 }
 
 filterPredictionRows = func(rows, allowedTypes, stopToken) {
@@ -751,6 +756,28 @@ predictNext = func(model, history, limit) {
         });
     }
     return out;
+}
+
+predictionRowsForHistory = func(model, history, allowedTypes) {
+    matched = this.predictionContext(model, history);
+    if (!defined(matched) || matched == null) {
+        return {
+            context: [],
+            order: 0,
+            rows: []
+        };
+    }
+
+    rows = this.bucketRows(matched.bucket);
+    if (defined(allowedTypes)) {
+        if (allowedTypes != null) rows = this.filterPredictionRows(rows, allowedTypes, model.stopToken);
+    }
+
+    return {
+        context: matched.context,
+        order: matched.order,
+        rows: rows
+    };
 }
 
 nextRandom = func(seed) {
@@ -950,10 +977,8 @@ generate = func(model, start, options) {
     steps = [];
 
     for (stepIndex = 0; stepIndex < maxSteps; stepIndex = stepIndex + 1) {
-        predictions = this.predictNext(model, history, 0);
-        if (defined(settings.allowedTypes)) {
-            predictions = this.filterPredictionRows(predictions, settings.allowedTypes, model.stopToken);
-        }
+        prediction = this.predictionRowsForHistory(model, history, defined(settings.allowedTypes) ? settings.allowedTypes : null);
+        predictions = prediction.rows;
         if (predictions.count() == 0) {
             reason = "no_transition";
             break;
@@ -963,8 +988,8 @@ generate = func(model, start, options) {
         seed = chosen.seed;
         row = chosen.choice;
         steps.add({
-            context: this.copyArray(row.context),
-            order: row.order,
+            context: this.copyArray(prediction.context),
+            order: prediction.order,
             value: row.value,
             probability: row.probability
         });
@@ -1053,7 +1078,8 @@ reply = func(model, userText, state, options) {
     stopKey = this.tokenKey(settings.stopToken);
 
     for (stepIndex = 0; stepIndex < maxSteps; stepIndex = stepIndex + 1) {
-        predictions = this.predictNext(model, history, 0);
+        prediction = this.predictionRowsForHistory(model, history, null);
+        predictions = prediction.rows;
         if (predictions.count() == 0) {
             reason = "no_transition";
             break;
@@ -1063,8 +1089,8 @@ reply = func(model, userText, state, options) {
         seed = chosen.seed;
         row = chosen.choice;
         steps.add({
-            context: this.copyArray(row.context),
-            order: row.order,
+            context: this.copyArray(prediction.context),
+            order: prediction.order,
             value: row.value,
             probability: row.probability
         });
