@@ -1,0 +1,32 @@
+corpus = "poodles are dogs.dogs are animals.A poodle in an animal. Dogs are mammals. Poodles are pets. Dogs are good pets. Pets are always animals. birds can fly. birds can be pets too. Parrots are birds. Sparrows are birds. Parrots are colourful. Parrots have large beaks. Birds are animals. birds have feathers. parrots have red feathers";
+
+token = import("tokens.ns");
+wordMatrix = import("wordmatrice.ns");
+probs = import("probs.ns");
+category = import("category.ns");
+
+lowercase = true;
+includeStop = false;
+
+tokens = token.getTokens(corpus, lowercase, includeStop, token.tokenModes.word);
+tokenIds = token.tokenize(tokens, corpus, lowercase);
+segmentTokenIds = wordMatrix.segmentTokenIds(tokens, corpus, lowercase);
+
+categoryMatrix = wordMatrix.build(tokens.tokens, tokenIds, {leftRange: 1, rightRange: 1, segments: segmentTokenIds});
+categoryNorms = wordMatrix.normalize(categoryMatrix);
+categoryDistance = wordMatrix.distance(categoryNorms);
+categories = category.categorize(tokens.tokens, categoryMatrix, categoryNorms, categoryDistance, tokenIds, segmentTokenIds);
+
+predicts = [
+    tokenIds[0],
+    tokenIds[1]
+];
+probModel = probs.probabilities(tokenIds, 3, {smoothing: 0.001});
+nextTokenId = probs.predict(probModel, predicts);
+nextToken = tokens.tokens[nextTokenId];
+
+printline("Predicts history: ", stringify(predicts));
+printline("Next token id: ", nextTokenId);
+printline("Next token: ", nextToken);
+
+foreach( cat in categories) {printline("{cat.token} - {cat.class}");}

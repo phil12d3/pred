@@ -1,0 +1,201 @@
+ROLE            DESCRIPTION
+--------------  ----------------------------------
+Entity          Refers to something
+Action          Performs an action
+Modifier        Describes or modifies
+Connector       Connects concepts
+Query           Requests information
+Context         Provides context
+
+TYPE            DESCRIPTION
+--------------  ----------------------------------
+Person          Human or character
+Animal          Living creature
+Plant           Living plant
+Object          Physical thing
+Place           Location or area
+Time            Temporal concept
+Action          Activity or process
+Attribute       Characteristic or property
+Concept         Abstract idea
+Quantity        Amount or number
+
+Identity        Equality or classification
+Possession      Ownership or belonging
+Containment     Inside or contains
+Location        Spatial relationship
+Direction       Movement relationship
+Addition        Combines concepts
+Alternative     Choice between concepts
+Contrast        Opposing concepts
+Comparison      Relative difference
+Cause           Reason or explanation
+Result          Consequence or outcome
+Condition       Dependency or requirement
+Purpose         Intended goal
+Method          Way something is done
+Association     General relationship
+Sequence        Ordering relationship
+
+Unknown         Unknown object or concept
+Choice          Unknown selection
+
+
+QUALIFIER CATEGORY     VALUES
+---------------------  --------------------------------------
+Time                   Past, Present, Future
+Certainty              Certain, Likely, Possible, Uncertain
+Capability             Able, Unable, Hypothetical
+Obligation             Required, Recommended, Optional
+Quantity               None, Single, Partial, Many, Complete
+Intensity              Slight, Moderate, Strong, Extreme
+Frequency              Never, Rarely, Sometimes, Often, Always
+Comparison             Less, Equal, Greater
+Distance               Near, Far
+Direction              Towards, Away, Through, Into, OutOf
+Order                  Before, After, During
+Specificity            General, Specific, Unique
+Polarity               Positive, Negative
+Selection              Any, One, Some, All, Specific
+State                  Beginning, Ongoing, Completed
+
+
+WORD        TYPE            ROLE
+----------  --------------  ----------
+dog         Animal          Entity
+poodle      Animal          Entity
+London      Place           Entity
+red         Attribute       Modifier
+run         Action          Action
+
+what        UnknownThing    Query
+who         Person          Query
+where       Location        Query
+when        Time            Query
+why         Cause           Query
+how         Method          Query
+which       Choice          Query
+whose       Possession      Query
+
+is          Identity        Connector
+are         Identity        Connector
+has         Possession      Connector
+contains    Containment     Connector
+in          Location        Connector
+towards     Direction       Connector
+
+and         Addition        Connector
+or          Alternative     Connector
+but         Contrast        Connector
+than        Comparison      Connector
+
+because     Cause           Connector
+therefore   Result          Connector
+
+if          Condition       Connector
+unless      Condition       Connector
+
+for         Purpose         Connector
+by          Method          Connector
+
+with        Association     Connector
+after       Sequence        Connector
+before      Sequence        Connector
+
+yesterday   Time            Context
+today       Time            Context
+here        Place           Context
+there       Place           Context
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CATEGORY       DESCRIPTION                      EXAMPLES
+-------------  -------------------------------  -------------------------
+Noun           Person, place, thing             dog, London, table
+Proper Noun    Specific named entity            Phil, England, Mars
+Pronoun        Replaces a noun                  he, she, it, they
+Verb           Action or state                  run, eat, think, is
+Adjective      Describes a noun                 red, tall, happy
+Adverb         Modifies action or description   quickly, very, often
+Preposition    Shows relationship or position   in, on, under, beside
+Conjunction    Connects words or clauses        and, but, or, because
+Determiner     Introduces or specifies noun     a, an, the, this
+Interjection   Emotional expression             wow, ouch, hey, ah
+
+PROPERTY        VALUE           DESCRIPTION
+--------------  --------------  ----------------------------
+
+Type            Person          Human individual
+                Animal          Living creature
+                Plant           Living plant
+                Object          Physical thing
+                Place           Location or area
+                Action          Activity or process
+                Event           Occurrence or happening
+                Time            Temporal concept
+                Attribute       Characteristic or property
+                Concept         Abstract idea
+                Quantity        Amount or number
+                Relation        Link between concepts
+
+Function        Entity          Refers to something
+                Describe        Adds characteristics
+                Act             Performs action
+                Connect         Links concepts
+                Question        Requests information
+                Compare         Compares things
+                Quantify        Indicates amount
+                Negate          Reverses meaning
+                Reference       Points to another item
+                Express         Shows emotion
+
+Physicality     Physical        Exists physically
+                Abstract        Idea or concept
+                Mixed           Both physical and abstract
+                Unknown         Not determined
+
+Specificity     Universal       Extremely broad category
+                General         Common category
+                Specific        Narrow category
+                Unique          Single named entity
+
+IntentRole      Inform          Provides information
+                Query           Requests information
+                Request         Requests action
+                Confirm         Verifies information
+                Reject          Denies information
+                Suggest         Offers possibility
+
+Domain          Nature          Natural world
+                Animal          Animals and wildlife
+                Human           People and society
+                Technology      Technical systems
+                Transport       Travel and movement
+                Food            Food and drink
+                Science         Scientific concepts
+                Emotion         Feelings and moods
+                Society         Social structures
+                Time            Temporal concepts
+                Language        Communication concepts
+
+Relation        Is-A            Category membership
+                Part-Of         Component relationship
+                Has-A           Possession/component
+                Causes          Produces effect
+                Located-In      Spatial containment
+                Used-For        Intended purpose
+                Similar-To      Related meaning
+                Opposite-Of     Contrasting meaning
+
+

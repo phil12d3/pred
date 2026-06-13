@@ -1,0 +1,931 @@
+// Heuristic token categorization from co-occurrence matrices.
+//
+// `categorize(tokens, matrix, normalized, distance, sequence)` returns rows like:
+// [{tokenId: 0, token: "poodles", class: "attribute", metrics: {...}}, ...]
+//
+// The classifier uses the raw co-occurrence matrix and, when available, the
+// normalized matrix to distinguish broad roles such as:
+// - isolated
+// - attribute
+// - bridge
+// - topic
+// - connector
+// - support
+
+wordMatrix = import("wordmatrice.ns");
+
+safeDiv = func(numerator, denominator) {
+    return denominator == 0 ? 0 : numerator / denominator;
+}
+
+normalizeTokenList = func(tokens) {
+    if (!defined(tokens) || tokens == null) return [];
+    if (defined(tokens.tokens) && tokens.tokens != null) return tokens.tokens;
+    return tokens;
+}
+
+zScore = func(value, mean, sd) {
+    if (sd == 0) return 0;
+    return (value - mean) / sd;
+}
+
+sharedNeighborRatio = func(matrix, a, b) {
+    if (!defined(matrix[a]) || !defined(matrix[b])) return 0;
+    totalA = matrix[a].count();
+    if (totalA == 0) return 0;
+
+    shared = 0;
+    for (n = 0; n < matrix[a].count(); n = n + 1) {
+        if (matrix[a][n] > 0 && matrix[b][n] > 0) shared = shared + 1;
+    }
+    return this.safeDiv(shared, totalA);
+};
+
+specificityMetrics = func(matrix, wordId) {
+    if (!defined(matrix[wordId])) {
+        return {specificity: 0, parentLike: 0, childLike: 0};
+    }
+
+    totalWeight = 0;
+    for (other = 0; other < matrix[wordId].count(); other = other + 1) {
+        totalWeight = totalWeight + matrix[wordId][other];
+    }
+    if (totalWeight <= 0) {
+        return {specificity: 0, parentLike: 0, childLike: 0};
+    }
+
+    parentLike = 0;
+    childLike = 0;
+    for (other = 0; other < matrix[wordId].count(); other = other + 1) {
+        if (other == wordId) continue;
+        if (matrix[wordId][other] <= 0) continue;
+        forward = this.sharedNeighborRatio(matrix, other, wordId);
+        backward = this.sharedNeighborRatio(matrix, wordId, other);
+        gap = forward - backward;
+        weight = this.safeDiv(matrix[wordId][other], totalWeight);
+
+        if (gap > 0) {
+            parentLike = parentLike + (gap * weight);
+        } else {
+            childLike = childLike + ((0 - gap) * weight);
+        }
+    }
+
+    specificity = (parentLike * 10) - (childLike * 4);
+    if (specificity < 0) specificity = 0;
+
+    return {
+        specificity: specificity,
+        parentLike: parentLike,
+        childLike: childLike
+    };
+}
+
+buildTransitionStats = func(sequence, size) {
+    incomingActivity = array(size, 0);
+    outgoingActivity = array(size, 0);
+    directionBalance = array(size, 0);
+    transitionSpread = array(size, 0);
+    occurrenceCount = array(size, 0);
+    middleCount = array(size, 0);
+    middleRatio = array(size, 0);
+
+    transitionMatrix = [];
+    for (i = 0; i < size; i = i + 1) {
+        transitionMatrix.add(array(size, 0));
+    }
+
+    if (!defined(sequence) || sequence == null || sequence.count() <= 1) {
+        return {
+            incomingActivity: incomingActivity,
+            outgoingActivity: outgoingActivity,
+            directionBalance: directionBalance,
+            transitionSpread: transitionSpread,
+            occurrenceCount: occurrenceCount,
+            middleCount: middleCount,
+            middleRatio: middleRatio
+        };
+    }
+
+    for (i = 0; i + 1 < sequence.count(); i = i + 1) {
+        source = sequence[i];
+        target = sequence[i + 1];
+        if (source < 0 || source >= size) continue;
+        if (target < 0 || target >= size) continue;
+
+        outgoingActivity[source] = outgoingActivity[source] + 1;
+        incomingActivity[target] = incomingActivity[target] + 1;
+        transitionMatrix[source][target] = transitionMatrix[source][target] + 1;
+    }
+
+    for (i = 0; i < sequence.count(); i = i + 1) {
+        tokenId = sequence[i];
+        if (tokenId < 0 || tokenId >= size) continue;
+        occurrenceCount[tokenId] = occurrenceCount[tokenId] + 1;
+    }
+
+    for (i = 1; i + 1 < sequence.count(); i = i + 1) {
+        tokenId = sequence[i];
+        if (tokenId < 0 || tokenId >= size) continue;
+        middleCount[tokenId] = middleCount[tokenId] + 1;
+    }
+
+    for (i = 0; i < size; i = i + 1) {
+        inCount = incomingActivity[i];
+        outCount = outgoingActivity[i];
+        high = inCount > outCount ? inCount : outCount;
+        low = inCount < outCount ? inCount : outCount;
+
+        if (high > 0) {
+            directionBalance[i] = this.safeDiv(low, high);
+        }
+
+        if (outCount > 0) {
+            sumSquares = 0;
+            for (j = 0; j < size; j = j + 1) {
+                edgeCount = transitionMatrix[i][j];
+                if (edgeCount > 0) {
+                    share = this.safeDiv(edgeCount, outCount);
+                    sumSquares = sumSquares + (share * share);
+                }
+            }
+            transitionSpread[i] = 1 - sumSquares;
+        }
+
+        if (occurrenceCount[i] > 0) {
+            middleRatio[i] = this.safeDiv(middleCount[i], occurrenceCount[i]);
+        }
+    }
+
+    return {
+        incomingActivity: incomingActivity,
+        outgoingActivity: outgoingActivity,
+        directionBalance: directionBalance,
+        transitionSpread: transitionSpread,
+        occurrenceCount: occurrenceCount,
+        middleCount: middleCount,
+        middleRatio: middleRatio
+    };
+}
+
+buildSegmentStats = func(segments, size) {
+    segmentFrequency = array(size, 0);
+    startCount = array(size, 0);
+    endCount = array(size, 0);
+    boundaryCount = array(size, 0);
+    segmentRatio = array(size, 0);
+    boundaryRatio = array(size, 0);
+    startRatio = array(size, 0);
+    endRatio = array(size, 0);
+
+    if (!defined(segments) || segments == null || segments.count() == 0) {
+        return {
+            segmentFrequency: segmentFrequency,
+            startCount: startCount,
+            endCount: endCount,
+            boundaryCount: boundaryCount,
+            segmentRatio: segmentRatio,
+            boundaryRatio: boundaryRatio,
+            startRatio: startRatio,
+            endRatio: endRatio
+        };
+    }
+
+    for (s = 0; s < segments.count(); s = s + 1) {
+        segment = segments[s];
+        if (!defined(segment) || segment == null || segment.count() == 0) continue;
+
+        seen = array(size, 0);
+        for (i = 0; i < segment.count(); i = i + 1) {
+            tokenId = segment[i];
+            if (tokenId < 0 || tokenId >= size) continue;
+
+            if (seen[tokenId] == 0) {
+                segmentFrequency[tokenId] = segmentFrequency[tokenId] + 1;
+                seen[tokenId] = 1;
+            }
+
+            if (i == 0) startCount[tokenId] = startCount[tokenId] + 1;
+            if (i == segment.count() - 1) endCount[tokenId] = endCount[tokenId] + 1;
+        }
+    }
+
+    totalSegments = segments.count();
+    for (i = 0; i < size; i = i + 1) {
+        boundaryCount[i] = startCount[i] + endCount[i];
+        segmentRatio[i] = this.safeDiv(segmentFrequency[i], totalSegments);
+        boundaryRatio[i] = segmentFrequency[i] > 0 ? this.safeDiv(boundaryCount[i], segmentFrequency[i]) : 0;
+        startRatio[i] = segmentFrequency[i] > 0 ? this.safeDiv(startCount[i], segmentFrequency[i]) : 0;
+        endRatio[i] = segmentFrequency[i] > 0 ? this.safeDiv(endCount[i], segmentFrequency[i]) : 0;
+    }
+
+    return {
+        segmentFrequency: segmentFrequency,
+        startCount: startCount,
+        endCount: endCount,
+        boundaryCount: boundaryCount,
+        segmentRatio: segmentRatio,
+        boundaryRatio: boundaryRatio,
+        startRatio: startRatio,
+        endRatio: endRatio
+    };
+}
+
+analyzeToken = func(matrix, normalized, tokenId) {
+    size = matrix.count();
+    rowTotal = 0;
+    colTotal = 0;
+    degree = 0;
+    maxAssoc = 0;
+    normalizedTotal = 0;
+    normalizedDegree = 0;
+    maxNormalized = 0;
+
+    for (i = 0; i < size; i = i + 1) {
+        outWeight = matrix[tokenId][i];
+        inWeight = matrix[i][tokenId];
+
+        rowTotal = rowTotal + outWeight;
+        colTotal = colTotal + inWeight;
+
+        if (outWeight > 0 || inWeight > 0) degree = degree + 1;
+
+        assoc = outWeight > inWeight ? outWeight : inWeight;
+        if (assoc > maxAssoc) maxAssoc = assoc;
+
+        if (defined(normalized) && normalized != null) {
+            outNorm = normalized[tokenId][i];
+            inNorm = normalized[i][tokenId];
+            normAssoc = outNorm > inNorm ? outNorm : inNorm;
+            if (normAssoc > 0) {
+                normalizedTotal = normalizedTotal + normAssoc;
+                normalizedDegree = normalizedDegree + 1;
+                if (normAssoc > maxNormalized) maxNormalized = normAssoc;
+            }
+        }
+    }
+
+    activity = rowTotal + colTotal;
+    balance = 0;
+    if (rowTotal > 0 && colTotal > 0) {
+        low = rowTotal < colTotal ? rowTotal : colTotal;
+        high = rowTotal > colTotal ? rowTotal : colTotal;
+        balance = this.safeDiv(low, high);
+    }
+
+    focus = this.safeDiv(maxAssoc, activity);
+    normalizedFocus = normalizedDegree > 0 ? this.safeDiv(normalizedTotal, normalizedDegree) : 0;
+    intensity = normalizedFocus > 0 ? normalizedFocus : focus;
+
+    // activity: total co-occurrence mass touching this token in both
+    // directions. High activity means the token is broadly connected in the
+    // local graph; low activity means it is sparse or isolated.
+    //
+    // degree: number of distinct neighboring tokens with at least one link.
+    // A high degree means the token touches many different neighbors.
+    //
+    // maxAssociation: the strongest single co-occurrence edge touching this
+    // token. High values indicate a very tight attachment to at least one
+    // neighbor.
+    //
+    // balance: how evenly the token connects as source vs target. Values near
+    // 1 mean symmetric connectivity; values near 0 mean one side dominates.
+    //
+    // focus: the fraction of total activity concentrated in the strongest
+    // edge. High focus means one neighbor dominates the token's signal.
+    //
+    // normalizedFocus: same idea as focus, but derived from the normalized
+    // matrix when present. It is a smoother concentration score.
+    //
+    // intensity: the concentration score used for classing. Prefer the
+    // normalized score when available; otherwise fall back to focus.
+    //
+    // spread: a Simpson-style diversity measure over the token's local row.
+    // Low spread means the token's edges are concentrated on a few neighbors;
+    // high spread means the token connects more evenly across many neighbors.
+    //
+    // centrality: a simple power-iteration score derived from the co-occurrence
+    // matrix. Higher values mean the token sits on more influential paths in
+    // the current graph.
+    return {
+        activity: activity,
+        degree: degree,
+        maxAssociation: maxAssoc,
+        balance: balance,
+        focus: focus,
+        normalizedFocus: normalizedFocus,
+        intensity: intensity,
+        spread: 0,
+        centrality: 0,
+        incomingActivity: 0,
+        outgoingActivity: 0,
+        directionBalance: 0,
+        transitionSpread: 0,
+        occurrenceCount: 0,
+        middleCount: 0,
+        middleRatio: 0,
+        specificity: 0,
+        parentLike: 0,
+        childLike: 0,
+        segmentFrequency: 0,
+        startCount: 0,
+        endCount: 0,
+        boundaryCount: 0,
+        segmentRatio: 0,
+        boundaryRatio: 0,
+        startRatio: 0,
+        endRatio: 0
+    };
+}
+
+computeCentrality = func(matrix, iterations) {
+    size = matrix.count();
+    if (size == 0) return [];
+
+    scores = array(size, 1);
+    steps = defined(iterations) && iterations != null ? iterations : 6;
+
+    for (iter = 0; iter < steps; iter = iter + 1) {
+        nextScores = array(size, 0);
+
+        for (i = 0; i < size; i = i + 1) {
+            total = 0;
+            for (j = 0; j < size; j = j + 1) {
+                weight = matrix[i][j];
+                if (weight > 0) {
+                    total = total + (weight * scores[j]);
+                }
+            }
+            nextScores[i] = total;
+        }
+
+        norm = 0;
+        for (i = 0; i < size; i = i + 1) {
+            norm = norm + nextScores[i];
+        }
+        if (norm <= 0) norm = 1;
+
+        for (i = 0; i < size; i = i + 1) {
+            nextScores[i] = nextScores[i] / norm;
+        }
+
+        scores = nextScores;
+    }
+
+    return scores;
+}
+
+buildCorpusStats = func(rows) {
+    count = rows.count();
+    if (count == 0) {
+        return {
+            activity: {mean: 0, sd: 0},
+            degree: {mean: 0, sd: 0},
+            focus: {mean: 0, sd: 0},
+            spread: {mean: 0, sd: 0},
+            balance: {mean: 0, sd: 0},
+            centrality: {mean: 0, sd: 0},
+            incomingActivity: {mean: 0, sd: 0},
+            outgoingActivity: {mean: 0, sd: 0},
+            directionBalance: {mean: 0, sd: 0},
+            transitionSpread: {mean: 0, sd: 0},
+            occurrenceCount: {mean: 0, sd: 0},
+            middleCount: {mean: 0, sd: 0},
+            middleRatio: {mean: 0, sd: 0},
+            specificity: {mean: 0, sd: 0},
+            parentLike: {mean: 0, sd: 0},
+            childLike: {mean: 0, sd: 0},
+            segmentFrequency: {mean: 0, sd: 0},
+            startCount: {mean: 0, sd: 0},
+            endCount: {mean: 0, sd: 0},
+            boundaryCount: {mean: 0, sd: 0},
+            segmentRatio: {mean: 0, sd: 0},
+            boundaryRatio: {mean: 0, sd: 0},
+            startRatio: {mean: 0, sd: 0},
+            endRatio: {mean: 0, sd: 0}
+        };
+    }
+
+    sumActivity = 0;
+    sumActivitySq = 0;
+    sumDegree = 0;
+    sumDegreeSq = 0;
+    sumFocus = 0;
+    sumFocusSq = 0;
+    sumSpread = 0;
+    sumSpreadSq = 0;
+    sumBalance = 0;
+    sumBalanceSq = 0;
+    sumCentrality = 0;
+    sumCentralitySq = 0;
+    sumIncoming = 0;
+    sumIncomingSq = 0;
+    sumOutgoing = 0;
+    sumOutgoingSq = 0;
+    sumDirectionBalance = 0;
+    sumDirectionBalanceSq = 0;
+    sumTransitionSpread = 0;
+    sumTransitionSpreadSq = 0;
+    sumOccurrence = 0;
+    sumOccurrenceSq = 0;
+    sumMiddle = 0;
+    sumMiddleSq = 0;
+    sumMiddleRatio = 0;
+    sumMiddleRatioSq = 0;
+    sumSpecificity = 0;
+    sumSpecificitySq = 0;
+    sumParentLike = 0;
+    sumParentLikeSq = 0;
+    sumChildLike = 0;
+    sumChildLikeSq = 0;
+    sumSegmentFrequency = 0;
+    sumSegmentFrequencySq = 0;
+    sumStartCount = 0;
+    sumStartCountSq = 0;
+    sumEndCount = 0;
+    sumEndCountSq = 0;
+    sumBoundaryCount = 0;
+    sumBoundaryCountSq = 0;
+    sumSegmentRatio = 0;
+    sumSegmentRatioSq = 0;
+    sumBoundaryRatio = 0;
+    sumBoundaryRatioSq = 0;
+    sumStartRatio = 0;
+    sumStartRatioSq = 0;
+    sumEndRatio = 0;
+    sumEndRatioSq = 0;
+
+    for (i = 0; i < count; i = i + 1) {
+        m = rows[i].metrics;
+        sumActivity = sumActivity + m.activity;
+        sumActivitySq = sumActivitySq + (m.activity * m.activity);
+        sumDegree = sumDegree + m.degree;
+        sumDegreeSq = sumDegreeSq + (m.degree * m.degree);
+        sumFocus = sumFocus + m.focus;
+        sumFocusSq = sumFocusSq + (m.focus * m.focus);
+        sumSpread = sumSpread + m.spread;
+        sumSpreadSq = sumSpreadSq + (m.spread * m.spread);
+        sumBalance = sumBalance + m.balance;
+        sumBalanceSq = sumBalanceSq + (m.balance * m.balance);
+        sumCentrality = sumCentrality + m.centrality;
+        sumCentralitySq = sumCentralitySq + (m.centrality * m.centrality);
+        sumIncoming = sumIncoming + m.incomingActivity;
+        sumIncomingSq = sumIncomingSq + (m.incomingActivity * m.incomingActivity);
+        sumOutgoing = sumOutgoing + m.outgoingActivity;
+        sumOutgoingSq = sumOutgoingSq + (m.outgoingActivity * m.outgoingActivity);
+        sumDirectionBalance = sumDirectionBalance + m.directionBalance;
+        sumDirectionBalanceSq = sumDirectionBalanceSq + (m.directionBalance * m.directionBalance);
+        sumTransitionSpread = sumTransitionSpread + m.transitionSpread;
+        sumTransitionSpreadSq = sumTransitionSpreadSq + (m.transitionSpread * m.transitionSpread);
+        sumOccurrence = sumOccurrence + m.occurrenceCount;
+        sumOccurrenceSq = sumOccurrenceSq + (m.occurrenceCount * m.occurrenceCount);
+        sumMiddle = sumMiddle + m.middleCount;
+        sumMiddleSq = sumMiddleSq + (m.middleCount * m.middleCount);
+        sumMiddleRatio = sumMiddleRatio + m.middleRatio;
+        sumMiddleRatioSq = sumMiddleRatioSq + (m.middleRatio * m.middleRatio);
+        sumSpecificity = sumSpecificity + m.specificity;
+        sumSpecificitySq = sumSpecificitySq + (m.specificity * m.specificity);
+        sumParentLike = sumParentLike + m.parentLike;
+        sumParentLikeSq = sumParentLikeSq + (m.parentLike * m.parentLike);
+        sumChildLike = sumChildLike + m.childLike;
+        sumChildLikeSq = sumChildLikeSq + (m.childLike * m.childLike);
+        sumSegmentFrequency = sumSegmentFrequency + m.segmentFrequency;
+        sumSegmentFrequencySq = sumSegmentFrequencySq + (m.segmentFrequency * m.segmentFrequency);
+        sumStartCount = sumStartCount + m.startCount;
+        sumStartCountSq = sumStartCountSq + (m.startCount * m.startCount);
+        sumEndCount = sumEndCount + m.endCount;
+        sumEndCountSq = sumEndCountSq + (m.endCount * m.endCount);
+        sumBoundaryCount = sumBoundaryCount + m.boundaryCount;
+        sumBoundaryCountSq = sumBoundaryCountSq + (m.boundaryCount * m.boundaryCount);
+        sumSegmentRatio = sumSegmentRatio + m.segmentRatio;
+        sumSegmentRatioSq = sumSegmentRatioSq + (m.segmentRatio * m.segmentRatio);
+        sumBoundaryRatio = sumBoundaryRatio + m.boundaryRatio;
+        sumBoundaryRatioSq = sumBoundaryRatioSq + (m.boundaryRatio * m.boundaryRatio);
+        sumStartRatio = sumStartRatio + m.startRatio;
+        sumStartRatioSq = sumStartRatioSq + (m.startRatio * m.startRatio);
+        sumEndRatio = sumEndRatio + m.endRatio;
+        sumEndRatioSq = sumEndRatioSq + (m.endRatio * m.endRatio);
+    }
+
+    activityMean = this.safeDiv(sumActivity, count);
+    degreeMean = this.safeDiv(sumDegree, count);
+    focusMean = this.safeDiv(sumFocus, count);
+    spreadMean = this.safeDiv(sumSpread, count);
+    balanceMean = this.safeDiv(sumBalance, count);
+    centralityMean = this.safeDiv(sumCentrality, count);
+
+    activitySd = sqrt(this.safeDiv(sumActivitySq, count) - (activityMean * activityMean));
+    degreeSd = sqrt(this.safeDiv(sumDegreeSq, count) - (degreeMean * degreeMean));
+    focusSd = sqrt(this.safeDiv(sumFocusSq, count) - (focusMean * focusMean));
+    spreadSd = sqrt(this.safeDiv(sumSpreadSq, count) - (spreadMean * spreadMean));
+    balanceSd = sqrt(this.safeDiv(sumBalanceSq, count) - (balanceMean * balanceMean));
+    centralitySd = sqrt(this.safeDiv(sumCentralitySq, count) - (centralityMean * centralityMean));
+    incomingMean = this.safeDiv(sumIncoming, count);
+    outgoingMean = this.safeDiv(sumOutgoing, count);
+    directionBalanceMean = this.safeDiv(sumDirectionBalance, count);
+    transitionSpreadMean = this.safeDiv(sumTransitionSpread, count);
+    occurrenceMean = this.safeDiv(sumOccurrence, count);
+    middleMean = this.safeDiv(sumMiddle, count);
+    middleRatioMean = this.safeDiv(sumMiddleRatio, count);
+    specificityMean = this.safeDiv(sumSpecificity, count);
+    parentLikeMean = this.safeDiv(sumParentLike, count);
+    childLikeMean = this.safeDiv(sumChildLike, count);
+    segmentFrequencyMean = this.safeDiv(sumSegmentFrequency, count);
+    startCountMean = this.safeDiv(sumStartCount, count);
+    endCountMean = this.safeDiv(sumEndCount, count);
+    boundaryCountMean = this.safeDiv(sumBoundaryCount, count);
+    segmentRatioMean = this.safeDiv(sumSegmentRatio, count);
+    boundaryRatioMean = this.safeDiv(sumBoundaryRatio, count);
+    startRatioMean = this.safeDiv(sumStartRatio, count);
+    endRatioMean = this.safeDiv(sumEndRatio, count);
+    incomingSd = sqrt(this.safeDiv(sumIncomingSq, count) - (incomingMean * incomingMean));
+    outgoingSd = sqrt(this.safeDiv(sumOutgoingSq, count) - (outgoingMean * outgoingMean));
+    directionBalanceSd = sqrt(this.safeDiv(sumDirectionBalanceSq, count) - (directionBalanceMean * directionBalanceMean));
+    transitionSpreadSd = sqrt(this.safeDiv(sumTransitionSpreadSq, count) - (transitionSpreadMean * transitionSpreadMean));
+    occurrenceSd = sqrt(this.safeDiv(sumOccurrenceSq, count) - (occurrenceMean * occurrenceMean));
+    middleSd = sqrt(this.safeDiv(sumMiddleSq, count) - (middleMean * middleMean));
+    middleRatioSd = sqrt(this.safeDiv(sumMiddleRatioSq, count) - (middleRatioMean * middleRatioMean));
+    specificitySd = sqrt(this.safeDiv(sumSpecificitySq, count) - (specificityMean * specificityMean));
+    parentLikeSd = sqrt(this.safeDiv(sumParentLikeSq, count) - (parentLikeMean * parentLikeMean));
+    childLikeSd = sqrt(this.safeDiv(sumChildLikeSq, count) - (childLikeMean * childLikeMean));
+    segmentFrequencySd = sqrt(this.safeDiv(sumSegmentFrequencySq, count) - (segmentFrequencyMean * segmentFrequencyMean));
+    startCountSd = sqrt(this.safeDiv(sumStartCountSq, count) - (startCountMean * startCountMean));
+    endCountSd = sqrt(this.safeDiv(sumEndCountSq, count) - (endCountMean * endCountMean));
+    boundaryCountSd = sqrt(this.safeDiv(sumBoundaryCountSq, count) - (boundaryCountMean * boundaryCountMean));
+    segmentRatioSd = sqrt(this.safeDiv(sumSegmentRatioSq, count) - (segmentRatioMean * segmentRatioMean));
+    boundaryRatioSd = sqrt(this.safeDiv(sumBoundaryRatioSq, count) - (boundaryRatioMean * boundaryRatioMean));
+    startRatioSd = sqrt(this.safeDiv(sumStartRatioSq, count) - (startRatioMean * startRatioMean));
+    endRatioSd = sqrt(this.safeDiv(sumEndRatioSq, count) - (endRatioMean * endRatioMean));
+
+    return {
+        activity: {mean: activityMean, sd: activitySd},
+        degree: {mean: degreeMean, sd: degreeSd},
+        focus: {mean: focusMean, sd: focusSd},
+        spread: {mean: spreadMean, sd: spreadSd},
+        balance: {mean: balanceMean, sd: balanceSd},
+        centrality: {mean: centralityMean, sd: centralitySd},
+        incomingActivity: {mean: incomingMean, sd: incomingSd},
+        outgoingActivity: {mean: outgoingMean, sd: outgoingSd},
+        directionBalance: {mean: directionBalanceMean, sd: directionBalanceSd},
+        transitionSpread: {mean: transitionSpreadMean, sd: transitionSpreadSd},
+        occurrenceCount: {mean: occurrenceMean, sd: occurrenceSd},
+        middleCount: {mean: middleMean, sd: middleSd},
+        middleRatio: {mean: middleRatioMean, sd: middleRatioSd},
+        specificity: {mean: specificityMean, sd: specificitySd},
+        parentLike: {mean: parentLikeMean, sd: parentLikeSd},
+        childLike: {mean: childLikeMean, sd: childLikeSd},
+        segmentFrequency: {mean: segmentFrequencyMean, sd: segmentFrequencySd},
+        startCount: {mean: startCountMean, sd: startCountSd},
+        endCount: {mean: endCountMean, sd: endCountSd},
+        boundaryCount: {mean: boundaryCountMean, sd: boundaryCountSd},
+        segmentRatio: {mean: segmentRatioMean, sd: segmentRatioSd},
+        boundaryRatio: {mean: boundaryRatioMean, sd: boundaryRatioSd},
+        startRatio: {mean: startRatioMean, sd: startRatioSd},
+        endRatio: {mean: endRatioMean, sd: endRatioSd}
+    };
+}
+
+classifyToken = func(token, stats, corpusStats) {
+    if (stats.degree == 0 || stats.activity == 0) return "isolated";
+
+    zActivity = this.zScore(stats.activity, corpusStats.activity.mean, corpusStats.activity.sd);
+    zDegree = this.zScore(stats.degree, corpusStats.degree.mean, corpusStats.degree.sd);
+    zFocus = this.zScore(stats.focus, corpusStats.focus.mean, corpusStats.focus.sd);
+    zSpread = this.zScore(stats.spread, corpusStats.spread.mean, corpusStats.spread.sd);
+    zBalance = this.zScore(stats.balance, corpusStats.balance.mean, corpusStats.balance.sd);
+    zCentrality = this.zScore(stats.centrality, corpusStats.centrality.mean, corpusStats.centrality.sd);
+    zIncoming = this.zScore(stats.incomingActivity, corpusStats.incomingActivity.mean, corpusStats.incomingActivity.sd);
+    zOutgoing = this.zScore(stats.outgoingActivity, corpusStats.outgoingActivity.mean, corpusStats.outgoingActivity.sd);
+    zDirectionBalance = this.zScore(stats.directionBalance, corpusStats.directionBalance.mean, corpusStats.directionBalance.sd);
+    zTransitionSpread = this.zScore(stats.transitionSpread, corpusStats.transitionSpread.mean, corpusStats.transitionSpread.sd);
+    zOccurrenceCount = this.zScore(stats.occurrenceCount, corpusStats.occurrenceCount.mean, corpusStats.occurrenceCount.sd);
+    zMiddleCount = this.zScore(stats.middleCount, corpusStats.middleCount.mean, corpusStats.middleCount.sd);
+    zMiddleRatio = this.zScore(stats.middleRatio, corpusStats.middleRatio.mean, corpusStats.middleRatio.sd);
+    zSpecificity = this.zScore(stats.specificity, corpusStats.specificity.mean, corpusStats.specificity.sd);
+    zParentLike = this.zScore(stats.parentLike, corpusStats.parentLike.mean, corpusStats.parentLike.sd);
+    zChildLike = this.zScore(stats.childLike, corpusStats.childLike.mean, corpusStats.childLike.sd);
+    zSegmentFrequency = this.zScore(stats.segmentFrequency, corpusStats.segmentFrequency.mean, corpusStats.segmentFrequency.sd);
+    zSegmentRatio = this.zScore(stats.segmentRatio, corpusStats.segmentRatio.mean, corpusStats.segmentRatio.sd);
+    zBoundaryRatio = this.zScore(stats.boundaryRatio, corpusStats.boundaryRatio.mean, corpusStats.boundaryRatio.sd);
+    zStartRatio = this.zScore(stats.startRatio, corpusStats.startRatio.mean, corpusStats.startRatio.sd);
+    zEndRatio = this.zScore(stats.endRatio, corpusStats.endRatio.mean, corpusStats.endRatio.sd);
+
+    // Scores are corpus-relative z-score combinations, so the class choice is
+    // driven by position within the current matrix rather than hard-coded
+    // numeric thresholds from a specific dataset.
+    //
+    // topicScore: favors globally central, frequently recurring tokens that
+    // also show up across multiple segments.
+    //
+    // bridgeScore: favors tokens with many neighbors and broad spread, but
+    // penalizes nodes whose strongest edge dominates too much.
+    //
+    // attributeScore: favors concentrated tokens with fewer neighbors and
+    // weaker segment coverage.
+    //
+    // connectorScore: favors low-centrality tokens that are spread across
+    // segments and often sit on segment boundaries.
+    topicScore = zSpecificity + zActivity + zCentrality + zSegmentFrequency + zOccurrenceCount - zFocus - zTransitionSpread - zDirectionBalance;
+    bridgeScore = zDirectionBalance + zTransitionSpread + zMiddleRatio + zSegmentRatio + zParentLike - zSpecificity - zFocus;
+    attributeScore = zFocus + zChildLike - zSpecificity - zDegree - zCentrality - zTransitionSpread;
+    connectorScore = zSegmentRatio + zBoundaryRatio + zStartRatio + zMiddleRatio - zSpecificity - zCentrality - zDegree;
+
+    bestClass = "support";
+    bestScore = 0;
+    secondScore = 0;
+
+    if (topicScore > bestScore) {
+        secondScore = bestScore;
+        bestClass = "topic";
+        bestScore = topicScore;
+    } else if (topicScore > secondScore) {
+        secondScore = topicScore;
+    }
+    if (bridgeScore > bestScore) {
+        secondScore = bestScore;
+        bestClass = "bridge";
+        bestScore = bridgeScore;
+    } else if (bridgeScore > secondScore) {
+        secondScore = bridgeScore;
+    }
+    if (attributeScore > bestScore) {
+        secondScore = bestScore;
+        bestClass = "attribute";
+        bestScore = attributeScore;
+    } else if (attributeScore > secondScore) {
+        secondScore = attributeScore;
+    }
+    if (connectorScore > bestScore) {
+        secondScore = bestScore;
+        bestClass = "connector";
+        bestScore = connectorScore;
+    } else if (connectorScore > secondScore) {
+        secondScore = connectorScore;
+    }
+
+    confidence = bestScore - secondScore;
+    if (bestScore <= 0 || confidence < 0.5) {
+        bestClass = "ambiguous";
+    }
+    if (bestClass == "connector" && stats.segmentFrequency <= 1 && stats.boundaryRatio == 0 && stats.middleRatio == 0) {
+        bestClass = "ambiguous";
+    }
+
+    return {
+        class: bestClass,
+        confidence: confidence,
+        scores: {
+            topic: topicScore,
+            bridge: bridgeScore,
+            attribute: attributeScore,
+            connector: connectorScore
+        }
+    };
+}
+
+categorize = func(tokens, matrix, normalized, distance, sequence, segments) {
+    if (!defined(matrix) || matrix == null || matrix.count() == 0) return [];
+
+    tokenList = this.normalizeTokenList(tokens);
+    if (!defined(normalized) || normalized == null || normalized.count() == 0) {
+        normalized = this.wordMatrix.normalize(matrix);
+    }
+
+    rows = [];
+    centrality = this.computeCentrality(matrix, 6);
+    transitionStats = this.buildTransitionStats(sequence, matrix.count());
+    segmentStats = this.buildSegmentStats(segments, matrix.count());
+    for (i = 0; i < matrix.count(); i = i + 1) {
+        tokenText = defined(tokenList[i]) ? tokenList[i] : null;
+        stats = this.analyzeToken(matrix, normalized, i);
+        spec = this.specificityMetrics(matrix, i);
+        stats.centrality = defined(centrality[i]) ? centrality[i] : 0;
+        stats.incomingActivity = defined(transitionStats.incomingActivity[i]) ? transitionStats.incomingActivity[i] : 0;
+        stats.outgoingActivity = defined(transitionStats.outgoingActivity[i]) ? transitionStats.outgoingActivity[i] : 0;
+        stats.directionBalance = defined(transitionStats.directionBalance[i]) ? transitionStats.directionBalance[i] : 0;
+        stats.transitionSpread = defined(transitionStats.transitionSpread[i]) ? transitionStats.transitionSpread[i] : 0;
+        stats.occurrenceCount = defined(transitionStats.occurrenceCount[i]) ? transitionStats.occurrenceCount[i] : 0;
+        stats.middleCount = defined(transitionStats.middleCount[i]) ? transitionStats.middleCount[i] : 0;
+        stats.middleRatio = defined(transitionStats.middleRatio[i]) ? transitionStats.middleRatio[i] : 0;
+        stats.specificity = spec.specificity;
+        stats.parentLike = spec.parentLike;
+        stats.childLike = spec.childLike;
+        stats.segmentFrequency = defined(segmentStats.segmentFrequency[i]) ? segmentStats.segmentFrequency[i] : 0;
+        stats.startCount = defined(segmentStats.startCount[i]) ? segmentStats.startCount[i] : 0;
+        stats.endCount = defined(segmentStats.endCount[i]) ? segmentStats.endCount[i] : 0;
+        stats.boundaryCount = defined(segmentStats.boundaryCount[i]) ? segmentStats.boundaryCount[i] : 0;
+        stats.segmentRatio = defined(segmentStats.segmentRatio[i]) ? segmentStats.segmentRatio[i] : 0;
+        stats.boundaryRatio = defined(segmentStats.boundaryRatio[i]) ? segmentStats.boundaryRatio[i] : 0;
+        stats.startRatio = defined(segmentStats.startRatio[i]) ? segmentStats.startRatio[i] : 0;
+        stats.endRatio = defined(segmentStats.endRatio[i]) ? segmentStats.endRatio[i] : 0;
+        stats.spread = stats.transitionSpread;
+        rows.add({
+            tokenId: i,
+            token: tokenText,
+            class: "support",
+            confidence: 0,
+            scores: {},
+            metrics: stats
+        });
+    }
+
+    corpusStats = this.buildCorpusStats(rows);
+
+    for (i = 0; i < rows.count(); i = i + 1) {
+        result = this.classifyToken(rows[i].token, rows[i].metrics, corpusStats);
+        rows[i].class = result.class;
+        rows[i].confidence = result.confidence;
+        rows[i].scores = result.scores;
+    }
+
+    return rows;
+}
+
+classify = func(tokens, matrix, normalized, distance, sequence, segments) {
+    return this.categorize(tokens, matrix, normalized, distance, sequence, segments);
+}
+
+isBoundaryConnector = func(stats) {
+    if (!defined(stats)) return false;
+    if (stats.degree > 2) return false;
+    if (stats.segmentFrequency != 1) return false;
+    if (stats.startCount <= 0) return false;
+    if (stats.focus > 0.6) return false;
+    return true;
+}
+
+isBridgeCandidate = func(stats) {
+    if (!defined(stats)) return false;
+    if (stats.degree < 2) return false;
+    if (stats.middleCount <= 0) return false;
+    score = stats.middleRatio + stats.segmentRatio + stats.degree + stats.centrality - stats.boundaryRatio - stats.focus;
+    return score >= 2;
+}
+
+buildRelationGraph = func(rows, segments) {
+    bridgeUseCount = array(rows.count(), 0);
+    incoming = array(rows.count(), 0);
+    outgoing = array(rows.count(), 0);
+    edges = [];
+    for (k = 0; k < rows.count(); k = k + 1) {
+        edges.add(array(rows.count(), 0));
+    }
+
+    if (!defined(segments) || segments == null || segments.count() == 0) {
+        return {
+            bridgeUseCount: bridgeUseCount,
+            incoming: incoming,
+            outgoing: outgoing,
+            edges: edges
+        };
+    }
+
+    for (s = 0; s < segments.count(); s = s + 1) {
+        segment = segments[s];
+        if (!defined(segment) || segment == null || segment.count() < 3) continue;
+
+        for (i = 1; i + 1 < segment.count(); i = i + 1) {
+            bridgeId = segment[i];
+            if (bridgeId < 0 || bridgeId >= rows.count()) continue;
+
+            bridgeStats = rows[bridgeId].metrics;
+            if (!this.isBridgeCandidate(bridgeStats)) continue;
+
+            child = segment[i - 1];
+            parent = segment[i + 1];
+            if (child < 0 || child >= rows.count()) continue;
+            if (parent < 0 || parent >= rows.count()) continue;
+            if (child == parent) continue;
+
+            bridgeUseCount[bridgeId] = bridgeUseCount[bridgeId] + 1;
+
+            incoming[parent] = incoming[parent] + 1;
+
+            outgoing[child] = outgoing[child] + 1;
+
+            edges[child][parent] = edges[child][parent] + 1;
+        }
+    }
+
+    return {
+        bridgeUseCount: bridgeUseCount,
+        incoming: incoming,
+        outgoing: outgoing,
+        edges: edges
+    };
+}
+
+categorize = func(tokens, matrix, normalized, distance, sequence, segments) {
+    if (!defined(matrix) || matrix == null || matrix.count() == 0) return [];
+
+    tokenList = this.normalizeTokenList(tokens);
+    if (!defined(normalized) || normalized == null || normalized.count() == 0) {
+        normalized = this.wordMatrix.normalize(matrix);
+    }
+
+    rows = [];
+    centrality = this.computeCentrality(matrix, 6);
+    transitionStats = this.buildTransitionStats(sequence, matrix.count());
+    segmentStats = this.buildSegmentStats(segments, matrix.count());
+
+    for (i = 0; i < matrix.count(); i = i + 1) {
+        tokenText = defined(tokenList[i]) ? tokenList[i] : null;
+        stats = this.analyzeToken(matrix, normalized, i);
+        spec = this.specificityMetrics(matrix, i);
+        stats.centrality = defined(centrality[i]) ? centrality[i] : 0;
+        stats.incomingActivity = defined(transitionStats.incomingActivity[i]) ? transitionStats.incomingActivity[i] : 0;
+        stats.outgoingActivity = defined(transitionStats.outgoingActivity[i]) ? transitionStats.outgoingActivity[i] : 0;
+        stats.directionBalance = defined(transitionStats.directionBalance[i]) ? transitionStats.directionBalance[i] : 0;
+        stats.transitionSpread = defined(transitionStats.transitionSpread[i]) ? transitionStats.transitionSpread[i] : 0;
+        stats.occurrenceCount = defined(transitionStats.occurrenceCount[i]) ? transitionStats.occurrenceCount[i] : 0;
+        stats.middleCount = defined(transitionStats.middleCount[i]) ? transitionStats.middleCount[i] : 0;
+        stats.middleRatio = defined(transitionStats.middleRatio[i]) ? transitionStats.middleRatio[i] : 0;
+        stats.specificity = spec.specificity;
+        stats.parentLike = spec.parentLike;
+        stats.childLike = spec.childLike;
+        stats.segmentFrequency = defined(segmentStats.segmentFrequency[i]) ? segmentStats.segmentFrequency[i] : 0;
+        stats.startCount = defined(segmentStats.startCount[i]) ? segmentStats.startCount[i] : 0;
+        stats.endCount = defined(segmentStats.endCount[i]) ? segmentStats.endCount[i] : 0;
+        stats.boundaryCount = defined(segmentStats.boundaryCount[i]) ? segmentStats.boundaryCount[i] : 0;
+        stats.segmentRatio = defined(segmentStats.segmentRatio[i]) ? segmentStats.segmentRatio[i] : 0;
+        stats.boundaryRatio = defined(segmentStats.boundaryRatio[i]) ? segmentStats.boundaryRatio[i] : 0;
+        stats.startRatio = defined(segmentStats.startRatio[i]) ? segmentStats.startRatio[i] : 0;
+        stats.endRatio = defined(segmentStats.endRatio[i]) ? segmentStats.endRatio[i] : 0;
+        stats.spread = stats.transitionSpread;
+        rows.add({
+            tokenId: i,
+            token: tokenText,
+            class: "support",
+            confidence: 0,
+            scores: {},
+            metrics: stats
+        });
+    }
+
+    graph = this.buildRelationGraph(rows, segments);
+    corpusStats = this.buildCorpusStats(rows);
+    meanCentrality = corpusStats.centrality.mean;
+
+    for (i = 0; i < rows.count(); i = i + 1) {
+        stats = rows[i].metrics;
+        bridgeUses = defined(graph.bridgeUseCount[i]) ? graph.bridgeUseCount[i] : 0;
+        incoming = defined(graph.incoming[i]) ? graph.incoming[i] : 0;
+        outgoing = defined(graph.outgoing[i]) ? graph.outgoing[i] : 0;
+
+        connectorScore = stats.boundaryRatio + stats.startRatio + stats.endRatio - stats.centrality - stats.degree - stats.focus;
+        bridgeScore = stats.middleRatio + stats.segmentRatio + stats.directionBalance + bridgeUses - stats.boundaryRatio - stats.focus;
+        topicScore = stats.specificity + stats.centrality + incoming + stats.segmentFrequency - stats.focus;
+        attributeScore = stats.focus + outgoing + stats.childLike - stats.specificity - stats.boundaryRatio;
+
+        bestClass = "support";
+        bestScore = 0;
+        secondScore = 0;
+        confidence = 0;
+
+        if (bridgeUses >= 2 && this.isBridgeCandidate(stats)) {
+            bestClass = "bridge";
+        } else if (stats.parentLike > stats.childLike && stats.parentLike > 0) {
+            bestClass = "topic";
+        } else if (stats.childLike > stats.parentLike && stats.childLike > 0) {
+            bestClass = "attribute";
+        } else if (stats.focus >= 0.4 && stats.degree <= 2) {
+            bestClass = "attribute";
+        } else if (this.isBoundaryConnector(stats) && stats.segmentFrequency <= 1 && stats.specificity <= corpusStats.specificity.mean) {
+            bestClass = "connector";
+        } else if (stats.degree <= 2 && stats.segmentFrequency <= 1 && stats.focus <= 0.35) {
+            bestClass = "attribute";
+        } else if (stats.segmentFrequency >= 2 && incoming > 0 && outgoing > 0) {
+            bestClass = "topic";
+        } else if (stats.segmentFrequency >= 2 && incoming > outgoing && incoming > 0) {
+            bestClass = "topic";
+        } else if (stats.segmentFrequency >= 2 && outgoing > incoming && outgoing > 0) {
+            bestClass = "attribute";
+        } else if (stats.centrality >= meanCentrality && stats.segmentFrequency >= 2) {
+            bestClass = "topic";
+        } else if (stats.specificity > corpusStats.specificity.mean && stats.centrality >= meanCentrality) {
+            bestClass = "topic";
+        } else {
+            bestClass = "support";
+        }
+
+        confidence = bestScore - secondScore;
+        if (bestClass == "support" && confidence < 0.5) {
+            bestClass = "ambiguous";
+        }
+
+        rows[i].class = bestClass;
+        rows[i].confidence = confidence;
+        rows[i].scores = {
+            topic: topicScore,
+            bridge: bridgeScore,
+            attribute: attributeScore,
+            connector: connectorScore
+        };
+    }
+
+    return rows;
+}
+
+classify = func(tokens, matrix, normalized, distance, sequence, segments) {
+    return this.categorize(tokens, matrix, normalized, distance, sequence, segments);
+}

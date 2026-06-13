@@ -1,5 +1,14 @@
-evaluation = import("../eval/src/eval.ns");
-explain = import("../explain/src/explain.ns");
+try {
+    evaluation = import("../eval/src/eval.ns");
+} catch (ex) {
+    evaluation = import("eval/src/eval.ns");
+}
+
+try {
+    explain = import("../explain/src/explain.ns");
+} catch (ex) {
+    explain = import("explain/src/explain.ns");
+}
 
 copyArray = func(values) {
     out = [];

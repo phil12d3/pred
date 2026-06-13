@@ -1,0 +1,92 @@
+tokenMode = {mode: String};
+tokenModes = {
+    word: {mode: "word"} <= tokenMode,
+    single: {mode: "single"} <= tokenMode,
+    double: {mode: "double"} <= tokenMode,
+    triple: {mode: "triple"} <= tokenMode
+}
+
+getTokens = func(corpus:String, lowercase:Boolean, includeStop:Boolean, mode: tokenMode) {
+    if (lowercase) corpus = toLower(corpus);
+    tokens = [];
+    stopChars = [" ", ".", ",", ":", ";", "\"", "?", "!", "'"];
+    token = "";
+
+    addIfNew = func(token) {
+        if (!tokens.contains(func(i,v) => v == token) && token != "") {
+            tokens.add(token);
+        }
+    }
+
+    if (mode.mode == this.tokenModes.word.mode) {
+        for(i=0; i< length(corpus); i++) {
+            c = corpus[i];
+            if (stopChars.contains(func(i,v) => v == c)) {
+                addIfNew(token);
+                if (includeStop) {
+                    addIfNew(c);
+                }
+                token = "";
+                continue;
+            }
+            token = token + c;
+        }
+        if (length(token) > 0) addIfNew(token);
+    }
+
+    if (mode.mode == this.tokenModes.single.mode) {
+        for(i=0; i< length(corpus); i++) {
+            addIfNew(corpus[i]);
+        }
+    }
+
+    addSets = func(corpus, num) {
+        for(i=0; i< length(corpus)-num+1; i++) {
+            token = "";
+            for(j=0;j<num;j++) {
+                token = token + corpus[i+j];
+            }
+            addIfNew(token);
+        }
+    }
+
+    if (mode.mode == this.tokenModes.double.mode) {
+        addSets(corpus, 2);
+    }
+
+    if (mode.mode == this.tokenModes.triple.mode) {
+        addSets(corpus, 3);
+    }
+
+    return {mode: mode, tokens: tokens};
+}
+
+tokenize = func(tokens: Object, corpus: String, lowercase: Boolean) {
+    tokenIds = [];
+    orderedTokens = [];
+
+    for (t = 0; t < tokens.tokens.count(); t++) {
+        orderedTokens.add({
+            id: t,
+            token: tokens.tokens[t]
+        });
+    }
+
+    orderedTokens = orderedTokens.sort(func(ai, av, bi, bv) => length(bv.token) - length(av.token));
+
+    for(i=0; i< length(corpus); i++) {
+        for(t=0; t< orderedTokens.count(); t++) {
+            l = length(orderedTokens[t].token);
+            token = orderedTokens[t].token;
+            c = substring(corpus, i, i+l);
+            if (lowercase) c = toLower(c);
+            if (token == c) {
+                tokenIds.add(orderedTokens[t].id);
+                i = i + l - 1;
+                break;
+            }
+        }
+    }
+
+    return tokenIds;
+}

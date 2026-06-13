@@ -1,0 +1,176 @@
+
+token = import("tokens.ns");
+
+// windows can be ...,3)  or ...,{leftRange: 3, rightRange: 1})
+
+splitSegments = func(corpus) {
+    segments = [];
+    current = "";
+    for (i = 0; i < length(corpus); i = i + 1) {
+        ch = corpus[i];
+        boundary = ch == "." || ch == "!" || ch == "?" || ch == ";" || ch == "\n";
+        if (boundary) {
+            if (length(current) > 0) segments.add(current);
+            current = "";
+        } else {
+            current = current + ch;
+        }
+    }
+    if (length(current) > 0) segments.add(current);
+    return segments;
+}
+
+segmentTokenIds = func(tokens, corpus, lowercase) {
+    segments = this.splitSegments(corpus);
+    segmentIds = [];
+    for (s = 0; s < segments.count(); s = s + 1) {
+        ids = this.token.tokenize(tokens, segments[s], lowercase);
+        if (ids.count() > 0) segmentIds.add(ids);
+    }
+    return segmentIds;
+}
+
+build = func(tokens, tokenIds, window) {
+    size = tokens.count();
+    settings = {};
+    if (defined(window) && window != null) {
+        if (type(window).typename == "Object") settings = window;
+        else settings = {range: window};
+    }
+
+    range = defined(settings.range) && settings.range != null ? settings.range : 1;
+    leftRange = defined(settings.leftRange) && settings.leftRange != null ? settings.leftRange : range;
+    rightRange = defined(settings.rightRange) && settings.rightRange != null ? settings.rightRange : range;
+    matrix = [];
+    useSegments = false;
+    if (defined(settings.segments)) {
+        if (type(settings.segments).typename == "Array") {
+            useSegments = true;
+        }
+    }
+
+    for (t = 0; t < size; t++) {
+        matrix.add(array(size, 0));
+    }
+
+    if (useSegments) {
+        for (s = 0; s < settings.segments.count(); s = s + 1) {
+            segment = settings.segments[s];
+            if (!defined(segment) || segment == null || segment.count() == 0) continue;
+
+            for (i = 0; i < segment.count(); i = i + 1) {
+                left = i - leftRange;
+                right = i + rightRange;
+
+                if (left < 0) left = 0;
+                if (right > segment.count() - 1) right = segment.count() - 1;
+
+                sourceId = segment[i];
+                for (j = left; j <= right; j = j + 1) {
+                    if (j == i) continue;
+                    targetId = segment[j];
+                    matrix[sourceId][targetId] = matrix[sourceId][targetId] + 1;
+                }
+            }
+        }
+        return matrix;
+    }
+
+    for (i = 0; i < tokenIds.count(); i++) {
+        left = i - leftRange;
+        right = i + rightRange;
+
+        if (left < 0) left = 0;
+        if (right > tokenIds.count() - 1) right = tokenIds.count() - 1;
+
+        sourceId = tokenIds[i];
+        for (j = left; j <= right; j++) {
+            if (j == i) continue;
+            targetId = tokenIds[j];
+            matrix[sourceId][targetId] = matrix[sourceId][targetId] + 1;
+        }
+    }
+
+    return matrix;
+}
+
+probability = func(matrix) {
+    size = matrix.count();
+    probabilities = [];
+    rowTotals = [];
+
+    for (i = 0; i < size; i = i + 1) {
+        rowTotal = 0;
+        for (j = 0; j < size; j = j + 1) {
+            rowTotal = rowTotal + matrix[i][j];
+        }
+        rowTotals.add(rowTotal);
+    }
+
+    for (i = 0; i < size; i = i + 1) {
+        row = [];
+        for (j = 0; j < size; j = j + 1) {
+            pairCount = matrix[i][j];
+            denom = rowTotals[i];
+
+            if (pairCount == 0 || denom <= 0) row.add(0);
+            else row.add(pairCount / denom);
+        }
+        probabilities.add(row);
+    }
+
+    return probabilities;
+}
+
+normalize = func(matrix) {
+    size = matrix.count();
+    normalized = [];
+    rowFreqs = [];
+    colFreqs = [];
+
+    for (i = 0; i < size; i = i + 1) {
+        rowTotal = 0;
+        colTotal = 0;
+
+        for (j = 0; j < size; j = j + 1) {
+            rowTotal = rowTotal + matrix[i][j];
+            colTotal = colTotal + matrix[j][i];
+        }
+
+        rowFreqs.add(rowTotal);
+        colFreqs.add(colTotal);
+    }
+
+    for (i = 0; i < size; i = i + 1) {
+        row = [];
+        for (j = 0; j < size; j = j + 1) {
+            pairCount = matrix[i][j];
+            freq1 = rowFreqs[i];
+            freq2 = colFreqs[j];
+            denom = freq1 * freq2;
+
+            if (pairCount == 0 || denom <= 0) row.add(0);
+            else row.add(pairCount / sqrt(denom));
+        }
+        normalized.add(row);
+    }
+
+    return normalized;
+}
+
+distance = func(matrix) {
+    size = matrix.count();
+    distances = [];
+
+    for (i = 0; i < size; i = i + 1) {
+        row = [];
+        for (j = 0; j < size; j = j + 1) {
+            association = matrix[i][j];
+            if (association == 0) row.add(0);
+            else row.add(1 / association);
+        }
+        distances.add(row);
+    }
+
+    return distances;
+}

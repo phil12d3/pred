@@ -1,0 +1,163 @@
+// N-gram probability model and next-token prediction.
+//
+// `probabilities(sequence, order, options)` learns an order-N context model
+// from a token-id sequence. Each stored context maps to a probability
+// distribution over the next token id.
+// `predict(model, history)` uses the longest matching suffix of history and
+// falls back to shorter suffixes if needed.
+
+contextKey = func(values) {
+    key = "";
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (i > 0) key = key + "|";
+        key = key + values[i];
+    }
+    return key;
+}
+
+copyTail = func(values, length) {
+    out = [];
+    start = values.count() - length;
+    if (start < 0) start = 0;
+    for (i = start; i < values.count(); i = i + 1) {
+        out.add(values[i]);
+    }
+    return out;
+}
+
+createEntry = func(size) {
+    return {
+        probabilities: array(size, 0),
+        total: 0,
+        observed: 0
+    };
+}
+
+finalizeEntry = func(entry, smoothing) {
+    if (!defined(entry) || entry == null) return entry;
+
+    total = entry.total;
+    vocab = entry.probabilities.count();
+    if (total <= 0) {
+        return {
+            probabilities: entry.probabilities,
+            total: 0
+        };
+    }
+
+    if (defined(smoothing) && smoothing != null && smoothing > 0) {
+        denom = total + (smoothing * vocab);
+        for (i = 0; i < vocab; i = i + 1) {
+            entry.probabilities[i] = (entry.probabilities[i] + smoothing) / denom;
+        }
+    } else {
+        for (i = 0; i < vocab; i = i + 1) {
+            entry.probabilities[i] = entry.probabilities[i] / total;
+        }
+    }
+
+    return {
+        probabilities: entry.probabilities,
+        total: total
+    };
+}
+
+probabilities = func(sequence, order, options) {
+    if (!defined(sequence) || sequence == null || sequence.count() == 0) {
+        return {
+            order: 0,
+            size: 0,
+            smoothing: 0,
+            contexts: {},
+            global: { probabilities: [], total: 0 }
+        };
+    }
+
+    maxOrder = defined(order) && order != null ? order : 3;
+    if (maxOrder < 0) maxOrder = 0;
+    if (maxOrder > sequence.count() - 1) maxOrder = sequence.count() - 1;
+    smoothing = 0;
+    if (defined(options) && options != null && defined(options.smoothing) && options.smoothing != null) {
+        smoothing = options.smoothing;
+    }
+
+    maxTokenId = 0;
+    for (i = 0; i < sequence.count(); i = i + 1) {
+        if (sequence[i] > maxTokenId) maxTokenId = sequence[i];
+    }
+
+    size = maxTokenId + 1;
+    model = {
+        order: maxOrder,
+        size: size,
+        smoothing: smoothing,
+        contexts: {},
+        global: this.createEntry(size)
+    };
+
+    for (i = 0; i < sequence.count() - 1; i = i + 1) {
+        nextTokenId = sequence[i + 1];
+        model.global.probabilities[nextTokenId] = model.global.probabilities[nextTokenId] + 1;
+        model.global.total = model.global.total + 1;
+
+        contextLength = maxOrder;
+        if (contextLength > i + 1) contextLength = i + 1;
+
+        context = [];
+        start = i - contextLength + 1;
+        for (j = start; j <= i; j = j + 1) {
+            context.add(sequence[j]);
+        }
+
+        key = this.contextKey(context);
+        if (!defined(model.contexts[key]) || model.contexts[key] == null) {
+            model.contexts[key] = this.createEntry(size);
+            model.contexts[key].context = context;
+        }
+
+        entry = model.contexts[key];
+        entry.probabilities[nextTokenId] = entry.probabilities[nextTokenId] + 1;
+        entry.total = entry.total + 1;
+    }
+
+    model.global = this.finalizeEntry(model.global, smoothing);
+    foreach(name in model.contexts.props) {
+        model.contexts[name] = this.finalizeEntry(model.contexts[name], smoothing);
+    }
+
+    return model;
+}
+
+argMax = func(values) {
+    bestIndex = null;
+    bestValue = -1;
+
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (values[i] > bestValue) {
+            bestValue = values[i];
+            bestIndex = i;
+        }
+    }
+
+    return bestIndex;
+}
+
+predict = func(model, history) {
+    if (!defined(model) || model == null) return null;
+    if (!defined(history) || history == null || history.count() == 0) {
+        return this.argMax(model.global.probabilities);
+    }
+
+    maxContextLength = model.order;
+    if (maxContextLength > history.count()) maxContextLength = history.count();
+
+    for (contextLength = maxContextLength; contextLength > 0; contextLength = contextLength - 1) {
+        context = this.copyTail(history, contextLength);
+        key = this.contextKey(context);
+        if (defined(model.contexts[key]) && model.contexts[key] != null) {
+            return this.argMax(model.contexts[key].probabilities);
+        }
+    }
+
+    return this.argMax(model.global.probabilities);
+}

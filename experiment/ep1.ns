@@ -1,0 +1,203 @@
+// Role: query, entity, action, modifier, connector
+// Type: person, object, place, time, action, attribute, concept, unknown
+
+language = import("english.ns");
+
+processWord = func(word) {
+    if (length(word) == 0) return;
+    lowerWord = toLower(word);
+
+    result = language.words.first(func(i,v) => v.word == lowerWord);
+    return result;
+}
+
+parse = func(text) {
+    seperator = [" ", ",", ".", "?"];
+    word = "";
+    results = [];
+
+    for(i=0; i < length(text); i++) {
+        c = text[i]
+        if (seperator.contains(func(i,v) => v == c)) {
+            result = processWord(word);
+            if (result != null) results.add(result);
+            word = "";
+            continue;
+        }
+        word = word + text[i];
+    }
+    if (length(word)) {
+        result = processWord(word);
+        if (result != null) results.add(result);
+    }
+
+    return results;
+}
+
+getIntent = func(words) {
+    foreach( rule in language.rules) {
+        patterns = getRulePatterns(rule);
+        values = matchPatternValues(words, patterns, 0, 0);
+        if (values != null) {
+            return {
+                match: rule,
+                values: values
+            };
+        }
+    }
+
+    return null;
+}
+
+matchesRule = func(words, rule) {
+    if (!defined(words) || words == null) return false;
+    if (!defined(rule) || rule == null) return false;
+    patterns = getRulePatterns(rule);
+    if (!defined(patterns) || patterns == null) return false;
+    return matchPatternValues(words, patterns, 0, 0) != null;
+}
+
+getRulePatterns = func(rule) {
+    if (defined(rule.pattern) && rule.pattern != null) return rule.pattern;
+    if (defined(rule.patterns) && rule.patterns != null) return rule.patterns;
+    return null;
+}
+
+matchesPatternPosition = func(word, position) {
+    if (!defined(word) || word == null) return false;
+    if (!defined(position) || position == null) return false;
+
+    items = getPatternItems(position);
+    positionLowercase = defined(position.lowercase) && position.lowercase == true;
+
+    // An empty array is a wildcard for this position.
+    if (items.count() == 0) return true;
+
+    for (i = 0; i < items.count(); i = i + 1) {
+        if (matchesPatternObject(word, items[i], positionLowercase)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+matchPatternValues = func(words, patterns, wordIndex, patternIndex) {
+    if (!defined(patterns) || patterns == null) return null;
+
+    if (patternIndex == patterns.count()) {
+        if (defined(words) && words != null && wordIndex != words.count()) return null;
+        return [];
+    }
+
+    position = patterns[patternIndex];
+    optional = isOptionalPosition(position);
+
+    if (optional) {
+        if (defined(words) && words != null && wordIndex < words.count() && matchesPatternPosition(words[wordIndex], position)) {
+            consumed = matchPatternValues(words, patterns, wordIndex + 1, patternIndex + 1);
+            if (consumed != null) {
+                values = [];
+                values.add(words[wordIndex]);
+                for (i = 0; i < consumed.count(); i = i + 1) {
+                    values.add(consumed[i]);
+                }
+                return values;
+            }
+        }
+
+        skipped = matchPatternValues(words, patterns, wordIndex, patternIndex + 1);
+        if (skipped != null) return skipped;
+    }
+
+    if (!defined(words) || words == null) return null;
+    if (wordIndex >= words.count()) return null;
+    if (!matchesPatternPosition(words[wordIndex], position)) return null;
+
+    rest = matchPatternValues(words, patterns, wordIndex + 1, patternIndex + 1);
+    if (rest == null) return null;
+
+    values = [];
+    values.add(words[wordIndex]);
+    for (i = 0; i < rest.count(); i = i + 1) {
+        values.add(rest[i]);
+    }
+    return values;
+}
+
+getPatternItems = func(position) {
+    if (!defined(position) || position == null) return [];
+    if (defined(position.items) && position.items != null) return position.items;
+    if (defined(position.count)) return position;
+    return [position];
+}
+
+isOptionalPosition = func(position) {
+    if (!defined(position) || position == null) return false;
+    if (defined(position.optional) && position.optional == true) return true;
+    return false;
+}
+
+matchesPatternObject = func(word, slot, positionLowercase) {
+    if (!defined(word) || word == null) return false;
+    if (!defined(slot) || slot == null) return false;
+
+    hasWord = (defined(slot.word) && slot.word != null) || (defined(slot.words) && slot.words != null);
+    hasRole = (defined(slot.role) && slot.role != null) || (defined(slot.roles) && slot.roles != null);
+    hasType = (defined(slot.type) && slot.type != null) || (defined(slot.types) && slot.types != null);
+    hasQualifier = (defined(slot.qualifier) && slot.qualifier != null) || (defined(slot.qualifiers) && slot.qualifiers != null);
+    lowercase = defined(slot.lowercase) ? (slot.lowercase == true) : positionLowercase;
+
+    if (!hasWord && !hasRole && !hasType && !hasQualifier) return true;
+
+    if (hasWord && !matchesAnyValue(word.word, slot.word, slot.words, lowercase)) {
+        return false;
+    }
+
+    if (hasRole && !matchesAnyValue(word.role, slot.role, slot.roles, false)) {
+        return false;
+    }
+
+    if (hasType && !matchesAnyValue(word.type, slot.type, slot.types, false)) {
+        return false;
+    }
+
+    if (hasQualifier && !matchesAnyValue(word.qualifier, slot.qualifier, slot.qualifiers, false)) {
+        return false;
+    }
+
+    return true;
+}
+
+matchesAnyValue = func(value, singleValue, values, lowercase) {
+    if (!defined(value) || value == null) return false;
+
+    compareValue = value;
+    if (defined(lowercase) && lowercase == true) {
+        compareValue = toLower(compareValue);
+    }
+
+    if (defined(singleValue) && singleValue != null) {
+        if (defined(lowercase) && lowercase == true) {
+            return compareValue == toLower(singleValue);
+        }
+        return compareValue == singleValue;
+    }
+
+    if (!defined(values) || values == null) return false;
+    if (defined(lowercase) && lowercase == true) {
+        return values.contains(func(i, v) => compareValue == toLower(v));
+    }
+    return values.contains(func(i, v) => v == value);
+}
+
+text = "what are dogs"
+result = parse(text);
+
+foreach( i in result) {
+    printraw(i);
+}
+
+intent = getIntent(result);
+printline("");
+printraw(intent);
