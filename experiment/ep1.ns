@@ -59,7 +59,6 @@ matchesRule = func(words, rule) {
 
 getRulePatterns = func(rule) {
     if (defined(rule.pattern) && rule.pattern != null) return rule.pattern;
-    if (defined(rule.patterns) && rule.patterns != null) return rule.patterns;
     return null;
 }
 
@@ -68,7 +67,7 @@ matchesPatternPosition = func(word, position) {
     if (!defined(position) || position == null) return false;
 
     items = getPatternItems(position);
-    positionLowercase = defined(position.lowercase) && position.lowercase == true;
+    positionLowercase = isLowercasePosition(position);
 
     // An empty array is a wildcard for this position.
     if (items.count() == 0) return true;
@@ -91,7 +90,7 @@ matchPatternValues = func(words, patterns, wordIndex, patternIndex) {
     }
 
     position = patterns[patternIndex];
-    optional = isOptionalPosition(position);
+    optional = defined(position.optional) && position.optional == true;
 
     if (optional) {
         if (defined(words) && words != null && wordIndex < words.count() && matchesPatternPosition(words[wordIndex], position)) {
@@ -107,7 +106,14 @@ matchPatternValues = func(words, patterns, wordIndex, patternIndex) {
         }
 
         skipped = matchPatternValues(words, patterns, wordIndex, patternIndex + 1);
-        if (skipped != null) return skipped;
+        if (skipped != null) {
+            values = [];
+            values.add(null);
+            for (i = 0; i < skipped.count(); i = i + 1) {
+                values.add(skipped[i]);
+            }
+            return values;
+        }
     }
 
     if (!defined(words) || words == null) return null;
@@ -127,14 +133,21 @@ matchPatternValues = func(words, patterns, wordIndex, patternIndex) {
 
 getPatternItems = func(position) {
     if (!defined(position) || position == null) return [];
-    if (defined(position.items) && position.items != null) return position.items;
-    if (defined(position.count)) return position;
+
+    if (defined(position.items) && position.items != null) {
+        return position.items;
+    }
+
+    if (defined(position.count)) {
+        return position;
+    }
+
     return [position];
 }
 
-isOptionalPosition = func(position) {
+isLowercasePosition = func(position) {
     if (!defined(position) || position == null) return false;
-    if (defined(position.optional) && position.optional == true) return true;
+    if (defined(position.lowercase) && position.lowercase == true) return true;
     return false;
 }
 
