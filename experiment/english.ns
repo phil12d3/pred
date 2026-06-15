@@ -167,3 +167,15 @@ rules = [
     {pattern: [[{role:"query"}], [{role:"connector"}], [{role:"entity"}]], intent: "question"}
 ]
 
+intentRules = [
+    {match: "question", pattern: [[{role:"query", type:"thing"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "what-is"},
+    {match: "question", pattern: [[{role:"query", type:"person"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "who-is"},
+    {match: "question", pattern: [[{role:"query", type:"location"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "where-is"},
+    {match: "question", pattern: [[{role:"query", type:"time"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "when-is"},
+    {match: "question", pattern: [[{role:"query", type:"cause"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "why-is"}
+]
+
+resolver = [
+    {intent: "what-is", tool: "lookup", sources: [{role: "entity"}]},
+    {intent: "description", tool: "describe", sources: [{role: "entity"}]}
+]

@@ -49,6 +49,108 @@ getIntent = func(words) {
     return null;
 }
 
+refineIntent = func(intent) {
+    if (!defined(intent) || intent == null) return null;
+
+    refined = matchIntentRule(intent);
+    if (refined != null) {
+        return refined;
+    }
+
+    return intent;
+}
+
+matchIntentRule = func(intent) {
+    if (!defined(intent) || intent == null) return null;
+    if (!defined(language.intentRules) || language.intentRules == null) return null;
+    if (!defined(intent.match) || intent.match == null) return null;
+
+    foreach (rule in language.intentRules) {
+        if (defined(rule.match) && rule.match != null && rule.match != intent.match.intent) {
+            continue;
+        }
+
+        patterns = getIntentRulePatterns(rule);
+        if (!defined(patterns) || patterns == null) {
+            continue;
+        }
+
+        if (matchPatternValues(intent.values, patterns, 0, 0) != null) {
+            return {
+                intent: rule.intent,
+                base: intent,
+                match: intent.match,
+                rule: rule,
+                values: intent.values
+            };
+        }
+    }
+
+    return null;
+}
+
+findIntentValue = func(intent, source) {
+    if (!defined(intent) || intent == null) return null;
+    if (!defined(intent.values) || intent.values == null) return null;
+
+    for (i = 0; i < intent.values.count(); i = i + 1) {
+        value = intent.values[i];
+        if (matchesPatternObject(value, source, false)) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+resolveIntent = func(intent) {
+    if (!defined(intent) || intent == null) return null;
+    if (!defined(language.resolver) || language.resolver == null) return null;
+
+    refined = intent;
+    if (!defined(refined.intent) || refined.intent == null) {
+        refined = refineIntent(intent);
+    }
+    if (!defined(refined) || refined == null) return null;
+
+    foreach (resolver in language.resolver) {
+        if (defined(resolver.intent) && resolver.intent == refined.intent) {
+            data = resolveIntentData(refined, resolver);
+            return {
+                tool: resolver.tool,
+                data: data,
+                intent: refined
+            };
+        }
+    }
+
+    return null;
+}
+
+getIntentRulePatterns = func(rule) {
+    if (!defined(rule) || rule == null) return null;
+    if (defined(rule.pattern) && rule.pattern != null) return rule.pattern;
+    return null;
+}
+
+resolveIntentData = func(intent, resolver) {
+    if (!defined(intent) || intent == null) return null;
+    if (!defined(intent.values) || intent.values == null) return null;
+    if (!defined(resolver) || resolver == null) return null;
+
+    if (defined(resolver.sources) && resolver.sources != null) {
+        data = [];
+        for (i = 0; i < resolver.sources.count(); i = i + 1) {
+            source = resolver.sources[i];
+            value = findIntentValue(intent, source);
+            data.add(value);
+        }
+        return data;
+    }
+
+    return null;
+}
+
 matchesRule = func(words, rule) {
     if (!defined(words) || words == null) return false;
     if (!defined(rule) || rule == null) return false;
@@ -205,12 +307,10 @@ matchesAnyValue = func(value, singleValue, values, lowercase) {
 }
 
 text = "what are dogs"
-result = parse(text);
 
-foreach( i in result) {
-    printraw(i);
-}
+words = parse(text);
+intent = getIntent(words);
+refinedIntent = refineIntent(intent);
+resolved = resolveIntent(refinedIntent);
 
-intent = getIntent(result);
-printline("");
-printraw(intent);
+printraw(resolved);
