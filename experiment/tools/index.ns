@@ -1,0 +1,338 @@
+copyObject = func(value) {
+    out = {};
+    if (!defined(value) || value == null) return out;
+    if (type(value).typename == "Null") return out;
+    foreach(name in value.props) out[name] = value[name];
+    return out;
+}
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+}
+
+normalizeKey = func(value) {
+    if (!defined(value) || value == null) return null;
+    if (type(value).typename == "Null") return null;
+    if (type(value).typename == "String") return toLower(value);
+    return value;
+}
+
+keyFor = func(indexed, item) {
+    if (!defined(indexed) || indexed == null) return null;
+    if (!defined(item) || item == null) return null;
+
+    field = indexed.keyField;
+    if (!defined(field) || field == null || field == "") field = "key";
+    if (!defined(item[field]) || item[field] == null) return null;
+
+    return this.normalizeKey(item[field]);
+}
+
+createNode = func() {
+    return {
+        children: {},
+        positions: []
+    };
+}
+
+create = func(keyField) {
+    out = {
+        keyField: keyField,
+        entries: [],
+        root: this.createNode(),
+        tree: null,
+        bins: null
+    };
+    out.tree = out.root;
+    out.bins = out.root;
+    out.copyObject = this.copyObject;
+    out.copyArray = this.copyArray;
+    out.normalizeKey = this.normalizeKey;
+    out.keyFor = this.keyFor;
+    out.createNode = this.createNode;
+    out.rebuildTree = this.rebuildTree;
+    out.create = this.create;
+    out.build = this.build;
+    out.add = this.add;
+    out.lookupNode = this.lookupNode;
+    out.lookupPositions = this.lookupPositions;
+    out.lookupAll = this.lookupAll;
+    out.lookup = this.lookup;
+    out.has = this.has;
+    out.count = this.count;
+    out.toArray = this.toArray;
+    out.first = this.first;
+    out.last = this.last;
+    out.slice = this.slice;
+    out.filter = this.filter;
+    out.sort = this.sort;
+    out.removeAt = this.removeAt;
+    out.remove = this.remove;
+    out.edit = this.edit;
+    out.snapshot = this.snapshot;
+    out.restore = this.restore;
+    out.pack = this.pack;
+    out.unpack = this.unpack;
+    out.saveFile = this.saveFile;
+    out.loadFile = this.loadFile;
+    return out;
+}
+
+insertKey = func(indexed, key, position) {
+    if (!defined(indexed) || indexed == null) return;
+    if (!defined(key) || key == null) return;
+
+    node = indexed.root;
+    for (i = 0; i < length(key); i = i + 1) {
+        ch = substring(key, i, i + 1);
+        if (!defined(node.children[ch]) || node.children[ch] == null) {
+            node.children[ch] = this.createNode();
+        }
+        node = node.children[ch];
+    }
+    node.positions.add(position);
+}
+
+rebuildTree = func(indexed) {
+    if (!defined(indexed) || indexed == null) return this.create(null);
+
+    indexed.root = this.createNode();
+    indexed.tree = indexed.root;
+    indexed.bins = indexed.root;
+
+    for (i = 0; i < indexed.entries.count(); i = i + 1) {
+        entry = indexed.entries[i];
+        key = this.keyFor(indexed, entry);
+        if (key == null) continue;
+        this.insertKey(indexed, key, i);
+    }
+
+    return indexed;
+}
+
+build = func(entries, keyField) {
+    indexed = this.create(keyField);
+    if (!defined(entries) || entries == null) return indexed;
+
+    for (i = 0; i < entries.count(); i = i + 1) {
+        indexed.entries.add(this.copyObject(entries[i]));
+    }
+    return this.rebuildTree(indexed);
+}
+
+add = func(indexed, item) {
+    if (!defined(indexed) || indexed == null) indexed = this.create(null);
+    indexed.entries.add(this.copyObject(item));
+    return this.rebuildTree(indexed);
+}
+
+lookupNode = func(indexed, key) {
+    if (!defined(indexed) || indexed == null) return null;
+    normalized = this.normalizeKey(key);
+    if (!defined(normalized) || normalized == null) return null;
+
+    node = indexed.root;
+    for (i = 0; i < length(normalized); i = i + 1) {
+        ch = substring(normalized, i, i + 1);
+        if (!defined(node.children[ch]) || node.children[ch] == null) {
+            return null;
+        }
+        node = node.children[ch];
+    }
+    return node;
+}
+
+lookupPositions = func(indexed, key) {
+    node = this.lookupNode(indexed, key);
+    if (!defined(node) || node == null) return [];
+    return node.positions;
+}
+
+lookupAll = func(indexed, key) {
+    result = [];
+    positions = this.lookupPositions(indexed, key);
+    for (i = 0; i < positions.count(); i = i + 1) {
+        position = positions[i];
+        if (position < 0 || position >= indexed.entries.count()) continue;
+        result.add(indexed.entries[position]);
+    }
+    return result;
+}
+
+lookup = func(indexed, key) {
+    matches = this.lookupAll(indexed, key);
+    if (matches.count() == 0) return null;
+    if (matches.count() == 1) return matches[0];
+    return matches;
+}
+
+has = func(indexed, key) {
+    if (!defined(indexed) || indexed == null) return false;
+    if (!defined(key) || key == null) return false;
+    return this.lookupPositions(indexed, key).count() > 0;
+}
+
+count = func(indexed) {
+    if (!defined(indexed) || indexed == null) return 0;
+    return indexed.entries.count();
+}
+
+toArray = func(indexed) {
+    result = [];
+    if (!defined(indexed) || indexed == null) return result;
+    for (i = 0; i < indexed.entries.count(); i = i + 1) {
+        result.add(this.copyObject(indexed.entries[i]));
+    }
+    return result;
+}
+
+first = func(indexed) {
+    if (!defined(indexed) || indexed == null) return null;
+    if (indexed.entries.count() == 0) return null;
+    return indexed.entries[0];
+}
+
+last = func(indexed) {
+    if (!defined(indexed) || indexed == null) return null;
+    if (indexed.entries.count() == 0) return null;
+    return indexed.entries[indexed.entries.count() - 1];
+}
+
+slice = func(indexed, start, count) {
+    result = [];
+    if (!defined(indexed) || indexed == null) return result;
+
+    begin = defined(start) && start != null ? start : 0;
+    if (begin < 0) begin = 0;
+
+    end = indexed.entries.count();
+    if (defined(count) && count != null) {
+        end = begin + count;
+    }
+    if (end > indexed.entries.count()) end = indexed.entries.count();
+
+    for (i = begin; i < end; i = i + 1) {
+        result.add(this.copyObject(indexed.entries[i]));
+    }
+    return result;
+}
+
+filter = func(indexed, predicate) {
+    if (!defined(indexed) || indexed == null) return this.create(null);
+    result = this.create(indexed.keyField);
+    if (!defined(predicate) || predicate == null) return this.build(this.toArray(indexed), indexed.keyField);
+
+    for (i = 0; i < indexed.entries.count(); i = i + 1) {
+        entry = indexed.entries[i];
+        if (predicate(i, entry)) {
+            result.entries.add(this.copyObject(entry));
+        }
+    }
+    return this.rebuildTree(result);
+}
+
+sort = func(indexed, comparator) {
+    if (!defined(indexed) || indexed == null) return this.create(null);
+    if (!defined(comparator) || comparator == null) return this.rebuildTree(indexed);
+    indexed.entries = indexed.entries.sort(comparator);
+    return this.rebuildTree(indexed);
+}
+
+removeAt = func(indexed, position) {
+    if (!defined(indexed) || indexed == null) return this.create(null);
+    result = this.create(indexed.keyField);
+    for (i = 0; i < indexed.entries.count(); i = i + 1) {
+        if (i == position) continue;
+        result.entries.add(this.copyObject(indexed.entries[i]));
+    }
+    return this.rebuildTree(result);
+}
+
+remove = func(indexed, key) {
+    if (!defined(indexed) || indexed == null) return this.create(null);
+    result = this.create(indexed.keyField);
+    normalized = this.normalizeKey(key);
+    for (i = 0; i < indexed.entries.count(); i = i + 1) {
+        entry = indexed.entries[i];
+        if (this.keyFor(indexed, entry) == normalized) continue;
+        result.entries.add(this.copyObject(entry));
+    }
+    return this.rebuildTree(result);
+}
+
+edit = func(indexed, key, item) {
+    if (!defined(indexed) || indexed == null) return this.create(null);
+    next = this.remove(indexed, key);
+    return this.add(next, item);
+}
+
+snapshot = func(indexed) {
+    if (!defined(indexed) || indexed == null) return this.create(null);
+    result = this.create(indexed.keyField);
+    result.entries = this.toArray(indexed);
+    return result;
+}
+
+restore = func(snapshot) {
+    if (!defined(snapshot) || snapshot == null) return this.create(null);
+    return this.build(snapshot.entries, snapshot.keyField);
+}
+
+pack = func(value) {
+    return value;
+}
+
+unpack = func(value) {
+    return value;
+}
+
+saveFile = func(path, value) {
+    payload = this.pack(this.snapshot(value));
+    compress_to_file(payload, path);
+    return {
+        path: path,
+        saved: true
+    };
+}
+
+loadFile = func(path) {
+    payload = decompress_from_file(path);
+    return this.restore(this.unpack(payload));
+}
+
+index = {
+    copyObject: copyObject,
+    copyArray: copyArray,
+    normalizeKey: normalizeKey,
+    keyFor: keyFor,
+    createNode: createNode,
+    insertKey: insertKey,
+    rebuildTree: rebuildTree,
+    create: create,
+    build: build,
+    add: add,
+    lookupNode: lookupNode,
+    lookupPositions: lookupPositions,
+    lookupAll: lookupAll,
+    lookup: lookup,
+    has: has,
+    count: count,
+    toArray: toArray,
+    first: first,
+    last: last,
+    slice: slice,
+    filter: filter,
+    sort: sort,
+    removeAt: removeAt,
+    remove: remove,
+    edit: edit,
+    snapshot: snapshot,
+    restore: restore,
+    pack: pack,
+    unpack: unpack,
+    saveFile: saveFile,
+    loadFile: loadFile
+}

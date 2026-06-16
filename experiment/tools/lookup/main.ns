@@ -1,0 +1,35 @@
+index = import("tools/index.ns");
+data = import("lookup-data.ns");
+lookupIndex = null;
+
+init = func() {
+    this.lookupIndex = this.index.build(this.data.entries, "word");
+    return this;
+}
+
+exec = func(data) {
+    result = "";
+    if (!defined(data) || data == null) return result;
+
+    for (i = 0; i < data.count(); i = i + 1) {
+        item = data[i];
+        if (!defined(item) || item == null) continue;
+        if (!defined(item.word) || item.word == null) continue;
+
+        match = this.index.lookup(this.lookupIndex, item.word);
+        if (!defined(match) || match == null) continue;
+
+        if (type(match).typename == "Array") {
+            for (j = 0; j < match.count(); j = j + 1) {
+                if (result != "") result = result + "\n";
+                result = result + match[j].answer;
+            }
+            continue;
+        }
+
+        if (result != "") result = result + "\n";
+        result = result + match.answer;
+    }
+
+    return result;
+}

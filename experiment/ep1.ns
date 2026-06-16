@@ -7,19 +7,18 @@ processWord = func(word) {
     if (length(word) == 0) return;
     lowerWord = toLower(word);
 
-    result = language.words.first(func(i,v) => v.word == lowerWord);
+    result = this.language.words.first(func(i,v) => v.word == lowerWord);
     return result;
 }
 
 parse = func(text) {
-    seperator = [" ", ",", ".", "?"];
     word = "";
     results = [];
 
     for(i=0; i < length(text); i++) {
         c = text[i]
-        if (seperator.contains(func(i,v) => v == c)) {
-            result = processWord(word);
+        if (this.language.seperator.contains(func(i,v) => v == c)) {
+            result = this.processWord(word);
             if (result != null) results.add(result);
             word = "";
             continue;
@@ -27,7 +26,7 @@ parse = func(text) {
         word = word + text[i];
     }
     if (length(word)) {
-        result = processWord(word);
+        result = this.processWord(word);
         if (result != null) results.add(result);
     }
 
@@ -35,9 +34,9 @@ parse = func(text) {
 }
 
 getIntent = func(words) {
-    foreach( rule in language.rules) {
-        patterns = getRulePatterns(rule);
-        values = matchPatternValues(words, patterns, 0, 0);
+    foreach( rule in this.language.rules) {
+        patterns = this.getRulePatterns(rule);
+        values = this.matchPatternValues(words, patterns, 0, 0);
         if (values != null) {
             return {
                 match: rule,
@@ -52,7 +51,7 @@ getIntent = func(words) {
 refineIntent = func(intent) {
     if (!defined(intent) || intent == null) return null;
 
-    refined = matchIntentRule(intent);
+    refined = this.matchIntentRule(intent);
     if (refined != null) {
         return refined;
     }
@@ -62,20 +61,20 @@ refineIntent = func(intent) {
 
 matchIntentRule = func(intent) {
     if (!defined(intent) || intent == null) return null;
-    if (!defined(language.intentRules) || language.intentRules == null) return null;
+    if (!defined(this.language.intentRules) || this.language.intentRules == null) return null;
     if (!defined(intent.match) || intent.match == null) return null;
 
-    foreach (rule in language.intentRules) {
+    foreach (rule in this.language.intentRules) {
         if (defined(rule.match) && rule.match != null && rule.match != intent.match.intent) {
             continue;
         }
 
-        patterns = getIntentRulePatterns(rule);
+        patterns = this.getIntentRulePatterns(rule);
         if (!defined(patterns) || patterns == null) {
             continue;
         }
 
-        if (matchPatternValues(intent.values, patterns, 0, 0) != null) {
+        if (this.matchPatternValues(intent.values, patterns, 0, 0) != null) {
             return {
                 intent: rule.intent,
                 base: intent,
@@ -95,7 +94,7 @@ findIntentValue = func(intent, source) {
 
     for (i = 0; i < intent.values.count(); i = i + 1) {
         value = intent.values[i];
-        if (matchesPatternObject(value, source, false)) {
+        if (this.matchesPatternObject(value, source, false)) {
             return value;
         }
     }
@@ -105,17 +104,17 @@ findIntentValue = func(intent, source) {
 
 resolveIntent = func(intent) {
     if (!defined(intent) || intent == null) return null;
-    if (!defined(language.resolver) || language.resolver == null) return null;
+    if (!defined(this.language.resolver) || this.language.resolver == null) return null;
 
     refined = intent;
     if (!defined(refined.intent) || refined.intent == null) {
-        refined = refineIntent(intent);
+        refined = this.refineIntent(intent);
     }
     if (!defined(refined) || refined == null) return null;
 
-    foreach (resolver in language.resolver) {
+    foreach (resolver in this.language.resolver) {
         if (defined(resolver.intent) && resolver.intent == refined.intent) {
-            data = resolveIntentData(refined, resolver);
+            data = this.resolveIntentData(refined, resolver);
             return {
                 tool: resolver.tool,
                 data: data,
@@ -142,7 +141,7 @@ resolveIntentData = func(intent, resolver) {
         data = [];
         for (i = 0; i < resolver.sources.count(); i = i + 1) {
             source = resolver.sources[i];
-            value = findIntentValue(intent, source);
+            value = this.findIntentValue(intent, source);
             data.add(value);
         }
         return data;
@@ -154,9 +153,9 @@ resolveIntentData = func(intent, resolver) {
 matchesRule = func(words, rule) {
     if (!defined(words) || words == null) return false;
     if (!defined(rule) || rule == null) return false;
-    patterns = getRulePatterns(rule);
+    patterns = this.getRulePatterns(rule);
     if (!defined(patterns) || patterns == null) return false;
-    return matchPatternValues(words, patterns, 0, 0) != null;
+    return this.matchPatternValues(words, patterns, 0, 0) != null;
 }
 
 getRulePatterns = func(rule) {
@@ -168,14 +167,14 @@ matchesPatternPosition = func(word, position) {
     if (!defined(word) || word == null) return false;
     if (!defined(position) || position == null) return false;
 
-    items = getPatternItems(position);
-    positionLowercase = isLowercasePosition(position);
+    items = this.getPatternItems(position);
+    positionLowercase = this.isLowercasePosition(position);
 
     // An empty array is a wildcard for this position.
     if (items.count() == 0) return true;
 
     for (i = 0; i < items.count(); i = i + 1) {
-        if (matchesPatternObject(word, items[i], positionLowercase)) {
+        if (this.matchesPatternObject(word, items[i], positionLowercase)) {
             return true;
         }
     }
@@ -195,8 +194,8 @@ matchPatternValues = func(words, patterns, wordIndex, patternIndex) {
     optional = defined(position.optional) && position.optional == true;
 
     if (optional) {
-        if (defined(words) && words != null && wordIndex < words.count() && matchesPatternPosition(words[wordIndex], position)) {
-            consumed = matchPatternValues(words, patterns, wordIndex + 1, patternIndex + 1);
+        if (defined(words) && words != null && wordIndex < words.count() && this.matchesPatternPosition(words[wordIndex], position)) {
+            consumed = this.matchPatternValues(words, patterns, wordIndex + 1, patternIndex + 1);
             if (consumed != null) {
                 values = [];
                 values.add(words[wordIndex]);
@@ -207,7 +206,7 @@ matchPatternValues = func(words, patterns, wordIndex, patternIndex) {
             }
         }
 
-        skipped = matchPatternValues(words, patterns, wordIndex, patternIndex + 1);
+        skipped = this.matchPatternValues(words, patterns, wordIndex, patternIndex + 1);
         if (skipped != null) {
             values = [];
             values.add(null);
@@ -220,9 +219,9 @@ matchPatternValues = func(words, patterns, wordIndex, patternIndex) {
 
     if (!defined(words) || words == null) return null;
     if (wordIndex >= words.count()) return null;
-    if (!matchesPatternPosition(words[wordIndex], position)) return null;
+    if (!this.matchesPatternPosition(words[wordIndex], position)) return null;
 
-    rest = matchPatternValues(words, patterns, wordIndex + 1, patternIndex + 1);
+    rest = this.matchPatternValues(words, patterns, wordIndex + 1, patternIndex + 1);
     if (rest == null) return null;
 
     values = [];
@@ -265,19 +264,19 @@ matchesPatternObject = func(word, slot, positionLowercase) {
 
     if (!hasWord && !hasRole && !hasType && !hasQualifier) return true;
 
-    if (hasWord && !matchesAnyValue(word.word, slot.word, slot.words, lowercase)) {
+    if (hasWord && !this.matchesAnyValue(word.word, slot.word, slot.words, lowercase)) {
         return false;
     }
 
-    if (hasRole && !matchesAnyValue(word.role, slot.role, slot.roles, false)) {
+    if (hasRole && !this.matchesAnyValue(word.role, slot.role, slot.roles, false)) {
         return false;
     }
 
-    if (hasType && !matchesAnyValue(word.type, slot.type, slot.types, false)) {
+    if (hasType && !this.matchesAnyValue(word.type, slot.type, slot.types, false)) {
         return false;
     }
 
-    if (hasQualifier && !matchesAnyValue(word.qualifier, slot.qualifier, slot.qualifiers, false)) {
+    if (hasQualifier && !this.matchesAnyValue(word.qualifier, slot.qualifier, slot.qualifiers, false)) {
         return false;
     }
 
@@ -306,11 +305,23 @@ matchesAnyValue = func(value, singleValue, values, lowercase) {
     return values.contains(func(i, v) => v == value);
 }
 
-text = "what are dogs"
-
-words = parse(text);
-intent = getIntent(words);
-refinedIntent = refineIntent(intent);
-resolved = resolveIntent(refinedIntent);
-
-printraw(resolved);
+ep1 = {
+    language: language,
+    processWord: processWord,
+    parse: parse,
+    getIntent: getIntent,
+    refineIntent: refineIntent,
+    matchIntentRule: matchIntentRule,
+    findIntentValue: findIntentValue,
+    resolveIntent: resolveIntent,
+    getIntentRulePatterns: getIntentRulePatterns,
+    resolveIntentData: resolveIntentData,
+    matchesRule: matchesRule,
+    getRulePatterns: getRulePatterns,
+    matchesPatternPosition: matchesPatternPosition,
+    matchPatternValues: matchPatternValues,
+    getPatternItems: getPatternItems,
+    isLowercasePosition: isLowercasePosition,
+    matchesPatternObject: matchesPatternObject,
+    matchesAnyValue: matchesAnyValue
+}

@@ -1,0 +1,59 @@
+english = import("english.ns");
+ep1 = import("ep1.ns").ep1;
+ep1.language = english;
+
+loadTools = func() {
+    toolDirs = directory("tools").directories;
+    tools = [];
+
+    foreach (toolDir in toolDirs) {
+        toolname = "tools/" + toolDir.name + "/main.ns";
+        printline("Loading [{toolname}]");
+        tool = import(toolname);
+        tool.init();
+        tools.add({key: toolDir.name, tool: tool});
+    }
+
+    return tools;
+}
+
+findTool = func(tools, name) {
+    if (!defined(tools) || tools == null) return null;
+    if (!defined(name) || name == null) return null;
+
+    foreach (item in tools) {
+        if (item.key == name) {
+            return item.tool;
+        }
+    }
+
+    return null;
+}
+
+tools = loadTools();
+
+talk = func(text) {
+    words = ep1.parse(text);
+    if (words.count()==0) return null;
+    intent = ep1.getIntent(words);
+    if (intent == null) return null;
+    refinedIntent = ep1.refineIntent(intent);
+    if (refinedIntent == null) return null;
+    resolved = ep1.resolveIntent(refinedIntent);
+    if (resolved == null) return null;
+
+    selectedTool = findTool(tools, resolved.tool);
+
+    result = "";
+    if (defined(selectedTool) && selectedTool != null) {
+        result = selectedTool.exec(resolved.data);
+    }
+    return result;
+}
+
+while(1) {
+    print("> ");
+    text = read_line();
+    result = talk(text);
+    printraw(result);
+}

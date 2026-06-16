@@ -1,3 +1,4 @@
+seperator = [" ", ",", ".", "?"];
 
 words = [
     {word:"what",       role:"query",      type:"thing",          qualifier:"unknown"},
@@ -164,11 +165,13 @@ words = [
 
 rules = [
     {pattern: [[{role:"entity"}],[{role:"connector", type:"identity"}],[{role:"modifier"}]], intent: "description"},
-    {pattern: [[{role:"query"}], [{role:"connector"}], [{role:"entity"}]], intent: "question"}
+    {pattern: [[{role:"query"}], [{role:"connector"}], [{role:"entity"}]], intent: "question"},
+    {pattern: [[{role:"query"}], [{role:"connector"}], [{role:"modifier", type:"selection"}], [{role:"entity"}]], intent: "question"}
 ]
 
 intentRules = [
     {match: "question", pattern: [[{role:"query", type:"thing"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "what-is"},
+    {match: "question", pattern: [[{role:"query", type:"thing"}], [{role:"connector", type:"identity"}], [{role:"modifier", type:"selection"}], [{role:"entity"}]], intent: "what-is"},
     {match: "question", pattern: [[{role:"query", type:"person"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "who-is"},
     {match: "question", pattern: [[{role:"query", type:"location"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "where-is"},
     {match: "question", pattern: [[{role:"query", type:"time"}], [{role:"connector", type:"identity"}], [{role:"entity"}]], intent: "when-is"},
@@ -177,5 +180,8 @@ intentRules = [
 
 resolver = [
     {intent: "what-is", tool: "lookup", sources: [{role: "entity"}]},
+    {intent: "who-is", tool: "lookup", sources: [{role: "entity"}]},
+    {intent: "where-is", tool: "lookup", sources: [{role: "entity"}]},
+    {intent: "when-is", tool: "lookup", sources: [{role: "entity"}]},
     {intent: "description", tool: "describe", sources: [{role: "entity"}]}
 ]
