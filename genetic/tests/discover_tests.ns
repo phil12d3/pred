@@ -1,0 +1,56 @@
+[test]
+expression_runtime_handles_math_and_logic = func(t) {
+    genetic = import("./genetic.ns");
+    program = {
+        kind: "op",
+        op: "if",
+        args: [
+            {kind: "op", op: "gt", args: [{kind: "var", name: "x"}, {kind: "const", value: 0}]},
+            {kind: "op", op: "mul", args: [{kind: "var", name: "x"}, {kind: "var", name: "x"}]},
+            {kind: "const", value: 0}
+        ]
+    };
+
+    t.equal(genetic.discover.run(program, {x: 3}), 9, "positive branch evaluates math expression");
+    t.equal(genetic.discover.run(program, {x: -3}), 0, "negative branch evaluates logic expression");
+    t.truthy(genetic.discover.programToText(program).length > 0, "program renders to text");
+    t.equal(genetic.discover.nodeCount(program), 8, "program node count includes ops and leaves");
+};
+
+[test]
+algorithm_discovery_returns_executable_program = func(t) {
+    genetic = import("./genetic.ns");
+    rows = [
+        {x: -2, y: 4},
+        {x: -1, y: 1},
+        {x: 0, y: 0},
+        {x: 1, y: 1},
+        {x: 2, y: 4}
+    ];
+
+    fitness = func(program, tools, ctx) {
+        err = 0;
+        for (i = 0; i < rows.count(); i = i + 1) {
+            pred = tools.run(program, {x: rows[i].x});
+            diff = pred - rows[i].y;
+            if (diff < 0) diff = 0 - diff;
+            err = err + diff;
+        }
+        return err;
+    };
+
+    result = genetic.discover.evolve(fitness, {
+        populationSize: 24,
+        generations: 20,
+        maxDepth: 3,
+        seed: 4,
+        variables: ["x"],
+        constants: [-2, -1, 0, 1, 2],
+        operators: ["add", "sub", "mul", "abs", "neg", "min", "max"]
+    });
+
+    value = genetic.discover.run(result.best.program, {x: 2});
+    t.truthy(type(value).typename == "Number", "discovered program is executable");
+    t.truthy(result.best.text.length > 0, "discovered program renders to text");
+    t.truthy(result.history.count() == 21, "discovery tracks best history");
+};

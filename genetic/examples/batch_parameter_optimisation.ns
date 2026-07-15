@@ -1,0 +1,54 @@
+genetic = import("./genetic.ns");
+
+// Batch fitness example.
+//
+// This scores the whole population in one call. In a runtime with GPU-backed
+// matrix support or caller-managed worker pools, this is the hook to move the
+// expensive part out of the inner per-candidate loop.
+
+rows = [
+    {week: 1, price: 10.0, promo: 0, sales: 121},
+    {week: 2, price: 10.2, promo: 0, sales: 123},
+    {week: 3, price: 9.8,  promo: 1, sales: 148},
+    {week: 4, price: 10.4, promo: 0, sales: 124},
+    {week: 5, price: 10.0, promo: 1, sales: 154},
+    {week: 6, price: 10.5, promo: 0, sales: 126},
+    {week: 7, price: 9.7,  promo: 1, sales: 163},
+    {week: 8, price: 10.8, promo: 0, sales: 126},
+    {week: 9, price: 10.1, promo: 0, sales: 135},
+    {week: 10, price: 9.9, promo: 1, sales: 171}
+];
+
+batchFitness = func(candidateRows, ctx) {
+    scores = [];
+    for (c = 0; c < candidateRows.count(); c = c + 1) {
+        params = candidateRows[c];
+        totalAbsError = 0;
+        for (i = 0; i < rows.count(); i = i + 1) {
+            forecast = params[0] + (params[1] * rows[i].week) + (params[2] * rows[i].promo) + (params[3] * (rows[i].price - 10));
+            diff = forecast - rows[i].sales;
+            if (diff < 0) diff = 0 - diff;
+            totalAbsError = totalAbsError + diff;
+        }
+        scores.add(totalAbsError / rows.count());
+    }
+    return scores;
+};
+
+result = genetic.de.optimizeBatch(batchFitness, [
+    {min: 80, max: 160},
+    {min: -2, max: 6},
+    {min: 0, max: 60},
+    {min: -80, max: 20}
+], {
+    populationSize: 64,
+    generations: 100,
+    mutationFactor: 0.75,
+    crossoverRate: 0.9,
+    seed: 29,
+    threads: 8
+});
+
+printline("Batch mean absolute error: ", stringify(result.best.score));
+printline("Best parameters: ", stringify(result.best.values));
+printline("Fitness context threads requested: 8");

@@ -1,0 +1,58 @@
+discovery = import("./src/discover.ns");
+
+// Discover a compact decision expression for customer escalation risk.
+// The fitness test rewards rules that match labelled rows and lightly penalizes
+// overly large expressions, so the result stays readable.
+
+rows = [
+    {tickets: 0, daysIdle: 1, planValue: 20, outage: 0, escalated: 0},
+    {tickets: 1, daysIdle: 2, planValue: 25, outage: 0, escalated: 0},
+    {tickets: 2, daysIdle: 3, planValue: 35, outage: 0, escalated: 0},
+    {tickets: 3, daysIdle: 8, planValue: 40, outage: 0, escalated: 1},
+    {tickets: 4, daysIdle: 4, planValue: 45, outage: 1, escalated: 1},
+    {tickets: 1, daysIdle: 9, planValue: 95, outage: 0, escalated: 1},
+    {tickets: 0, daysIdle: 6, planValue: 120, outage: 0, escalated: 0},
+    {tickets: 2, daysIdle: 10, planValue: 80, outage: 0, escalated: 1},
+    {tickets: 5, daysIdle: 2, planValue: 30, outage: 1, escalated: 1},
+    {tickets: 1, daysIdle: 4, planValue: 60, outage: 0, escalated: 0},
+    {tickets: 3, daysIdle: 5, planValue: 110, outage: 0, escalated: 1},
+    {tickets: 0, daysIdle: 12, planValue: 25, outage: 0, escalated: 0}
+];
+
+fitness = func(program, tools, ctx) {
+    mistakes = 0;
+    for (i = 0; i < rows.count(); i = i + 1) {
+        score = tools.run(program, rows[i]);
+        predicted = score >= 0.5 ? 1 : 0;
+        if (predicted != rows[i].escalated) mistakes = mistakes + 1;
+    }
+    return mistakes + (tools.nodeCount(program) * 0.02);
+};
+
+printline("Searching for a compact escalation rule...");
+
+result = discovery.evolve(fitness, {
+    populationSize: 24,
+    generations: 18,
+    maxDepth: 3,
+    variables: ["tickets", "daysIdle", "planValue", "outage"],
+    constants: [0, 1, 2, 3, 5, 7, 10, 50],
+    operatorPreset: "rules",
+    seed: 31,
+    threads: 4
+});
+
+printline("Fitness score: ", stringify(result.best.score));
+printline("Discovered rule: ", result.best.text);
+printline("");
+printline("Row checks");
+
+correct = 0;
+for (i = 0; i < rows.count(); i = i + 1) {
+    riskScore = discovery.run(result.best.program, rows[i]);
+    predicted = riskScore >= 0.5 ? 1 : 0;
+    if (predicted == rows[i].escalated) correct = correct + 1;
+    printline("row ", stringify(i + 1), " predicted=", stringify(predicted), " actual=", stringify(rows[i].escalated), " score=", stringify(riskScore));
+}
+
+printline("Accuracy: ", stringify(correct), "/", stringify(rows.count()));

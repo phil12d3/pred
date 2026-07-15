@@ -1,0 +1,47 @@
+[test]
+parameter_optimisation_moves_toward_target = func(t) {
+    genetic = import("./genetic.ns");
+    fitness = func(values, ctx) {
+        dx = values[0] - 3;
+        dy = values[1] + 2;
+        return (dx * dx) + (dy * dy);
+    };
+
+    result = genetic.de.optimize(fitness, [{min: -10, max: 10}, {min: -10, max: 10}], {
+        populationSize: 28,
+        generations: 45,
+        seed: 9,
+        threads: 4
+    });
+
+    t.truthy(result.best.score < 1.0, "differential evolution lowers numeric objective");
+    t.truthy(result.history.count() == 46, "history includes initial and generated best scores");
+};
+
+[test]
+batch_fitness_scores_population_rows = func(t) {
+    genetic = import("./genetic.ns");
+    calls = {count: 0, seenThreads: 0};
+
+    batch = func(rows, ctx) {
+        calls.count = calls.count + 1;
+        calls.seenThreads = ctx.threads;
+        scores = [];
+        for (i = 0; i < rows.count(); i = i + 1) {
+            x = rows[i][0] - 1;
+            scores.add(x * x);
+        }
+        return scores;
+    };
+
+    result = genetic.de.optimizeBatch(batch, [{min: -5, max: 5}], {
+        populationSize: 16,
+        generations: 20,
+        seed: 11,
+        threads: 6
+    });
+
+    t.truthy(calls.count > 0, "batch fitness function is used");
+    t.equal(calls.seenThreads, 6, "thread setting is passed to fitness context");
+    t.truthy(result.best.score < 1.0, "batch optimisation returns improved score");
+};

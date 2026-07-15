@@ -1,0 +1,533 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>genetic ns module</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --text: #1f2933;
+      --muted: #5f6b7a;
+      --line: #d9e2ec;
+      --code: #f3f4f6;
+      --panel: #f8fafc;
+      --accent: #245b7a;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 1080px;
+      margin: 32px auto;
+      padding: 0 24px 48px;
+      line-height: 1.55;
+      color: var(--text);
+      background: #fff;
+    }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { font-size: 2.2rem; margin-bottom: 0.2rem; }
+    h2 { border-top: 1px solid var(--line); padding-top: 28px; margin-top: 36px; }
+    h3 { margin-top: 28px; }
+    p, li { max-width: 880px; }
+    a { color: var(--accent); }
+    code, pre { background: var(--code); border-radius: 5px; }
+    code { padding: 1px 5px; }
+    pre { padding: 14px; overflow: auto; border: 1px solid var(--line); }
+    table { border-collapse: collapse; width: 100%; margin: 16px 0 24px; }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    .lead { color: var(--muted); font-size: 1.08rem; }
+    .note { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); padding: 12px 14px; margin: 18px 0; }
+    .toc { background: var(--panel); border: 1px solid var(--line); padding: 14px 18px; }
+    .toc ul { margin: 8px 0 0; columns: 2; }
+  </style>
+</head>
+<body>
+  <h1>genetic</h1>
+  <p class="lead">A practical ns module for differential evolution parameter optimisation and symbolic algorithm discovery.</p>
+
+  <div class="toc">
+    <strong>Contents</strong>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#install">Importing the module</a></li>
+      <li><a href="#parameter">Parameter optimisation</a></li>
+      <li><a href="#de-theory">Differential evolution theory</a></li>
+      <li><a href="#batch">Batch fitness and acceleration</a></li>
+      <li><a href="#discovery">Algorithm discovery</a></li>
+      <li><a href="#discovery-theory">Discovery theory</a></li>
+      <li><a href="#api">API reference</a></li>
+      <li><a href="#examples">Real-world example patterns</a></li>
+      <li><a href="#tuning">Tuning and troubleshooting</a></li>
+    </ul>
+  </div>
+
+  <h2 id="overview">Overview</h2>
+  <p>
+    The module has two related search tools. Differential evolution searches for the best numeric parameter vector.
+    Symbolic algorithm discovery searches for a small expression tree made from variables, constants, and operators.
+    Both tools use the same idea: generate candidates, score them with a fitness function, keep better candidates,
+    and repeat.
+  </p>
+  <p>
+    Use parameter optimisation when you already know the model shape and need to fit its numeric settings. Use
+    algorithm discovery when you do not know the exact rule or formula and want the module to search for one.
+  </p>
+
+  <table>
+    <tr><th>Task</th><th>Use</th><th>Candidate shape</th><th>Fitness receives</th></tr>
+    <tr>
+      <td>Calibrate a model, policy, controller, simulator, or forecast</td>
+      <td><code>genetic.de.optimize</code></td>
+      <td>Array of numbers, for example <code>[base, trend, promoLift]</code></td>
+      <td><code>fitness(values, ctx)</code></td>
+    </tr>
+    <tr>
+      <td>Score a whole population in one call for heavier workloads</td>
+      <td><code>genetic.de.optimizeBatch</code></td>
+      <td>Array of candidate arrays</td>
+      <td><code>batchFitness(candidateRows, ctx)</code></td>
+    </tr>
+    <tr>
+      <td>Discover a readable formula or decision rule</td>
+      <td><code>genetic.discover.evolve</code></td>
+      <td>Expression tree</td>
+      <td><code>fitness(program, tools, ctx)</code></td>
+    </tr>
+  </table>
+
+  <h2 id="install">Importing the Module</h2>
+  <pre><code>genetic = import("./genetic.ns");</code></pre>
+  <p>The umbrella module exports:</p>
+  <ul>
+    <li><code>genetic.de</code>: numeric differential evolution.</li>
+    <li><code>genetic.discover</code>: symbolic expression discovery.</li>
+    <li><code>genetic.vectors</code>: dense vector helpers used by the optimiser.</li>
+    <li><code>genetic.utils</code>: deterministic random and scoring helpers.</li>
+    <li><code>genetic.run</code>: a unified dispatcher for simple callers.</li>
+  </ul>
+
+  <h2 id="parameter">Parameter Optimisation</h2>
+  <p>
+    Parameter optimisation fits numbers. You define a candidate vector, bounds for each number, and a fitness function
+    that returns a score. Lower score is better by default.
+  </p>
+
+  <h3>Demand Forecast Calibration</h3>
+  <p>
+    Suppose you use this compact forecast model:
+  </p>
+  <pre><code>forecast = base + trend * week + promoLift * promo + priceSensitivity * (price - 10)</code></pre>
+  <p>
+    The structure is fixed. The unknowns are <code>base</code>, <code>trend</code>, <code>promoLift</code>, and
+    <code>priceSensitivity</code>. Differential evolution searches those four values.
+  </p>
+  <pre><code>genetic = import("./genetic.ns");
+
+rows = [
+    {week: 1, price: 10.0, promo: 0, sales: 121},
+    {week: 2, price: 10.2, promo: 0, sales: 123},
+    {week: 3, price: 9.8, promo: 1, sales: 148},
+    {week: 4, price: 10.4, promo: 0, sales: 124}
+];
+
+predictSales = func(params, row) {
+    base = params[0];
+    trend = params[1];
+    promoLift = params[2];
+    priceSensitivity = params[3];
+    return base + (trend * row.week) + (promoLift * row.promo) + (priceSensitivity * (row.price - 10));
+};
+
+fitness = func(values, ctx) {
+    totalAbsError = 0;
+    for (i = 0; i &lt; rows.count(); i = i + 1) {
+        predicted = predictSales(values, rows[i]);
+        diff = predicted - rows[i].sales;
+        if (diff &lt; 0) diff = 0 - diff;
+        totalAbsError = totalAbsError + diff;
+    }
+    return totalAbsError / rows.count();
+};
+
+result = genetic.de.optimize(fitness, [
+    {min: 80, max: 160},
+    {min: -2, max: 6},
+    {min: 0, max: 60},
+    {min: -80, max: 20}
+], {
+    populationSize: 48,
+    generations: 120,
+    mutationFactor: 0.75,
+    crossoverRate: 0.9,
+    seed: 23,
+    threads: 4
+});
+
+printline("Mean absolute error: ", stringify(result.best.score));
+printline("Best parameters: ", stringify(result.best.values));</code></pre>
+
+  <h3>Bounds</h3>
+  <p>Bounds can be objects or two-item arrays:</p>
+  <pre><code>bounds = [
+    {min: 0, max: 100},
+    [-10, 10]
+];</code></pre>
+  <p>
+    Bounds are important. Wide bounds let the optimiser explore, but they also make the search harder. Prefer ranges
+    that are broad enough to contain good answers but narrow enough to exclude impossible values.
+  </p>
+
+  <h3>Fitness Function Design</h3>
+  <p>
+    A fitness function should turn a candidate into one number. That number should reflect what you actually want.
+    Common choices are:
+  </p>
+  <ul>
+    <li>Mean absolute error for forecasts and calibration.</li>
+    <li>Penalty-weighted cost for operations or scheduling.</li>
+    <li>Negative profit when using <code>mode: "minimize"</code>, or profit with <code>mode: "maximize"</code>.</li>
+    <li>Error plus constraint penalties when candidates can violate rules.</li>
+  </ul>
+  <pre><code>fitness = func(values, ctx) {
+    cost = simulate(values);
+    penalty = 0;
+    if (values[0] &lt; values[1]) penalty = penalty + 1000;
+    return cost + penalty;
+};</code></pre>
+
+  <h2 id="de-theory">Differential Evolution Theory</h2>
+  <p>
+    Differential evolution is a population-based optimiser. Instead of keeping one current answer, it keeps a population
+    of possible answers. Each answer is a vector of numbers. In each generation, the optimiser tries to improve every
+    candidate by combining information from other candidates.
+  </p>
+
+  <h3>The Core Loop</h3>
+  <ol>
+    <li>Create an initial population of random vectors inside the bounds.</li>
+    <li>Score each vector with the fitness function.</li>
+    <li>For each target vector, pick three distinct vectors from the population.</li>
+    <li>Create a mutant vector: <code>a + mutationFactor * (b - c)</code>.</li>
+    <li>Cross the mutant with the target vector to create a trial vector.</li>
+    <li>Score the trial vector.</li>
+    <li>If the trial is better, replace the target. Otherwise keep the target.</li>
+    <li>Repeat for the configured number of generations.</li>
+  </ol>
+
+  <h3>Why It Works</h3>
+  <p>
+    The difference vector <code>(b - c)</code> captures a direction and scale already present in the population.
+    If the population has candidates spread around useful areas, these difference vectors become practical search
+    steps. The method does not require gradients, derivatives, or a smooth objective. That makes it useful for
+    simulations, forecasts, policy rules, and other systems where the score is available but the mathematical derivative
+    is not.
+  </p>
+
+  <h3>Exploration and Exploitation</h3>
+  <p>
+    <code>mutationFactor</code> controls step size. Larger values explore more aggressively. Smaller values refine
+    locally. <code>crossoverRate</code> controls how much of the mutant enters the trial candidate. Higher crossover
+    mixes more new information into each trial. Population size controls diversity. More population means more search
+    coverage, but more fitness calls.
+  </p>
+
+  <h2 id="batch">Batch Fitness and Acceleration</h2>
+  <p>
+    Fitness scoring is usually the expensive part. <code>optimizeBatch</code> lets you score the whole population in
+    one call:
+  </p>
+  <pre><code>batchFitness = func(candidateRows, ctx) {
+    scores = [];
+    for (c = 0; c &lt; candidateRows.count(); c = c + 1) {
+        params = candidateRows[c];
+        scores.add(scoreParams(params));
+    }
+    return scores;
+};
+
+result = genetic.de.optimizeBatch(batchFitness, bounds, {
+    populationSize: 64,
+    generations: 100,
+    threads: 8
+});</code></pre>
+  <p>
+    The module passes <code>ctx.threads</code> through to your fitness function. The current ns scripts do not create
+    worker threads themselves, but the value is available for callers or runtimes that can parallelize scoring. The
+    batch path also returns candidates as dense rows, which is the right shape for matrix or GPU-backed evaluation.
+  </p>
+
+  <h2 id="discovery">Algorithm Discovery</h2>
+  <p>
+    Algorithm discovery searches expression trees. A tree can contain variables, constants, and operators. The module
+    generates candidate trees, runs them against your data, and keeps trees with better fitness.
+  </p>
+
+  <h3>Expression Trees</h3>
+  <p>This tree:</p>
+  <pre><code>{
+    kind: "op",
+    op: "gt",
+    args: [
+        {kind: "var", name: "daysIdle"},
+        {kind: "const", value: 7}
+    ]
+}</code></pre>
+  <p>means:</p>
+  <pre><code>daysIdle &gt; 7</code></pre>
+  <p>
+    <code>discovery.run(program, vars)</code> evaluates the tree. <code>vars</code> is normally one data row.
+  </p>
+
+  <h3>Escalation Rule Discovery</h3>
+  <pre><code>discovery = import("./src/discover.ns");
+
+rows = [
+    {tickets: 0, daysIdle: 1, planValue: 20, outage: 0, escalated: 0},
+    {tickets: 3, daysIdle: 8, planValue: 40, outage: 0, escalated: 1},
+    {tickets: 4, daysIdle: 4, planValue: 45, outage: 1, escalated: 1}
+];
+
+fitness = func(program, tools, ctx) {
+    mistakes = 0;
+    for (i = 0; i &lt; rows.count(); i = i + 1) {
+        score = tools.run(program, rows[i]);
+        predicted = score &gt;= 0.5 ? 1 : 0;
+        if (predicted != rows[i].escalated) mistakes = mistakes + 1;
+    }
+    return mistakes + (tools.nodeCount(program) * 0.02);
+};
+
+result = discovery.evolve(fitness, {
+    populationSize: 24,
+    generations: 18,
+    maxDepth: 3,
+    variables: ["tickets", "daysIdle", "planValue", "outage"],
+    constants: [0, 1, 2, 3, 5, 7, 10, 50],
+    operatorPreset: "rules",
+    seed: 31
+});
+
+printline(result.best.text);</code></pre>
+
+  <h3>Operator Presets</h3>
+  <p>
+    Operator presets keep the search space manageable. Smaller search spaces run faster and usually produce simpler
+    expressions.
+  </p>
+  <table>
+    <tr><th>Preset</th><th>Operators</th><th>Use for</th></tr>
+    <tr><td><code>math</code></td><td><code>add sub mul div min max abs neg</code></td><td>Numeric formulas and calibration-like symbolic regression.</td></tr>
+    <tr><td><code>compare</code></td><td><code>gt lt eq min max</code></td><td>Threshold comparisons and simple ranking rules.</td></tr>
+    <tr><td><code>logic</code></td><td><code>gt lt eq and or not if</code></td><td>Boolean expressions and decision logic.</td></tr>
+    <tr><td><code>rules</code></td><td><code>gt lt eq and or if</code></td><td>Readable decision rules without unary negation.</td></tr>
+    <tr><td><code>arithmeticRules</code></td><td><code>add sub mul div gt lt eq and or if</code></td><td>Rules that need derived numeric expressions.</td></tr>
+    <tr><td><code>all</code></td><td>All built-in operators</td><td>Open-ended searches when runtime is acceptable.</td></tr>
+  </table>
+  <p>You can override presets with an explicit operator list:</p>
+  <pre><code>result = discovery.evolve(fitness, {
+    variables: ["margin", "risk", "age"],
+    constants: [0, 1, 5, 10, 100],
+    operators: ["gt", "lt", "and", "or"]
+});</code></pre>
+
+  <h2 id="discovery-theory">Algorithm Discovery Theory</h2>
+  <p>
+    Symbolic discovery is related to genetic programming. Instead of evolving numeric vectors, it evolves programs or
+    expressions. A candidate might be a small rule, a formula, or a conditional expression. The fitness function decides
+    whether that candidate behaves well.
+  </p>
+  <p>
+    The search is not magic and it does not infer meaning from operator names. Operators are interpreted by
+    <code>evalNode</code>. The generator only chooses from the operators you allow. If you allow <code>gt</code>,
+    the evaluator knows how to run a greater-than comparison. If you allow <code>if</code>, the evaluator knows how
+    to choose between two branches.
+  </p>
+
+  <h3>Why Limit Operators?</h3>
+  <p>
+    Every extra operator increases the number of possible trees. With four variables, eight constants, and fifteen
+    operators, even shallow trees have a large number of combinations. If your task is a decision rule, starting with
+    <code>rules</code> is usually better than <code>all</code>. If your task is a formula, start with <code>math</code>
+    or <code>arithmeticRules</code>.
+  </p>
+
+  <h3>Fitness as Specification</h3>
+  <p>
+    In discovery mode, the fitness function is the specification. For classification, count mistakes. For forecasting,
+    sum error. For a trading rule, combine profit, drawdown, and transaction costs. For operations, combine service
+    level and resource cost.
+  </p>
+  <pre><code>fitness = func(program, tools, ctx) {
+    loss = 0;
+    for (i = 0; i &lt; validationRows.count(); i = i + 1) {
+        predicted = tools.run(program, validationRows[i]);
+        loss = loss + abs(predicted - validationRows[i].target);
+    }
+    complexityPenalty = tools.nodeCount(program) * 0.01;
+    return loss + complexityPenalty;
+};</code></pre>
+
+  <h3>Complexity Penalty</h3>
+  <p>
+    A discovered expression can overfit the training rows. Penalising node count nudges the search toward smaller,
+    more readable expressions. This is similar to preferring simpler decision trees or regularized statistical models.
+    Remove the penalty when raw fit matters more than readability. Increase it when you want compact rules.
+  </p>
+
+  <h2 id="api">API Reference</h2>
+
+  <h3><code>genetic.de.defaultConfig()</code></h3>
+  <table>
+    <tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>mode</code></td><td><code>"minimize"</code></td><td>Use <code>"minimize"</code> for lower-is-better scores or <code>"maximize"</code> for higher-is-better scores.</td></tr>
+    <tr><td><code>populationSize</code></td><td><code>24</code></td><td>Number of candidate vectors per generation.</td></tr>
+    <tr><td><code>generations</code></td><td><code>100</code></td><td>Number of evolution rounds after the initial population.</td></tr>
+    <tr><td><code>mutationFactor</code></td><td><code>0.8</code></td><td>Scale applied to the difference vector <code>(b - c)</code>.</td></tr>
+    <tr><td><code>crossoverRate</code></td><td><code>0.9</code></td><td>Probability that each dimension comes from the mutant vector.</td></tr>
+    <tr><td><code>seed</code></td><td><code>42</code></td><td>Deterministic random seed.</td></tr>
+    <tr><td><code>threads</code></td><td><code>1</code></td><td>Passed to fitness context for caller-managed parallelism.</td></tr>
+    <tr><td><code>keepHistory</code></td><td><code>true</code></td><td>Keep best score and values after each generation.</td></tr>
+  </table>
+
+  <h3><code>genetic.de.optimize(fitness, bounds, config)</code></h3>
+  <p>
+    Runs single-candidate fitness scoring. <code>fitness(values, ctx)</code> returns a number or an object with
+    <code>score</code> or <code>fitness</code>.
+  </p>
+
+  <h3><code>genetic.de.optimizeBatch(batchFitness, bounds, config)</code></h3>
+  <p>
+    Runs population-level scoring. <code>batchFitness(candidateRows, ctx)</code> must return one score per candidate.
+  </p>
+
+  <h3>Differential Evolution Result</h3>
+  <table>
+    <tr><th>Field</th><th>Meaning</th></tr>
+    <tr><td><code>mode</code></td><td><code>"parameter"</code> or <code>"parameter-batch"</code>.</td></tr>
+    <tr><td><code>best</code></td><td>Best candidate: <code>{values, score, index}</code>.</td></tr>
+    <tr><td><code>population</code></td><td>Final population of candidates.</td></tr>
+    <tr><td><code>history</code></td><td>Best-so-far entries per generation when <code>keepHistory</code> is true.</td></tr>
+    <tr><td><code>config</code></td><td>Resolved config used for the run.</td></tr>
+    <tr><td><code>seed</code></td><td>Final random seed, useful for continuation or reproducibility.</td></tr>
+  </table>
+
+  <h3><code>genetic.discover.defaultConfig()</code></h3>
+  <table>
+    <tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>mode</code></td><td><code>"minimize"</code></td><td>Whether lower or higher fitness is better.</td></tr>
+    <tr><td><code>populationSize</code></td><td><code>32</code></td><td>Number of expression trees per generation.</td></tr>
+    <tr><td><code>generations</code></td><td><code>80</code></td><td>Number of discovery rounds.</td></tr>
+    <tr><td><code>maxDepth</code></td><td><code>4</code></td><td>Maximum generated tree depth. Larger depth allows richer programs but grows runtime quickly.</td></tr>
+    <tr><td><code>mutationRate</code></td><td><code>0.35</code></td><td>Chance to replace a subtree with a new random subtree.</td></tr>
+    <tr><td><code>crossoverRate</code></td><td><code>0.5</code></td><td>Chance to exchange subtree material between parent programs.</td></tr>
+    <tr><td><code>seed</code></td><td><code>42</code></td><td>Deterministic random seed.</td></tr>
+    <tr><td><code>variables</code></td><td><code>["x"]</code></td><td>Variable names the generated programs may read from each input row.</td></tr>
+    <tr><td><code>constants</code></td><td><code>[-2, -1, 0, 1, 2]</code></td><td>Fixed numeric constants available to generated programs.</td></tr>
+    <tr><td><code>operatorPreset</code></td><td><code>"all"</code></td><td>Preset operator set used when <code>operators</code> is null.</td></tr>
+    <tr><td><code>operators</code></td><td><code>null</code></td><td>Explicit operator list. Overrides <code>operatorPreset</code>.</td></tr>
+    <tr><td><code>threads</code></td><td><code>1</code></td><td>Passed to fitness context.</td></tr>
+    <tr><td><code>keepHistory</code></td><td><code>true</code></td><td>Keep best score and text after each generation.</td></tr>
+  </table>
+
+  <h3>Discovery Helpers</h3>
+  <table>
+    <tr><th>Function</th><th>Purpose</th></tr>
+    <tr><td><code>discover.evolve(fitness, config)</code></td><td>Run symbolic algorithm discovery.</td></tr>
+    <tr><td><code>discover.discover(fitness, config)</code></td><td>Compatibility alias for <code>evolve</code>.</td></tr>
+    <tr><td><code>discover.run(program, vars)</code></td><td>Evaluate a program tree against a variable object.</td></tr>
+    <tr><td><code>discover.programToText(program)</code></td><td>Render a readable expression string.</td></tr>
+    <tr><td><code>discover.nodeCount(program)</code></td><td>Count expression-tree nodes for complexity penalties.</td></tr>
+    <tr><td><code>discover.operatorPresets()</code></td><td>Return the available preset operator lists.</td></tr>
+  </table>
+
+  <h3>Fitness Tool Object</h3>
+  <p>During discovery, your fitness function receives a <code>tools</code> object:</p>
+  <table>
+    <tr><th>Tool</th><th>Purpose</th></tr>
+    <tr><td><code>tools.run(program, vars)</code></td><td>Evaluate the candidate program.</td></tr>
+    <tr><td><code>tools.text(program)</code></td><td>Render the program as text.</td></tr>
+    <tr><td><code>tools.nodeCount(program)</code></td><td>Measure expression complexity.</td></tr>
+  </table>
+
+  <h3>Vector Helpers</h3>
+  <p>
+    <code>genetic.vectors</code> exposes <code>copy</code>, <code>add</code>, <code>subtract</code>,
+    <code>scale</code>, <code>combineDifferential</code>, <code>clip</code>, <code>populationToMatrix</code>,
+    and <code>matrixToPopulationValues</code>. These are mostly internal, but they are useful when building custom
+    optimisers or inspecting populations.
+  </p>
+
+  <h3>Utility Helpers</h3>
+  <p>
+    <code>genetic.utils</code> includes <code>clamp</code>, <code>copyArray</code>, <code>mergeConfig</code>,
+    deterministic <code>nextRandom</code>, <code>randomBetween</code>, <code>randomIndex</code>,
+    <code>isBetter</code>, and <code>scoreValue</code>.
+  </p>
+
+  <h2 id="examples">Real-World Example Patterns</h2>
+  <h3>Operations Policy Tuning</h3>
+  <p>
+    Tune reorder thresholds, staffing levels, retry delays, or routing weights. Fitness can combine service level,
+    cost, and penalty terms.
+  </p>
+  <pre><code>fitness = func(values, ctx) {
+    reorderPoint = values[0];
+    safetyStock = values[1];
+    result = simulateInventory(reorderPoint, safetyStock);
+    return result.stockoutDays * 100 + result.holdingCost;
+};</code></pre>
+
+  <h3>Backtest Parameter Search</h3>
+  <p>
+    Tune windows, thresholds, and risk limits. Use penalties so the optimiser does not chase profit while ignoring
+    drawdown.
+  </p>
+  <pre><code>fitness = func(values, ctx) {
+    shortWindow = values[0];
+    longWindow = values[1];
+    threshold = values[2];
+    stats = backtest(shortWindow, longWindow, threshold);
+    return (0 - stats.profit) + (stats.maxDrawdown * 2) + stats.tradeCost;
+};</code></pre>
+
+  <h3>Quality Control Rule Discovery</h3>
+  <p>
+    Discover readable pass/fail rules from inspection rows. Use <code>operatorPreset: "rules"</code> and penalize
+    node count to keep the rule understandable.
+  </p>
+
+  <h3>Formula Discovery for Sensor Calibration</h3>
+  <p>
+    Use <code>operatorPreset: "math"</code> or <code>"arithmeticRules"</code> when the output is numeric. Score by
+    mean absolute error or squared error against measured outputs.
+  </p>
+
+  <h2 id="tuning">Tuning and Troubleshooting</h2>
+  <table>
+    <tr><th>Symptom</th><th>Likely cause</th><th>What to change</th></tr>
+    <tr><td>Parameter optimisation stalls</td><td>Too little diversity or bounds too narrow</td><td>Increase <code>populationSize</code>, widen bounds, or increase <code>mutationFactor</code>.</td></tr>
+    <tr><td>Parameter results jump around</td><td>Too much exploration or noisy fitness</td><td>Lower <code>mutationFactor</code>, increase generations, average noisy scores.</td></tr>
+    <tr><td>Discovery is slow</td><td>Search space too large</td><td>Use a narrower <code>operatorPreset</code>, fewer constants, lower <code>maxDepth</code>.</td></tr>
+    <tr><td>Discovery accuracy is low</td><td>Search too small or expression depth too shallow</td><td>Increase <code>populationSize</code>, <code>generations</code>, or <code>maxDepth</code>.</td></tr>
+    <tr><td>Discovered rule is too complex</td><td>No complexity pressure</td><td>Add <code>tools.nodeCount(program) * penalty</code> to fitness.</td></tr>
+    <tr><td>Rule overfits training rows</td><td>Fitness only scores training data</td><td>Score validation rows too, or add stronger complexity penalties.</td></tr>
+  </table>
+
+  <h2>Included Files</h2>
+  <ul>
+    <li><code>genetic.ns</code>: umbrella entry point.</li>
+    <li><code>src/de.ns</code>: differential evolution optimiser.</li>
+    <li><code>src/discover.ns</code>: symbolic discovery runtime and search.</li>
+    <li><code>src/vectors.ns</code>: dense vector operations.</li>
+    <li><code>src/utils.ns</code>: shared helpers.</li>
+    <li><code>examples/parameter_optimisation.ns</code>: demand forecast calibration.</li>
+    <li><code>examples/batch_parameter_optimisation.ns</code>: population-level scoring.</li>
+    <li><code>examples/algorithm_discovery.ns</code>: escalation-rule discovery.</li>
+  </ul>
+
+  <h2>Run</h2>
+  <pre><code>ns tests/run_tests.ns
+ns examples/parameter_optimisation.ns
+ns examples/batch_parameter_optimisation.ns
+ns examples/algorithm_discovery.ns</code></pre>
+</body>
+</html>

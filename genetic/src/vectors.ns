@@ -1,0 +1,86 @@
+// Dense vector helpers. Native matrice operations are used where they map cleanly
+// to row-vector math; loop fallbacks keep the module usable in small runtimes.
+
+zeros = func(size) {
+    out = [];
+    for (i = 0; i < size; i = i + 1) out.add(0);
+    return out;
+};
+
+copy = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+};
+
+add = func(a, b) {
+    try {
+        m1 = matrice_fromArray([a]);
+        m2 = matrice_fromArray([b]);
+        return m1.add(m2).toArray()[0];
+    } catch (ex) {
+        out = [];
+        n = a.count();
+        for (i = 0; i < n; i = i + 1) out.add(a[i] + b[i]);
+        return out;
+    }
+};
+
+subtract = func(a, b) {
+    try {
+        m1 = matrice_fromArray([a]);
+        m2 = matrice_fromArray([b]);
+        return m1.subtract(m2).toArray()[0];
+    } catch (ex) {
+        out = [];
+        n = a.count();
+        for (i = 0; i < n; i = i + 1) out.add(a[i] - b[i]);
+        return out;
+    }
+};
+
+scale = func(a, factor) {
+    try {
+        m = matrice_fromArray([a]);
+        return m.scale(factor).toArray()[0];
+    } catch (ex) {
+        out = [];
+        for (i = 0; i < a.count(); i = i + 1) out.add(a[i] * factor);
+        return out;
+    }
+};
+
+combineDifferential = func(base, a, b, factor) {
+    diff = this.subtract(a, b);
+    step = this.scale(diff, factor);
+    return this.add(base, step);
+};
+
+clip = func(values, bounds) {
+    out = [];
+    for (i = 0; i < values.count(); i = i + 1) {
+        bound = bounds[i];
+        lo = defined(bound.min) ? bound.min : bound[0];
+        hi = defined(bound.max) ? bound.max : bound[1];
+        value = values[i];
+        if (value < lo) value = lo;
+        if (value > hi) value = hi;
+        out.add(value);
+    }
+    return out;
+};
+
+populationToMatrix = func(population) {
+    rows = [];
+    if (!defined(population) || population == null) return rows;
+    for (i = 0; i < population.count(); i = i + 1) rows.add(this.copy(population[i].values));
+    return rows;
+};
+
+matrixToPopulationValues = func(rows) {
+    out = [];
+    if (!defined(rows) || rows == null) return out;
+    for (i = 0; i < rows.count(); i = i + 1) out.add(this.copy(rows[i]));
+    return out;
+};

@@ -1,0 +1,71 @@
+// Shared helpers for deterministic evolutionary search.
+
+asNumber = func(value, fallback) {
+    if (defined(value) && value != null && type(value).typename == "Number") return value;
+    return defined(fallback) ? fallback : 0;
+};
+
+abs = func(value) {
+    return value < 0 ? 0 - value : value;
+};
+
+clamp = func(value, lo, hi) {
+    if (value < lo) return lo;
+    if (value > hi) return hi;
+    return value;
+};
+
+copyArray = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+};
+
+mergeConfig = func(defaults, config) {
+    out = {};
+    if (defined(defaults) && defaults != null) {
+        foreach(name in defaults.props) out[name] = defaults[name];
+    }
+    if (defined(config) && config != null) {
+        foreach(name in config.props) out[name] = config[name];
+    }
+    return out;
+};
+
+nextRandom = func(seed) {
+    seedNum = defined(seed) ? seed : 42;
+    nextSeed = (seedNum * 1103515245 + 12345) % 2147483648;
+    return {seed: nextSeed, value: nextSeed / 2147483648};
+};
+
+randomBetween = func(seed, lo, hi) {
+    rnd = this.nextRandom(seed);
+    return {
+        seed: rnd.seed,
+        value: lo + ((hi - lo) * rnd.value),
+        random: rnd.value
+    };
+};
+
+randomIndex = func(seed, count) {
+    if (count <= 1) return {seed: seed, index: 0, random: 0};
+    rnd = this.nextRandom(seed);
+    idx = floor(rnd.value * count);
+    if (idx >= count) idx = count - 1;
+    return {seed: rnd.seed, index: idx, random: rnd.value};
+};
+
+isBetter = func(score, bestScore, mode) {
+    if (!defined(bestScore) || bestScore == null) return true;
+    if (mode == "maximize") return score > bestScore;
+    return score < bestScore;
+};
+
+scoreValue = func(result) {
+    if (!defined(result) || result == null) return 999999999;
+    if (type(result).typename == "Number") return result;
+    if (defined(result.score) && type(result.score).typename == "Number") return result.score;
+    if (defined(result.fitness) && type(result.fitness).typename == "Number") return result.fitness;
+    return 999999999;
+};

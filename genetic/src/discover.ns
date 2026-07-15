@@ -1,0 +1,275 @@
+// Symbolic algorithm discovery for mathematical and logical expression trees.
+// Fitness functions receive a program plus a tool object that can run and render it.
+
+utils = import("./src/utils.ns");
+
+defaultConfig = func() {
+    return {
+        mode: "minimize",
+        populationSize: 32,
+        generations: 80,
+        maxDepth: 4,
+        mutationRate: 0.35,
+        crossoverRate: 0.5,
+        seed: 42,
+        variables: ["x"],
+        constants: [-2, -1, 0, 1, 2],
+        operatorPreset: "all",
+        operators: null,
+        threads: 1,
+        keepHistory: true
+    };
+};
+
+operatorPresets = func() {
+    return {
+        math: ["add", "sub", "mul", "div", "min", "max", "abs", "neg"],
+        compare: ["gt", "lt", "eq", "min", "max"],
+        logic: ["gt", "lt", "eq", "and", "or", "not", "if"],
+        rules: ["gt", "lt", "eq", "and", "or", "if"],
+        arithmeticRules: ["add", "sub", "mul", "div", "gt", "lt", "eq", "and", "or", "if"],
+        all: ["add", "sub", "mul", "div", "min", "max", "abs", "neg", "gt", "lt", "eq", "and", "or", "not", "if"]
+    };
+};
+
+copyOperators = func(values) {
+    out = [];
+    if (!defined(values) || values == null) return out;
+    for (i = 0; i < values.count(); i = i + 1) out.add(values[i]);
+    return out;
+};
+
+resolveOperators = func(config) {
+    if (defined(config.operators)) {
+        if (config.operators != null) return this.copyOperators(config.operators);
+    }
+    presets = this.operatorPresets();
+    name = defined(config.operatorPreset) ? config.operatorPreset : "all";
+    if (defined(presets[name])) return this.copyOperators(presets[name]);
+    return this.copyOperators(presets.all);
+};
+
+prepareConfig = func(config) {
+    cfg = this.utils.mergeConfig(this.defaultConfig(), config);
+    cfg.operators = this.resolveOperators(cfg);
+    return cfg;
+};
+
+arity = func(op) {
+    if (op == "abs" || op == "neg" || op == "not") return 1;
+    if (op == "if") return 3;
+    return 2;
+};
+
+isTruthy = func(value) {
+    if (type(value).typename == "Number") return value != 0;
+    return value ? true : false;
+};
+
+safeDiv = func(a, b) {
+    if (b > -0.000001 && b < 0.000001) return 0;
+    return a / b;
+};
+
+evalNode = func(node, vars) {
+    if (!defined(node) || node == null) return 0;
+    if (node.kind == "const") return node.value;
+    if (node.kind == "var") {
+        if (defined(vars[node.name])) return vars[node.name];
+        return 0;
+    }
+
+    op = node.op;
+    args = node.args;
+    a = args.count() > 0 ? this.evalNode(args[0], vars) : 0;
+    b = args.count() > 1 ? this.evalNode(args[1], vars) : 0;
+    c = args.count() > 2 ? this.evalNode(args[2], vars) : 0;
+
+    if (op == "add") return a + b;
+    if (op == "sub") return a - b;
+    if (op == "mul") return a * b;
+    if (op == "div") return this.safeDiv(a, b);
+    if (op == "min") return a < b ? a : b;
+    if (op == "max") return a > b ? a : b;
+    if (op == "abs") return this.utils.abs(a);
+    if (op == "neg") return 0 - a;
+    if (op == "gt") return a > b ? 1 : 0;
+    if (op == "lt") return a < b ? 1 : 0;
+    if (op == "eq") return this.utils.abs(a - b) < 0.000001 ? 1 : 0;
+    if (op == "and") return this.isTruthy(a) && this.isTruthy(b) ? 1 : 0;
+    if (op == "or") return this.isTruthy(a) || this.isTruthy(b) ? 1 : 0;
+    if (op == "not") return this.isTruthy(a) ? 0 : 1;
+    if (op == "if") return this.isTruthy(a) ? b : c;
+    return 0;
+};
+
+run = func(program, vars) {
+    return this.evalNode(program, vars);
+};
+
+programToText = func(node) {
+    if (!defined(node) || node == null) return "0";
+    if (node.kind == "const") return stringify(node.value);
+    if (node.kind == "var") return node.name;
+    op = node.op;
+    args = node.args;
+    if (op == "abs" || op == "neg" || op == "not") return op + "(" + this.programToText(args[0]) + ")";
+    if (op == "if") return "if(" + this.programToText(args[0]) + ", " + this.programToText(args[1]) + ", " + this.programToText(args[2]) + ")";
+    return "(" + this.programToText(args[0]) + " " + op + " " + this.programToText(args[1]) + ")";
+};
+
+nodeCount = func(node) {
+    if (!defined(node) || node == null) return 0;
+    if (node.kind != "op") return 1;
+    total = 1;
+    for (i = 0; i < node.args.count(); i = i + 1) total = total + this.nodeCount(node.args[i]);
+    return total;
+};
+
+cloneNode = func(node) {
+    if (node.kind == "const") return {kind: "const", value: node.value};
+    if (node.kind == "var") return {kind: "var", name: node.name};
+    args = [];
+    for (i = 0; i < node.args.count(); i = i + 1) args.add(this.cloneNode(node.args[i]));
+    return {kind: "op", op: node.op, args: args};
+};
+
+randomLeaf = func(config, seed) {
+    rnd = this.utils.nextRandom(seed);
+    seed = rnd.seed;
+    if (rnd.value < 0.5 && config.variables.count() > 0) {
+        pick = this.utils.randomIndex(seed, config.variables.count());
+        return {seed: pick.seed, node: {kind: "var", name: config.variables[pick.index]}};
+    }
+    pickConst = this.utils.randomIndex(seed, config.constants.count());
+    return {seed: pickConst.seed, node: {kind: "const", value: config.constants[pickConst.index]}};
+};
+
+randomProgram = func(config, depth, seed) {
+    if (depth <= 0) return this.randomLeaf(config, seed);
+    rnd = this.utils.nextRandom(seed);
+    seed = rnd.seed;
+    if (rnd.value < 0.35) return this.randomLeaf(config, seed);
+
+    pickOp = this.utils.randomIndex(seed, config.operators.count());
+    seed = pickOp.seed;
+    op = config.operators[pickOp.index];
+    args = [];
+    count = this.arity(op);
+    for (i = 0; i < count; i = i + 1) {
+        child = this.randomProgram(config, depth - 1, seed);
+        seed = child.seed;
+        args.add(child.node);
+    }
+    return {seed: seed, node: {kind: "op", op: op, args: args}};
+};
+
+mutateNode = func(node, config, depth, seed) {
+    rnd = this.utils.nextRandom(seed);
+    seed = rnd.seed;
+    if (rnd.value < config.mutationRate) return this.randomProgram(config, depth, seed);
+
+    if (node.kind != "op" || node.args.count() == 0) return {seed: seed, node: this.cloneNode(node)};
+    copy = this.cloneNode(node);
+    pick = this.utils.randomIndex(seed, copy.args.count());
+    seed = pick.seed;
+    mutated = this.mutateNode(copy.args[pick.index], config, depth - 1, seed);
+    seed = mutated.seed;
+    copy.args[pick.index] = mutated.node;
+    return {seed: seed, node: copy};
+};
+
+crossover = func(a, b, config, seed) {
+    rnd = this.utils.nextRandom(seed);
+    seed = rnd.seed;
+    if (rnd.value > config.crossoverRate) return {seed: seed, node: this.cloneNode(a)};
+    if (a.kind != "op" || a.args.count() == 0) return {seed: seed, node: this.cloneNode(b)};
+
+    copy = this.cloneNode(a);
+    pick = this.utils.randomIndex(seed, copy.args.count());
+    seed = pick.seed;
+    copy.args[pick.index] = this.cloneNode(b);
+    return {seed: seed, node: copy};
+};
+
+toolkit = func() {
+    self = this;
+    return {
+        run: func(program, vars) { return self.evalNode(program, vars); },
+        text: func(program) { return self.programToText(program); },
+        nodeCount: func(program) { return self.nodeCount(program); }
+    };
+};
+
+scoreProgram = func(program, fitness, config, generation) {
+    self = this;
+    tools = {
+        run: func(p, vars) { return self.evalNode(p, vars); },
+        text: func(p) { return self.programToText(p); },
+        nodeCount: func(p) { return self.nodeCount(p); }
+    };
+    result = fitness(program, tools, {generation: generation, threads: config.threads});
+    return this.utils.scoreValue(result);
+};
+
+bestOf = func(population, mode) {
+    best = null;
+    for (i = 0; i < population.count(); i = i + 1) {
+        row = population[i];
+        if (best == null || this.utils.isBetter(row.score, best.score, mode)) {
+            best = {program: this.cloneNode(row.program), score: row.score, text: this.programToText(row.program)};
+        }
+    }
+    return best;
+};
+
+evolve = func(fitness, config) {
+    cfg = this.prepareConfig(config);
+    population = [];
+    seed = cfg.seed;
+    for (i = 0; i < cfg.populationSize; i = i + 1) {
+        generated = this.randomProgram(cfg, cfg.maxDepth, seed);
+        seed = generated.seed;
+        score = this.scoreProgram(generated.node, fitness, cfg, 0);
+        population.add({program: generated.node, score: score});
+    }
+
+    best = this.bestOf(population, cfg.mode);
+    history = [];
+    if (cfg.keepHistory) history.add({generation: 0, score: best.score, text: best.text});
+
+    for (g = 1; g <= cfg.generations; g = g + 1) {
+        next = [];
+        while (next.count() < cfg.populationSize) {
+            aPick = this.utils.randomIndex(seed, population.count());
+            seed = aPick.seed;
+            bPick = this.utils.randomIndex(seed, population.count());
+            seed = bPick.seed;
+            crossed = this.crossover(population[aPick.index].program, population[bPick.index].program, cfg, seed);
+            seed = crossed.seed;
+            mutated = this.mutateNode(crossed.node, cfg, cfg.maxDepth, seed);
+            seed = mutated.seed;
+            score = this.scoreProgram(mutated.node, fitness, cfg, g);
+            parent = population[aPick.index];
+            if (this.utils.isBetter(score, parent.score, cfg.mode)) next.add({program: mutated.node, score: score});
+            else next.add(parent);
+        }
+        population = next;
+        currentBest = this.bestOf(population, cfg.mode);
+        if (this.utils.isBetter(currentBest.score, best.score, cfg.mode)) best = currentBest;
+        if (cfg.keepHistory) history.add({generation: g, score: best.score, text: best.text});
+    }
+
+    return {
+        mode: "discovery",
+        best: best,
+        population: population,
+        history: history,
+        config: cfg,
+        seed: seed
+    };
+};
+
+discover = func(fitness, config) {
+    return this.evolve(fitness, config);
+};

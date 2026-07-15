@@ -1,0 +1,226 @@
+// Differential evolution for numeric parameter optimisation.
+
+utils = import("./src/utils.ns");
+vectors = import("./src/vectors.ns");
+
+defaultConfig = func() {
+    return {
+        mode: "minimize",
+        populationSize: 24,
+        generations: 100,
+        mutationFactor: 0.8,
+        crossoverRate: 0.9,
+        seed: 42,
+        threads: 1,
+        keepHistory: true
+    };
+};
+
+normalizeBounds = func(bounds) {
+    out = [];
+    if (!defined(bounds) || bounds == null) return out;
+    for (i = 0; i < bounds.count(); i = i + 1) {
+        b = bounds[i];
+        lo = defined(b.min) ? b.min : b[0];
+        hi = defined(b.max) ? b.max : b[1];
+        out.add({min: lo, max: hi});
+    }
+    return out;
+};
+
+createCandidate = func(values, score, index) {
+    return {values: this.vectors.copy(values), score: score, index: index};
+};
+
+randomVector = func(bounds, seed) {
+    values = [];
+    currentSeed = seed;
+    for (i = 0; i < bounds.count(); i = i + 1) {
+        rnd = this.utils.randomBetween(currentSeed, bounds[i].min, bounds[i].max);
+        currentSeed = rnd.seed;
+        values.add(rnd.value);
+    }
+    return {values: values, seed: currentSeed};
+};
+
+initialPopulation = func(bounds, config) {
+    cfg = this.utils.mergeConfig(this.defaultConfig(), config);
+    normalized = this.normalizeBounds(bounds);
+    pop = [];
+    seed = cfg.seed;
+    for (i = 0; i < cfg.populationSize; i = i + 1) {
+        row = this.randomVector(normalized, seed);
+        seed = row.seed;
+        pop.add(this.createCandidate(row.values, null, i));
+    }
+    return {population: pop, seed: seed, bounds: normalized, config: cfg};
+};
+
+evaluationContext = func(config, generation, population) {
+    return {
+        generation: generation,
+        threads: config.threads,
+        mode: config.mode,
+        populationSize: population.count()
+    };
+};
+
+scorePopulation = func(population, fitness, config, generation) {
+    context = this.evaluationContext(config, generation, population);
+    for (i = 0; i < population.count(); i = i + 1) {
+        result = fitness(population[i].values, context);
+        population[i].score = this.utils.scoreValue(result);
+    }
+    return population;
+};
+
+scorePopulationBatch = func(population, batchFitness, config, generation) {
+    context = this.evaluationContext(config, generation, population);
+    rows = this.vectors.populationToMatrix(population);
+    scores = batchFitness(rows, context);
+    for (i = 0; i < population.count(); i = i + 1) {
+        population[i].score = this.utils.scoreValue(scores[i]);
+    }
+    return population;
+};
+
+bestOf = func(population, mode) {
+    best = null;
+    for (i = 0; i < population.count(); i = i + 1) {
+        row = population[i];
+        if (best == null || this.utils.isBetter(row.score, best.score, mode)) {
+            best = this.createCandidate(row.values, row.score, row.index);
+        }
+    }
+    return best;
+};
+
+pickDistinct = func(seed, count, excluded) {
+    picked = [];
+    currentSeed = seed;
+    while (picked.count() < 3) {
+        rnd = this.utils.randomIndex(currentSeed, count);
+        currentSeed = rnd.seed;
+        idx = rnd.index;
+        blocked = idx == excluded;
+        for (i = 0; i < picked.count(); i = i + 1) {
+            if (picked[i] == idx) blocked = true;
+        }
+        if (!blocked) picked.add(idx);
+    }
+    return {seed: currentSeed, indexes: picked};
+};
+
+trialVector = func(population, targetIndex, bounds, config, seed) {
+    pick = this.pickDistinct(seed, population.count(), targetIndex);
+    currentSeed = pick.seed;
+    a = population[pick.indexes[0]].values;
+    b = population[pick.indexes[1]].values;
+    c = population[pick.indexes[2]].values;
+    mutant = this.vectors.combineDifferential(a, b, c, config.mutationFactor);
+    mutant = this.vectors.clip(mutant, bounds);
+
+    dimPick = this.utils.randomIndex(currentSeed, bounds.count());
+    currentSeed = dimPick.seed;
+    forced = dimPick.index;
+    trial = [];
+    for (d = 0; d < bounds.count(); d = d + 1) {
+        rnd = this.utils.nextRandom(currentSeed);
+        currentSeed = rnd.seed;
+        if (rnd.value < config.crossoverRate || d == forced) trial.add(mutant[d]);
+        else trial.add(population[targetIndex].values[d]);
+    }
+    return {seed: currentSeed, values: trial};
+};
+
+nextGeneration = func(population, fitness, bounds, config, generation, seed) {
+    trials = [];
+    currentSeed = seed;
+    for (i = 0; i < population.count(); i = i + 1) {
+        trial = this.trialVector(population, i, bounds, config, currentSeed);
+        currentSeed = trial.seed;
+        trials.add(this.createCandidate(trial.values, null, i));
+    }
+
+    trials = this.scorePopulation(trials, fitness, config, generation);
+    next = [];
+    for (i = 0; i < population.count(); i = i + 1) {
+        if (this.utils.isBetter(trials[i].score, population[i].score, config.mode)) next.add(trials[i]);
+        else next.add(population[i]);
+    }
+    return {population: next, seed: currentSeed};
+};
+
+nextGenerationBatch = func(population, batchFitness, bounds, config, generation, seed) {
+    trials = [];
+    currentSeed = seed;
+    for (i = 0; i < population.count(); i = i + 1) {
+        trial = this.trialVector(population, i, bounds, config, currentSeed);
+        currentSeed = trial.seed;
+        trials.add(this.createCandidate(trial.values, null, i));
+    }
+
+    trials = this.scorePopulationBatch(trials, batchFitness, config, generation);
+    next = [];
+    for (i = 0; i < population.count(); i = i + 1) {
+        if (this.utils.isBetter(trials[i].score, population[i].score, config.mode)) next.add(trials[i]);
+        else next.add(population[i]);
+    }
+    return {population: next, seed: currentSeed};
+};
+
+optimize = func(fitness, bounds, config) {
+    cfg = this.utils.mergeConfig(this.defaultConfig(), config);
+    state = this.initialPopulation(bounds, cfg);
+    population = this.scorePopulation(state.population, fitness, cfg, 0);
+    best = this.bestOf(population, cfg.mode);
+    history = [];
+    if (cfg.keepHistory) history.add({generation: 0, score: best.score, values: this.vectors.copy(best.values)});
+
+    seed = state.seed;
+    for (g = 1; g <= cfg.generations; g = g + 1) {
+        evolved = this.nextGeneration(population, fitness, state.bounds, cfg, g, seed);
+        seed = evolved.seed;
+        population = evolved.population;
+        currentBest = this.bestOf(population, cfg.mode);
+        if (this.utils.isBetter(currentBest.score, best.score, cfg.mode)) best = currentBest;
+        if (cfg.keepHistory) history.add({generation: g, score: best.score, values: this.vectors.copy(best.values)});
+    }
+
+    return {
+        mode: "parameter",
+        best: best,
+        population: population,
+        history: history,
+        config: cfg,
+        seed: seed
+    };
+};
+
+optimizeBatch = func(batchFitness, bounds, config) {
+    cfg = this.utils.mergeConfig(this.defaultConfig(), config);
+    state = this.initialPopulation(bounds, cfg);
+    population = this.scorePopulationBatch(state.population, batchFitness, cfg, 0);
+    best = this.bestOf(population, cfg.mode);
+    history = [];
+    if (cfg.keepHistory) history.add({generation: 0, score: best.score, values: this.vectors.copy(best.values)});
+
+    seed = state.seed;
+    for (g = 1; g <= cfg.generations; g = g + 1) {
+        evolved = this.nextGenerationBatch(population, batchFitness, state.bounds, cfg, g, seed);
+        seed = evolved.seed;
+        population = evolved.population;
+        currentBest = this.bestOf(population, cfg.mode);
+        if (this.utils.isBetter(currentBest.score, best.score, cfg.mode)) best = currentBest;
+        if (cfg.keepHistory) history.add({generation: g, score: best.score, values: this.vectors.copy(best.values)});
+    }
+
+    return {
+        mode: "parameter-batch",
+        best: best,
+        population: population,
+        history: history,
+        config: cfg,
+        seed: seed
+    };
+};

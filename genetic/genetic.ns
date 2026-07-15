@@ -1,0 +1,39 @@
+// Genetic / differential-evolution library umbrella entry point.
+//
+// Usage:
+//   genetic = import("./genetic.ns");
+//   result = genetic.de.optimize(fitnessFn, bounds, config);
+
+de       = import("./src/de.ns");
+discover = import("./src/discover.ns");
+vectors  = import("./src/vectors.ns");
+utils    = import("./src/utils.ns");
+
+// Unified entry point.
+// config.searchMode: "parameter" or "discovery" / "algorithm"
+// Parameter mode expects `problem` to be bounds.
+// Discovery mode expects `problem` to be a discovery config overlay.
+run = func(fitness, problem, config) {
+    cfg = defined(config) ? config : {};
+    mode = defined(cfg.searchMode) ? cfg.searchMode : "parameter";
+    if (defined(cfg.mode) && (cfg.mode == "parameter" || cfg.mode == "discovery" || cfg.mode == "algorithm")) mode = cfg.mode;
+    objective = "minimize";
+    if (defined(cfg.objective)) objective = cfg.objective;
+    else if (defined(cfg.objectiveMode)) objective = cfg.objectiveMode;
+    else if (defined(cfg.mode) && (cfg.mode == "minimize" || cfg.mode == "maximize")) objective = cfg.mode;
+
+    if (mode == "discovery" || mode == "algorithm") {
+        discoveryConfig = {};
+        if (defined(problem) && problem != null && type(problem).typename == "Object") {
+            foreach(name in problem.props) discoveryConfig[name] = problem[name];
+        }
+        foreach(name in cfg.props) discoveryConfig[name] = cfg[name];
+        discoveryConfig.mode = objective;
+        return this.discover.evolve(fitness, discoveryConfig);
+    }
+
+    deConfig = {};
+    foreach(name in cfg.props) deConfig[name] = cfg[name];
+    deConfig.mode = objective;
+    return this.de.optimize(fitness, problem, deConfig);
+};
