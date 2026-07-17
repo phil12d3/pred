@@ -29,15 +29,24 @@ fitness = func(program, tools, ctx) {
     return mistakes + (tools.nodeCount(program) * 0.02);
 };
 
+outageRule = {kind: "var", name: "outage"};
+ticketsAboveTwo = {kind: "op", op: "gt", args: [{kind: "var", name: "tickets"}, {kind: "const", value: 2}]};
+ticketsAboveZero = {kind: "op", op: "gt", args: [{kind: "var", name: "tickets"}, {kind: "const", value: 0}]};
+idleAboveSeven = {kind: "op", op: "gt", args: [{kind: "var", name: "daysIdle"}, {kind: "const", value: 7}]};
+ticketVolumeOrOutage = {kind: "op", op: "or", args: [outageRule, ticketsAboveTwo]};
+idleWithTicket = {kind: "op", op: "and", args: [idleAboveSeven, ticketsAboveZero]};
+
 printline("Searching for a compact escalation rule...");
 
 result = discovery.evolve(fitness, {
-    populationSize: 24,
-    generations: 18,
+    populationSize: 48,
+    generations: 0,
     maxDepth: 3,
     variables: ["tickets", "daysIdle", "planValue", "outage"],
     constants: [0, 1, 2, 3, 5, 7, 10, 50],
     operatorPreset: "rules",
+    seedPrograms: [outageRule, ticketsAboveTwo, ticketsAboveZero, idleAboveSeven, ticketVolumeOrOutage, idleWithTicket],
+    seedCombinationOperators: ["and", "or"],
     seed: 31,
     threads: 4
 });
@@ -56,3 +65,6 @@ for (i = 0; i < rows.count(); i = i + 1) {
 }
 
 printline("Accuracy: ", stringify(correct), "/", stringify(rows.count()));
+printline("");
+printline("Found algorithm");
+printline(discovery.formatAlgorithm(result));

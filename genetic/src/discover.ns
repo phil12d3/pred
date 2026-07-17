@@ -11,11 +11,15 @@ defaultConfig = func() {
         maxDepth: 4,
         mutationRate: 0.35,
         crossoverRate: 0.5,
+        tournamentSize: 3,
+        elitism: true,
         seed: 42,
         variables: ["x"],
         constants: [-2, -1, 0, 1, 2],
         operatorPreset: "all",
         operators: null,
+        seedPrograms: [],
+        seedCombinationOperators: [],
         threads: 1,
         keepHistory: true
     };
@@ -118,6 +122,110 @@ programToText = func(node) {
     return "(" + this.programToText(args[0]) + " " + op + " " + this.programToText(args[1]) + ")";
 };
 
+programFrom = func(value) {
+    if (!defined(value) || value == null) return null;
+    if (defined(value.kind)) return value;
+    if (defined(value.best) && value.best != null && defined(value.best["program"])) return value.best["program"];
+    if (defined(value["program"])) return value["program"];
+    return value;
+};
+
+operatorSymbol = func(op) {
+    if (op == "add") return "+";
+    if (op == "sub") return "-";
+    if (op == "mul") return "*";
+    if (op == "div") return "/";
+    if (op == "gt") return ">";
+    if (op == "lt") return "<";
+    if (op == "eq") return "==";
+    if (op == "and") return "and";
+    if (op == "or") return "or";
+    return op;
+};
+
+constantValue = func(node) {
+    node = this.programFrom(node);
+    unknown = {known: false, value: 0};
+    if (!defined(node) || node == null) return {known: true, value: 0};
+    if (node.kind == "const") return {known: true, value: node.value};
+    if (node.kind == "var") return unknown;
+
+    op = node.op;
+    args = node.args;
+    a = args.count() > 0 ? this.constantValue(args[0]) : {known: true, value: 0};
+    b = args.count() > 1 ? this.constantValue(args[1]) : {known: true, value: 0};
+    c = args.count() > 2 ? this.constantValue(args[2]) : {known: true, value: 0};
+
+    if (op == "or") {
+        if (a.known && this.isTruthy(a.value)) return {known: true, value: 1};
+        if (b.known && this.isTruthy(b.value)) return {known: true, value: 1};
+        if (a.known && b.known) return {known: true, value: 0};
+        return unknown;
+    }
+    if (op == "and") {
+        if (a.known && !this.isTruthy(a.value)) return {known: true, value: 0};
+        if (b.known && !this.isTruthy(b.value)) return {known: true, value: 0};
+        if (a.known && b.known) return {known: true, value: 1};
+        return unknown;
+    }
+    if (op == "not") {
+        if (a.known) return {known: true, value: this.isTruthy(a.value) ? 0 : 1};
+        return unknown;
+    }
+    if (op == "if") {
+        if (a.known) return this.isTruthy(a.value) ? b : c;
+        return unknown;
+    }
+    if (!a.known || (this.arity(op) > 1 && !b.known)) return unknown;
+
+    if (op == "add") return {known: true, value: a.value + b.value};
+    if (op == "sub") return {known: true, value: a.value - b.value};
+    if (op == "mul") return {known: true, value: a.value * b.value};
+    if (op == "div") return {known: true, value: this.safeDiv(a.value, b.value)};
+    if (op == "min") return {known: true, value: a.value < b.value ? a.value : b.value};
+    if (op == "max") return {known: true, value: a.value > b.value ? a.value : b.value};
+    if (op == "abs") return {known: true, value: this.utils.abs(a.value)};
+    if (op == "neg") return {known: true, value: 0 - a.value};
+    if (op == "gt") return {known: true, value: a.value > b.value ? 1 : 0};
+    if (op == "lt") return {known: true, value: a.value < b.value ? 1 : 0};
+    if (op == "eq") return {known: true, value: this.utils.abs(a.value - b.value) < 0.000001 ? 1 : 0};
+    return unknown;
+};
+
+programToHumanExpression = func(node) {
+    node = this.programFrom(node);
+    folded = this.constantValue(node);
+    if (folded.known) return stringify(folded.value);
+    if (!defined(node) || node == null) return "0";
+    if (node.kind == "const") return stringify(node.value);
+    if (node.kind == "var") return node.name;
+
+    op = node.op;
+    args = node.args;
+    if (op == "abs") return "absolute value of " + this.programToHumanExpression(args[0]);
+    if (op == "neg") return "negative " + this.programToHumanExpression(args[0]);
+    if (op == "not") return "not (" + this.programToHumanExpression(args[0]) + ")";
+    if (op == "min") return "the smaller of " + this.programToHumanExpression(args[0]) + " and " + this.programToHumanExpression(args[1]);
+    if (op == "max") return "the larger of " + this.programToHumanExpression(args[0]) + " and " + this.programToHumanExpression(args[1]);
+    if (op == "if") return "if " + this.programToHumanExpression(args[0]) + " then " + this.programToHumanExpression(args[1]) + " else " + this.programToHumanExpression(args[2]);
+    if (op == "gt" || op == "lt") {
+        left = this.constantValue(args[0]);
+        right = this.constantValue(args[1]);
+        if (left.known && !right.known) {
+            flipped = op == "gt" ? "<" : ">";
+            return "(" + this.programToHumanExpression(args[1]) + " " + flipped + " " + stringify(left.value) + ")";
+        }
+        if (!left.known && right.known) {
+            return "(" + this.programToHumanExpression(args[0]) + " " + this.operatorSymbol(op) + " " + stringify(right.value) + ")";
+        }
+    }
+    return "(" + this.programToHumanExpression(args[0]) + " " + this.operatorSymbol(op) + " " + this.programToHumanExpression(args[1]) + ")";
+};
+
+formatAlgorithm = func(value) {
+    return "return " + this.programToHumanExpression(value);
+};
+
 nodeCount = func(node) {
     if (!defined(node) || node == null) return 0;
     if (node.kind != "op") return 1;
@@ -197,6 +305,7 @@ toolkit = func() {
     return {
         run: func(program, vars) { return self.evalNode(program, vars); },
         text: func(program) { return self.programToText(program); },
+        human: func(program) { return self.formatAlgorithm(program); },
         nodeCount: func(program) { return self.nodeCount(program); }
     };
 };
@@ -206,6 +315,7 @@ scoreProgram = func(program, fitness, config, generation) {
     tools = {
         run: func(p, vars) { return self.evalNode(p, vars); },
         text: func(p) { return self.programToText(p); },
+        human: func(p) { return self.formatAlgorithm(p); },
         nodeCount: func(p) { return self.nodeCount(p); }
     };
     result = fitness(program, tools, {generation: generation, threads: config.threads});
@@ -223,11 +333,44 @@ bestOf = func(population, mode) {
     return best;
 };
 
+selectParent = func(population, mode, tournamentSize, seed) {
+    size = tournamentSize;
+    if (!defined(size) || size < 1) size = 1;
+    best = null;
+    currentSeed = seed;
+    for (i = 0; i < size; i = i + 1) {
+        pick = this.utils.randomIndex(currentSeed, population.count());
+        currentSeed = pick.seed;
+        row = population[pick.index];
+        if (best == null || this.utils.isBetter(row.score, best.score, mode)) best = row;
+    }
+    return {seed: currentSeed, parent: best};
+};
+
 evolve = func(fitness, config) {
     cfg = this.prepareConfig(config);
     population = [];
     seed = cfg.seed;
-    for (i = 0; i < cfg.populationSize; i = i + 1) {
+    if (defined(cfg.seedPrograms) && cfg.seedPrograms != null) {
+        for (i = 0; i < cfg.seedPrograms.count() && population.count() < cfg.populationSize; i = i + 1) {
+            seeded = this.cloneNode(cfg.seedPrograms[i]);
+            score = this.scoreProgram(seeded, fitness, cfg, 0);
+            population.add({program: seeded, score: score});
+        }
+        if (defined(cfg.seedCombinationOperators) && cfg.seedCombinationOperators != null) {
+            for (opIndex = 0; opIndex < cfg.seedCombinationOperators.count() && population.count() < cfg.populationSize; opIndex = opIndex + 1) {
+                op = cfg.seedCombinationOperators[opIndex];
+                for (leftIndex = 0; leftIndex < cfg.seedPrograms.count() && population.count() < cfg.populationSize; leftIndex = leftIndex + 1) {
+                    for (rightIndex = leftIndex + 1; rightIndex < cfg.seedPrograms.count() && population.count() < cfg.populationSize; rightIndex = rightIndex + 1) {
+                        combined = {kind: "op", op: op, args: [this.cloneNode(cfg.seedPrograms[leftIndex]), this.cloneNode(cfg.seedPrograms[rightIndex])]};
+                        score = this.scoreProgram(combined, fitness, cfg, 0);
+                        population.add({program: combined, score: score});
+                    }
+                }
+            }
+        }
+    }
+    while (population.count() < cfg.populationSize) {
         generated = this.randomProgram(cfg, cfg.maxDepth, seed);
         seed = generated.seed;
         score = this.scoreProgram(generated.node, fitness, cfg, 0);
@@ -240,17 +383,18 @@ evolve = func(fitness, config) {
 
     for (g = 1; g <= cfg.generations; g = g + 1) {
         next = [];
+        if (cfg.elitism) next.add({program: this.cloneNode(best.program), score: best.score});
         while (next.count() < cfg.populationSize) {
-            aPick = this.utils.randomIndex(seed, population.count());
+            aPick = this.selectParent(population, cfg.mode, cfg.tournamentSize, seed);
             seed = aPick.seed;
-            bPick = this.utils.randomIndex(seed, population.count());
+            bPick = this.selectParent(population, cfg.mode, cfg.tournamentSize, seed);
             seed = bPick.seed;
-            crossed = this.crossover(population[aPick.index].program, population[bPick.index].program, cfg, seed);
+            crossed = this.crossover(aPick.parent.program, bPick.parent.program, cfg, seed);
             seed = crossed.seed;
             mutated = this.mutateNode(crossed.node, cfg, cfg.maxDepth, seed);
             seed = mutated.seed;
             score = this.scoreProgram(mutated.node, fitness, cfg, g);
-            parent = population[aPick.index];
+            parent = aPick.parent;
             if (this.utils.isBetter(score, parent.score, cfg.mode)) next.add({program: mutated.node, score: score});
             else next.add(parent);
         }
