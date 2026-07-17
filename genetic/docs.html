@@ -64,8 +64,9 @@
   <p>
     The module has two related search tools. Differential evolution searches for the best numeric parameter vector.
     Symbolic algorithm discovery searches for a small expression tree made from variables, constants, and operators.
-    Both tools use the same idea: generate candidates, score them with a fitness function, keep better candidates,
-    and repeat.
+    It includes an evolutionary strategy for open-ended expression search and a typed beam strategy for readable
+    decision-rule induction. Both tools use the same idea: generate candidates, score them with a fitness function,
+    keep better candidates, and repeat.
   </p>
   <p>
     Use parameter optimisation when you already know the model shape and need to fit its numeric settings. Use
@@ -88,7 +89,7 @@
     </tr>
     <tr>
       <td>Discover a readable formula or decision rule</td>
-      <td><code>genetic.discover.evolve</code></td>
+      <td><code>genetic.discovery.evolve</code> or direct <code>import("./src/discover.ns")</code></td>
       <td>Expression tree</td>
       <td><code>fitness(program, tools, ctx)</code></td>
     </tr>
@@ -99,7 +100,7 @@
   <p>The umbrella module exports:</p>
   <ul>
     <li><code>genetic.de</code>: numeric differential evolution.</li>
-    <li><code>genetic.discover</code>: symbolic expression discovery.</li>
+    <li><code>genetic.discovery</code>: symbolic expression discovery.</li>
     <li><code>genetic.vectors</code>: dense vector helpers used by the optimiser.</li>
     <li><code>genetic.utils</code>: deterministic random and scoring helpers.</li>
     <li><code>genetic.run</code>: a unified dispatcher for simple callers.</li>
@@ -260,6 +261,11 @@ result = genetic.de.optimizeBatch(batchFitness, bounds, {
     Algorithm discovery searches expression trees. A tree can contain variables, constants, and operators. The module
     generates candidate trees, runs them against your data, and keeps trees with better fitness.
   </p>
+  <p>
+    Use the default evolutionary strategy for open-ended formula discovery. Use <code>searchStrategy: "beam"</code>
+    for decision-rule problems where you want typed predicates such as <code>tickets &gt; 2</code> composed into
+    readable boolean rules.
+  </p>
 
   <h3>Expression Trees</h3>
   <p>This tree:</p>
@@ -297,16 +303,36 @@ fitness = func(program, tools, ctx) {
 };
 
 result = discovery.evolve(fitness, {
-    populationSize: 24,
-    generations: 18,
+    searchStrategy: "beam",
+    beamWidth: 8,
     maxDepth: 3,
-    variables: ["tickets", "daysIdle", "planValue", "outage"],
+    variables: ["tickets", "daysIdle", "outage"],
+    booleanVariables: ["outage"],
+    comparisonOperators: ["gt"],
     constants: [0, 1, 2, 3, 5, 7, 10, 50],
     operatorPreset: "rules",
     seed: 31
 });
 
-printline(result.best.text);</code></pre>
+printline(discovery.formatAlgorithm(result));</code></pre>
+
+  <h3>Rule Beam Search</h3>
+  <p>
+    <code>searchStrategy: "beam"</code> builds atomic rule predicates, keeps the best scoring beam, and composes
+    those predicates with boolean operators. This is usually a better fit for professional rule induction than
+    random expression generation.
+  </p>
+  <table>
+    <tr><th>Field</th><th>Purpose</th></tr>
+    <tr><td><code>beamWidth</code></td><td>Number of top candidates retained at each beam depth. Higher values explore more combinations.</td></tr>
+    <tr><td><code>booleanVariables</code></td><td>Variables that can be used directly as boolean predicates, for example <code>outage</code>.</td></tr>
+    <tr><td><code>comparisonOperators</code></td><td>Comparison operators used to build numeric predicates, for example <code>["gt"]</code> or <code>["gt", "lt"]</code>.</td></tr>
+    <tr><td><code>maxDepth</code></td><td>Maximum predicate composition depth. Depth 1 is atomic predicates; depth 3 can express rules such as <code>(a or b) and c</code>.</td></tr>
+  </table>
+  <p>
+    Beam rule search still uses your fitness function. It is not a hand-coded answer; it enumerates and scores a
+    bounded set of typed candidate rules according to the same objective as evolutionary discovery.
+  </p>
 
   <h3>Operator Presets</h3>
   <p>
@@ -348,6 +374,19 @@ printline(result.best.text);</code></pre>
     operators, even shallow trees have a large number of combinations. If your task is a decision rule, starting with
     <code>rules</code> is usually better than <code>all</code>. If your task is a formula, start with <code>math</code>
     or <code>arithmeticRules</code>.
+  </p>
+
+  <h3>Evolution vs Beam Rule Search</h3>
+  <p>
+    Evolutionary discovery is useful when candidate programs can be arbitrary formulas and the useful building blocks
+    are not known in advance. It is stochastic and may need larger populations or more generations.
+  </p>
+  <p>
+    Beam rule search is deterministic rule induction over typed predicates. It first builds atoms from variables,
+    constants, and <code>comparisonOperators</code>, then composes the best atoms with <code>and</code> / <code>or</code>
+    up to <code>maxDepth</code>. Prefer it for classification, escalation, inspection, policy, and eligibility rules.
+    Restrict <code>variables</code>, <code>booleanVariables</code>, and <code>comparisonOperators</code> to meaningful
+    fields so the beam spends work on plausible rules.
   </p>
 
   <h3>Fitness as Specification</h3>
@@ -410,7 +449,7 @@ printline(result.best.text);</code></pre>
     <tr><td><code>seed</code></td><td>Final random seed, useful for continuation or reproducibility.</td></tr>
   </table>
 
-  <h3><code>genetic.discover.defaultConfig()</code></h3>
+  <h3><code>genetic.discovery.defaultConfig()</code></h3>
   <table>
     <tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
     <tr><td><code>mode</code></td><td><code>"minimize"</code></td><td>Whether lower or higher fitness is better.</td></tr>
@@ -419,11 +458,18 @@ printline(result.best.text);</code></pre>
     <tr><td><code>maxDepth</code></td><td><code>4</code></td><td>Maximum generated tree depth. Larger depth allows richer programs but grows runtime quickly.</td></tr>
     <tr><td><code>mutationRate</code></td><td><code>0.35</code></td><td>Chance to replace a subtree with a new random subtree.</td></tr>
     <tr><td><code>crossoverRate</code></td><td><code>0.5</code></td><td>Chance to exchange subtree material between parent programs.</td></tr>
+    <tr><td><code>tournamentSize</code></td><td><code>3</code></td><td>Number of candidates sampled when choosing parents in evolutionary discovery.</td></tr>
+    <tr><td><code>elitism</code></td><td><code>true</code></td><td>Carry the current best program into the next evolutionary generation.</td></tr>
     <tr><td><code>seed</code></td><td><code>42</code></td><td>Deterministic random seed.</td></tr>
     <tr><td><code>variables</code></td><td><code>["x"]</code></td><td>Variable names the generated programs may read from each input row.</td></tr>
     <tr><td><code>constants</code></td><td><code>[-2, -1, 0, 1, 2]</code></td><td>Fixed numeric constants available to generated programs.</td></tr>
     <tr><td><code>operatorPreset</code></td><td><code>"all"</code></td><td>Preset operator set used when <code>operators</code> is null.</td></tr>
     <tr><td><code>operators</code></td><td><code>null</code></td><td>Explicit operator list. Overrides <code>operatorPreset</code>.</td></tr>
+    <tr><td><code>seedPrograms</code></td><td><code>[]</code></td><td>Optional programs included in the initial evolutionary population or beam atom set.</td></tr>
+    <tr><td><code>searchStrategy</code></td><td><code>"evolution"</code></td><td>Use <code>"evolution"</code> for genetic programming or <code>"beam"</code> / <code>"ruleBeam"</code> for typed rule beam search.</td></tr>
+    <tr><td><code>beamWidth</code></td><td><code>64</code></td><td>Number of top candidates retained per level by beam rule discovery.</td></tr>
+    <tr><td><code>booleanVariables</code></td><td><code>[]</code></td><td>Variables that beam rule discovery may use directly as boolean predicates.</td></tr>
+    <tr><td><code>comparisonOperators</code></td><td><code>["gt", "lt", "eq"]</code></td><td>Comparison operators used by beam rule discovery to build numeric predicates.</td></tr>
     <tr><td><code>threads</code></td><td><code>1</code></td><td>Passed to fitness context.</td></tr>
     <tr><td><code>keepHistory</code></td><td><code>true</code></td><td>Keep best score and text after each generation.</td></tr>
   </table>
@@ -435,6 +481,7 @@ printline(result.best.text);</code></pre>
     <tr><td><code>discover.discover(fitness, config)</code></td><td>Compatibility alias for <code>evolve</code>.</td></tr>
     <tr><td><code>discover.run(program, vars)</code></td><td>Evaluate a program tree against a variable object.</td></tr>
     <tr><td><code>discover.programToText(program)</code></td><td>Render a readable expression string.</td></tr>
+    <tr><td><code>discover.formatAlgorithm(resultOrProgram)</code></td><td>Render human-readable pseudo-code from a result or raw program tree, including simple constant folding.</td></tr>
     <tr><td><code>discover.nodeCount(program)</code></td><td>Count expression-tree nodes for complexity penalties.</td></tr>
     <tr><td><code>discover.operatorPresets()</code></td><td>Return the available preset operator lists.</td></tr>
   </table>
@@ -445,6 +492,7 @@ printline(result.best.text);</code></pre>
     <tr><th>Tool</th><th>Purpose</th></tr>
     <tr><td><code>tools.run(program, vars)</code></td><td>Evaluate the candidate program.</td></tr>
     <tr><td><code>tools.text(program)</code></td><td>Render the program as text.</td></tr>
+    <tr><td><code>tools.human(program)</code></td><td>Render the program with <code>discover.formatAlgorithm</code>.</td></tr>
     <tr><td><code>tools.nodeCount(program)</code></td><td>Measure expression complexity.</td></tr>
   </table>
 
@@ -507,7 +555,8 @@ printline(result.best.text);</code></pre>
     <tr><td>Parameter optimisation stalls</td><td>Too little diversity or bounds too narrow</td><td>Increase <code>populationSize</code>, widen bounds, or increase <code>mutationFactor</code>.</td></tr>
     <tr><td>Parameter results jump around</td><td>Too much exploration or noisy fitness</td><td>Lower <code>mutationFactor</code>, increase generations, average noisy scores.</td></tr>
     <tr><td>Discovery is slow</td><td>Search space too large</td><td>Use a narrower <code>operatorPreset</code>, fewer constants, lower <code>maxDepth</code>.</td></tr>
-    <tr><td>Discovery accuracy is low</td><td>Search too small or expression depth too shallow</td><td>Increase <code>populationSize</code>, <code>generations</code>, or <code>maxDepth</code>.</td></tr>
+    <tr><td>Discovery accuracy is low on rules</td><td>Evolution is stuck on simple predicates</td><td>Use <code>searchStrategy: "beam"</code>, set <code>booleanVariables</code>, and restrict <code>comparisonOperators</code>.</td></tr>
+    <tr><td>Evolutionary discovery accuracy is low</td><td>Search too small or expression depth too shallow</td><td>Increase <code>populationSize</code>, <code>generations</code>, or <code>maxDepth</code>.</td></tr>
     <tr><td>Discovered rule is too complex</td><td>No complexity pressure</td><td>Add <code>tools.nodeCount(program) * penalty</code> to fitness.</td></tr>
     <tr><td>Rule overfits training rows</td><td>Fitness only scores training data</td><td>Score validation rows too, or add stronger complexity penalties.</td></tr>
   </table>

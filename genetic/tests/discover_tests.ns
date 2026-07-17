@@ -59,34 +59,60 @@ algorithm_discovery_returns_executable_program = func(t) {
 };
 
 [test]
-seeded_discovery_scores_composed_seed_programs = func(t) {
+rule_beam_composes_predicates_beyond_atomic_plateaus = func(t) {
     discovery = import("./src/discover.ns");
     rows = [
-        {a: 0, b: 0, y: 0},
-        {a: 1, b: 0, y: 0},
-        {a: 0, b: 1, y: 0},
-        {a: 1, b: 1, y: 1}
+        {tickets: 0, daysIdle: 1, escalated: 0},
+        {tickets: 1, daysIdle: 2, escalated: 0},
+        {tickets: 2, daysIdle: 3, escalated: 0},
+        {tickets: 3, daysIdle: 8, escalated: 1},
+        {tickets: 1, daysIdle: 9, escalated: 1},
+        {tickets: 2, daysIdle: 10, escalated: 1},
+        {tickets: 0, daysIdle: 12, escalated: 0}
     ];
 
     fitness = func(program, tools, ctx) {
         mistakes = 0;
         for (rowIndex = 0; rowIndex < rows.count(); rowIndex = rowIndex + 1) {
             predicted = tools.run(program, rows[rowIndex]) >= 0.5 ? 1 : 0;
-            if (predicted != rows[rowIndex].y) mistakes = mistakes + 1;
+            if (predicted != rows[rowIndex].escalated) mistakes = mistakes + 1;
         }
         return mistakes;
     };
 
     result = discovery.evolve(fitness, {
-        populationSize: 3,
-        generations: 0,
-        seedPrograms: [{kind: "var", name: "a"}, {kind: "var", name: "b"}],
-        seedCombinationOperators: ["and"],
-        variables: ["a", "b"],
-        constants: [0, 1],
-        operators: ["and"]
+        searchStrategy: "beam",
+        beamWidth: 4,
+        maxDepth: 3,
+        variables: ["tickets", "daysIdle"],
+        comparisonOperators: ["gt"],
+        constants: [0, 1, 2, 7],
+        operatorPreset: "rules"
     });
 
-    t.equal(result.best.score, 0, "seed combinations are included in the initial scored population");
-    t.equal(discovery.formatAlgorithm(result), "return (a and b)", "best seed combination renders clearly");
+    t.equal(result.best.score, 0, "beam rule discovery composes predicates to clear the plateau");
+    t.truthy(discovery.nodeCount(result.best.program) > 3, "best beam rule is composed, not only an atomic predicate");
+};
+
+[test]
+umbrella_run_supports_discovery_mode = func(t) {
+    genetic = import("./genetic.ns");
+    fitness = func(program, tools, ctx) {
+        return tools.run(program, {x: 1}) == 1 ? 0 : 1;
+    };
+
+    result = genetic.run(fitness, {
+        variables: ["x"],
+        constants: [0, 1],
+        comparisonOperators: ["gt"]
+    }, {
+        searchMode: "discovery",
+        searchStrategy: "beam",
+        beamWidth: 2,
+        maxDepth: 1,
+        operatorPreset: "rules"
+    });
+
+    t.equal(result.mode, "discovery", "umbrella run dispatches discovery mode");
+    t.truthy(defined(genetic.discovery), "umbrella exports discovery module without builtin name collision");
 };

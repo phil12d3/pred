@@ -4,10 +4,10 @@
 //   genetic = import("./genetic.ns");
 //   result = genetic.de.optimize(fitnessFn, bounds, config);
 
-de       = import("./src/de.ns");
-discover = import("./src/discover.ns");
-vectors  = import("./src/vectors.ns");
-utils    = import("./src/utils.ns");
+de        = import("./src/de.ns");
+discovery = import("./src/discover.ns");
+vectors   = import("./src/vectors.ns");
+utils     = import("./src/utils.ns");
 
 // Unified entry point.
 // config.searchMode: "parameter" or "discovery" / "algorithm"
@@ -29,7 +29,7 @@ run = func(fitness, problem, config) {
         }
         foreach(name in cfg.props) discoveryConfig[name] = cfg[name];
         discoveryConfig.mode = objective;
-        return this.discover.evolve(fitness, discoveryConfig);
+        return this.discovery.evolve(fitness, discoveryConfig);
     }
 
     deConfig = {};

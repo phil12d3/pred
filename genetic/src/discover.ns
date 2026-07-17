@@ -19,7 +19,10 @@ defaultConfig = func() {
         operatorPreset: "all",
         operators: null,
         seedPrograms: [],
-        seedCombinationOperators: [],
+        searchStrategy: "evolution",
+        beamWidth: 64,
+        booleanVariables: [],
+        comparisonOperators: ["gt", "lt", "eq"],
         threads: 1,
         keepHistory: true
     };
@@ -347,8 +350,140 @@ selectParent = func(population, mode, tournamentSize, seed) {
     return {seed: currentSeed, parent: best};
 };
 
+addUniqueProgram = func(out, seen, program) {
+    text = this.programToText(program);
+    if (defined(seen[text])) return;
+    seen[text] = true;
+    out.add(this.cloneNode(program));
+};
+
+containsValue = func(values, target) {
+    if (!defined(values) || values == null) return false;
+    for (i = 0; i < values.count(); i = i + 1) {
+        if (values[i] == target) return true;
+    }
+    return false;
+};
+
+atomicRulePrograms = func(config) {
+    out = [];
+    seen = {};
+    if (defined(config.seedPrograms) && config.seedPrograms != null) {
+        for (i = 0; i < config.seedPrograms.count(); i = i + 1) this.addUniqueProgram(out, seen, config.seedPrograms[i]);
+    }
+
+    for (vi = 0; vi < config.variables.count(); vi = vi + 1) {
+        variable = {kind: "var", name: config.variables[vi]};
+        if (this.containsValue(config.booleanVariables, config.variables[vi])) this.addUniqueProgram(out, seen, variable);
+        for (ci = 0; ci < config.constants.count(); ci = ci + 1) {
+            constant = {kind: "const", value: config.constants[ci]};
+            for (oi = 0; oi < config.comparisonOperators.count(); oi = oi + 1) {
+                comparisonOp = config.comparisonOperators[oi];
+                this.addUniqueProgram(out, seen, {kind: "op", op: comparisonOp, args: [variable, constant]});
+            }
+        }
+    }
+    return out;
+};
+
+scoreCandidateList = func(programs, fitness, config, generation) {
+    rows = [];
+    for (i = 0; i < programs.count(); i = i + 1) {
+        program = programs[i];
+        rows.add({program: this.cloneNode(program), score: this.scoreProgram(program, fitness, config, generation), text: this.programToText(program)});
+    }
+    return rows;
+};
+
+topRows = func(rows, limit, mode) {
+    out = [];
+    rowLimit = limit;
+    if (rows.count() < rowLimit) rowLimit = rows.count();
+    used = {};
+    for (rank = 0; rank < rowLimit; rank = rank + 1) {
+        bestIndex = -1;
+        bestRow = null;
+        for (candidateIndex = 0; candidateIndex < rows.count(); candidateIndex = candidateIndex + 1) {
+            key = stringify(candidateIndex);
+            if (defined(used[key])) continue;
+            row = rows[candidateIndex];
+            if (bestRow == null || this.utils.isBetter(row.score, bestRow.score, mode)) {
+                bestRow = row;
+                bestIndex = candidateIndex;
+            }
+        }
+        if (bestIndex >= 0) {
+            used[stringify(bestIndex)] = true;
+            out.add(bestRow);
+        }
+    }
+    return out;
+};
+
+sortScoredRows = func(rows, mode) {
+    rows.sort(func(indexA, valueA, indexB, valueB) {
+        if (mode == "maximize") return valueA.score > valueB.score;
+        return valueA.score < valueB.score;
+    });
+    return rows;
+};
+
+beamDiscover = func(fitness, config) {
+    cfg = this.prepareConfig(config);
+    atoms = this.atomicRulePrograms(cfg);
+    scored = this.scoreCandidateList(atoms, fitness, cfg, 0);
+    best = this.bestOf(scored, cfg.mode);
+    history = [];
+    if (cfg.keepHistory) history.add({generation: 0, score: best.score, text: best.text});
+
+    frontier = this.topRows(scored, cfg.beamWidth, cfg.mode);
+    beamAtoms = this.topRows(scored, cfg.beamWidth, cfg.mode);
+    seen = {};
+    for (i = 0; i < scored.count(); i = i + 1) seen[scored[i].text] = true;
+
+    for (depth = 2; depth <= cfg.maxDepth; depth = depth + 1) {
+        candidates = [];
+        for (fi = 0; fi < frontier.count(); fi = fi + 1) {
+            for (ai = 0; ai < beamAtoms.count(); ai = ai + 1) {
+                for (oi = 0; oi < cfg.operators.count(); oi = oi + 1) {
+                    combineOp = cfg.operators[oi];
+                    if (combineOp != "and" && combineOp != "or") continue;
+                    candidate = {kind: "op", op: combineOp, args: [this.cloneNode(frontier[fi].program), this.cloneNode(beamAtoms[ai].program)]};
+                    text = this.programToText(candidate);
+                    if (!defined(seen[text])) {
+                        seen[text] = true;
+                        candidates.add(candidate);
+                    }
+                }
+            }
+        }
+
+        if (candidates.count() == 0) {
+            if (cfg.keepHistory) history.add({generation: depth - 1, score: best.score, text: best.text});
+            continue;
+        }
+
+        scored = this.scoreCandidateList(candidates, fitness, cfg, depth - 1);
+        generationBest = this.bestOf(scored, cfg.mode);
+        if (this.utils.isBetter(generationBest.score, best.score, cfg.mode)) best = generationBest;
+        frontier = this.topRows(scored, cfg.beamWidth, cfg.mode);
+        if (cfg.keepHistory) history.add({generation: depth - 1, score: best.score, text: best.text});
+    }
+
+    return {
+        mode: "discovery",
+        strategy: "beam",
+        best: best,
+        population: frontier,
+        history: history,
+        config: cfg,
+        seed: cfg.seed
+    };
+};
+
 evolve = func(fitness, config) {
     cfg = this.prepareConfig(config);
+    if (cfg.searchStrategy == "beam" || cfg.searchStrategy == "ruleBeam") return this.beamDiscover(fitness, cfg);
     population = [];
     seed = cfg.seed;
     if (defined(cfg.seedPrograms) && cfg.seedPrograms != null) {
@@ -356,18 +491,6 @@ evolve = func(fitness, config) {
             seeded = this.cloneNode(cfg.seedPrograms[i]);
             score = this.scoreProgram(seeded, fitness, cfg, 0);
             population.add({program: seeded, score: score});
-        }
-        if (defined(cfg.seedCombinationOperators) && cfg.seedCombinationOperators != null) {
-            for (opIndex = 0; opIndex < cfg.seedCombinationOperators.count() && population.count() < cfg.populationSize; opIndex = opIndex + 1) {
-                op = cfg.seedCombinationOperators[opIndex];
-                for (leftIndex = 0; leftIndex < cfg.seedPrograms.count() && population.count() < cfg.populationSize; leftIndex = leftIndex + 1) {
-                    for (rightIndex = leftIndex + 1; rightIndex < cfg.seedPrograms.count() && population.count() < cfg.populationSize; rightIndex = rightIndex + 1) {
-                        combined = {kind: "op", op: op, args: [this.cloneNode(cfg.seedPrograms[leftIndex]), this.cloneNode(cfg.seedPrograms[rightIndex])]};
-                        score = this.scoreProgram(combined, fitness, cfg, 0);
-                        population.add({program: combined, score: score});
-                    }
-                }
-            }
         }
     }
     while (population.count() < cfg.populationSize) {
